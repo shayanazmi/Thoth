@@ -16,33 +16,46 @@ Traditional Large Language Model (LLM) generation often suffers from hallucinati
 
 ---
 
-## 🏗️ Multi-Agent Architecture
+## 🏗️ Multi-Agent Architecture & Data Pipeline
 
-Thoth implements a deterministic, stateful looping graph using **LangGraph**:
+Thoth implements a deterministic, stateful looping graph using **LangGraph**, integrating real-time web retrieval, DOM scraping, and neural verification:
 
 ```mermaid
 graph TD
-    START([START]) --> Search[Search Node / Web Search Agent]
-    Search --> Scrape[Scrape Node / Reader Agent]
-    Scrape --> Writer[Writer Node / Synthesis Chain]
-    Writer --> Verifier[Verifier Node / SLM Truth Guard]
+    START([START: User Prompt]) --> Search[Search Agent]
+    
+    subgraph Data_Sources [Live Data Ingestion Layer]
+        Tavily[(Tavily AI Search API)]
+        WebDOM[(Live Web DOM / BeautifulSoup)]
+    end
+    
+    Tavily -->|Live Web Registries & Papers| Search
+    Search -->|Discovered Target URLs| Scrape[Reader Agent]
+    WebDOM -->|Raw HTML Extraction & Parsing| Scrape
+    
+    Scrape -->|Scraped Grounding Context| Writer[Writer Node / Synthesis Engine]
+    Writer -->|Draft Report| Verifier[Verifier Node / SLM Truth Guard]
+    
+    Tavily -.->|Live Fact Check Query| Verifier
     
     Verifier -->|Contradictions Flagged| Writer
     Verifier -->|Verification Passed| Critic[Critic Node / LLM-as-a-Judge]
     
     Critic -->|Score < Min Threshold & Retries Left| Writer
-    Critic -->|Score >= Threshold or Max Retries| FollowUp[Follow-Up Node / Explorer Agent]
+    Critic -->|Score >= Threshold or Max Retries| FollowUp[Follow-Up Explorer]
     
-    FollowUp --> END([END])
+    FollowUp --> END([END: Research Workspace Output])
     
     style START fill:#4F46E5,stroke:#312E81,stroke-width:2px,color:#fff
     style END fill:#10B981,stroke:#065F46,stroke-width:2px,color:#fff
     style Verifier fill:#7C3AED,stroke:#4C1D95,stroke-width:2px,color:#fff
+    style Tavily fill:#0E7490,stroke:#155E75,stroke-width:2px,color:#fff
+    style WebDOM fill:#0E7490,stroke:#155E75,stroke-width:2px,color:#fff
 ```
 
 ### Specialized Agents & Graph Nodes
-1. **Search Agent (`search`)**: Targets relevant academic publications, policy registries, and institutional datasets using Tavily Search with dynamic date grounding.
-2. **Reader Agent (`scrape`)**: Parses and extracts primary text content from discovered URLs using BeautifulSoup to ground downstream synthesis in factual source text.
+1. **Search Agent (`search`)**: Interacts with the **Tavily AI Search API** using dynamic date-grounded query expansion to discover high-signal academic papers, institutional releases, and policy documentation.
+2. **Reader Agent (`scrape`)**: Parses target URLs through an automated **BeautifulSoup DOM scraper**, stripping boilerplate/scripts to extract primary clean text for factual grounding.
 3. **Synthesis Engine (`writer`)**: Drafts and iteratively refines comprehensive reports containing:
    - **Introduction**: Contextual overview and societal/technical significance.
    - **Key Findings**: Evidence-backed analytical pillars.
@@ -50,7 +63,7 @@ graph TD
    - **Methodology**: Research retrieval parameters and analytical bounds.
    - **Conclusion**: Key takeaways and actionable insights.
    - **Sources**: Non-fabricated, traceable source references.
-4. **SLM Truth Guard (`verifier`)**: Employs **`meta/llama-3.1-8b-instruct`** on NVIDIA NIM with Pydantic structured output models to extract and test individual factual claims against source text in ~1–2 seconds. If conflations or contradictions are identified, the graph automatically loops back to the Writer node with explicit remediation instructions.
+4. **SLM Truth Guard (`verifier`)**: Employs **`meta/llama-3.1-8b-instruct`** on NVIDIA NIM with Pydantic structured output models to extract and test individual factual claims against source text (and live Tavily verification pings) in ~1–2 seconds. If conflations or contradictions are identified, the graph automatically loops back to the Writer node with explicit remediation instructions.
 5. **Critic LLM-as-a-Judge (`critic`)**: Evaluates drafts across 5 orthogonal dimensions (*Faithfulness, Relevance, Completeness, Evidence Quality, Clarity & Coherence*), enforcing quality thresholds (default: ≥ 6.5/10) before authorizing publication.
 6. **Follow-Up Explorer (`follow_up`)**: Generates targeted investigative threads to enable immediate pivot research.
 
