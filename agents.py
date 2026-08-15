@@ -13,46 +13,46 @@ warnings.filterwarnings("ignore", category=UserWarning, module="langchain_nvidia
 
 load_dotenv()
 
-#model setup
+# Fast Primary LLM for agents & chains
 llm = ChatNVIDIA(
   model="nvidia/nemotron-3.5-lightning-30b-a3b",
   api_key=os.getenv("NVIDIA_API_KEY"),
-  temperature=0.7,
-  max_completion_tokens=4000,
-  timeout=120,  # Prevent ReadTimeout during long reasoning phases
+  temperature=0.6,
+  max_completion_tokens=3000,
+  timeout=60,
   model_kwargs={
       "chat_template_kwargs": {"enable_thinking": True},
-      "reasoning_budget": 2048
+      "reasoning_budget": 512  # Streamlined reasoning for fast generation
   }
 )
 
-# Verifier Model Setup (Llama 3.3 Nemotron Super for strict fact-checking)
+# Ultra-Fast 8B SLM for Truth Guard Fact-Verification
 verifier_llm = ChatNVIDIA(
-  model="nvidia/llama-3.3-nemotron-super-49b-v1.5",
+  model="meta/llama-3.1-8b-instruct",
   api_key=os.getenv("NVIDIA_API_KEY"),
-  temperature=0.1,  # Low temperature for strict factual consistency
-  max_completion_tokens=2048,
-  timeout=120,
+  temperature=0.1,  # Strict factual consistency
+  max_completion_tokens=1024,
+  timeout=60,
 )
 
-#1st agent 
+# 1st Agent: Web Search Expert
 def build_search_agent():
     import datetime
     current_date = datetime.datetime.now().strftime("%B %d, %Y")
     return create_agent(
-        model = llm,
-        tools = [web_search],
-        system_prompt = (
+        model=llm,
+        tools=[web_search],
+        system_prompt=(
             f"You are a search expert. Today's date is {current_date}. "
             "When searching for recent information, structure your queries to target the current year or relevant range."
         )
     )
 
-#2nd Agent 
+# 2nd Agent: Reader Scraping Agent
 def build_render_agent():
     return create_agent(
-        model = llm,
-        tools = [scrape_url]
+        model=llm,
+        tools=[scrape_url]
     )
 
 # Pydantic models for structured verification response
@@ -67,7 +67,7 @@ class VerificationResult(BaseModel):
 class FactVerificationReport(BaseModel):
     results: List[VerificationResult] = Field(description="List of verification results for all key claims in the report")
 
-# 3rd Agent: Fact-Verifier Agent
+# 3rd Agent: Fact-Verifier SLM Agent (The Truth Guard)
 def build_verifier_agent():
     import datetime
     current_date = datetime.datetime.now().strftime("%B %d, %Y")
@@ -83,7 +83,7 @@ def build_verifier_agent():
         )
     )
 
-#writer chain
+# Writer Chain
 writer_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a {role}. Write in a {tone} tone and respond in {language}. Today's date is {current_date}.
  
@@ -104,21 +104,9 @@ Research Data:
 Write the research report.""")
 ])
  
-from langchain_core.output_parsers import StrOutputParser
 writer_chain = writer_prompt | llm | StrOutputParser()
 
-
-# remind me when making the ui add and section that if the user wants to change this they can do it too
-# report = writer_chain.invoke({
-#     "role": "senior academic researcher",
-#     "tone": "formal and analytical",
-#     "language": "English",
-#     "topic": "AI in healthcare diagnostics",
-#     "research": "<raw search results here>"
-# })
-
-
-#critic_chain
+# Critic Chain (LLM-as-a-Judge)
 critic_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a rigorous research quality evaluator (LLM-as-a-Judge).
 
@@ -161,7 +149,6 @@ Evaluate the report now.""")
 
 critic_chain = critic_prompt | llm | StrOutputParser()
 
-
 # Follow-up Questions Agent
 follow_up_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are an inquisitive research editor. Given a research report on a topic, generate 3 clear, specific, and highly relevant follow-up questions that a user might want to ask next to explore the topic deeper.
@@ -175,7 +162,3 @@ Report:
 ])
 
 follow_up_chain = follow_up_prompt | llm | StrOutputParser()
-
-
-# remind me after i complete the video demo where i am learining too add more tools and agents also one thing to do add is creating doc file in ieee or other formats or any format that user wants
-# reminder: when building output formatting, add a tool that generates diagrams (Mermaid/Matplotlib) based on the report to embed in the output document.

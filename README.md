@@ -1,111 +1,151 @@
-# Thoth: AI Research Agent 
+# Thoth: AI Research Copilot ✦
 
-An automated multi-agent research pipeline built using **LangGraph**, **LangChain**, **NVIDIA AI Foundation Endpoints**, and **Tavily Search**. The pipeline queries the web, scrapes top resources, drafts a report, fact-checks and verifies all claims against sources, evaluates the draft using an LLM-as-a-Judge, and generates follow-up questions for deeper exploration.
+An autonomous, multi-agent academic research and synthesis workspace inspired by **SciSpace**, powered by **LangGraph**, **LangChain**, **NVIDIA AI Endpoints**, and **Streamlit**.
+
+Thoth transforms natural language queries into comprehensive, verifiable research syntheses by querying live web registries, scraping academic sources, fact-checking claims with a dedicated 8B SLM **Truth Guard**, critiquing drafts with an **LLM-as-a-Judge**, and structuring findings into an interactive **Literature Review Matrix**.
 
 ---
 
-## 🏗️ Architecture & Agent Flow
+## 📸 Interface Preview
 
-The project implements a sequential and looping stateful graph using LangGraph:
+### 1. Research Launchpad & Horizontal Agent Stepper
+![Thoth Workspace Initial Launchpad](assets/thoth_workspace_landing.jpg)
+
+### 2. Split-Screen Copilot & Verified Synthesis Report
+![Thoth Research Synthesis & Copilot](assets/thoth_workspace_synthesis.jpg)
+
+---
+
+## 🏗️ Multi-Agent Architecture
+
+Thoth implements a stateful looping graph using **LangGraph**:
 
 ```mermaid
 graph TD
-    START([START]) --> Search[Search Node / Search Agent]
+    START([START]) --> Search[Search Node / Web Search Agent]
     Search --> Scrape[Scrape Node / Reader Agent]
-    Scrape --> Writer[Writer Node / Writer Chain]
-    Writer --> Verifier[Verifier Node / Fact-Verifier Agent]
+    Scrape --> Writer[Writer Node / Synthesis Chain]
+    Writer --> Verifier[Verifier Node / SLM Truth Guard]
     
-    Verifier -->|Contradictions Found| Writer
+    Verifier -->|Contradictions Flagged| Writer
     Verifier -->|Verification Passed| Critic[Critic Node / LLM-as-a-Judge]
     
-    Critic -->|Score < Threshold & Retries Left| Writer
-    Critic -->|Score >= Threshold or Max Retries| FollowUp[Follow-up Node / Follow-up Agent]
+    Critic -->|Score < Min Threshold & Retries Left| Writer
+    Critic -->|Score >= Threshold or Max Retries| FollowUp[Follow-Up Node / Explorer Agent]
     
     FollowUp --> END([END])
     
     style START fill:#4F46E5,stroke:#312E81,stroke-width:2px,color:#fff
     style END fill:#10B981,stroke:#065F46,stroke-width:2px,color:#fff
+    style Verifier fill:#7C3AED,stroke:#4C1D95,stroke-width:2px,color:#fff
 ```
 
-### Specialized Agents & Chains
-1. **Search Agent (Search Node)**: Uses Tavily Search to find recent, reliable, and detailed information about a specified topic.
-2. **Reader Agent (Scrape Node)**: Scrapes clean text content from the top search results for deeper, contextual reading.
-3. **Writer Chain (Writer Node)**: Drafts and refines the report sections (Introduction, Key Findings, Knowledge Gaps, Methodology, Conclusion, Sources).
-4. **Fact-Verifier Agent (Verifier Node / Truth Guard)**: A Llama 3.3 Nemotron Super model that verifies claims against scraped content and live search results, returning structured validation results.
-5. **Critic Chain (Critic Node / LLM-as-a-Judge)**: Scores the report out of 10 across 5 dimensions: Faithfulness, Relevance, Completeness, Evidence Quality, and Clarity & Coherence.
-6. **Follow-up Agent (Follow-up Node)**: Generates 3 highly specific, relevant follow-up questions for the user to explore the topic further.
+### Specialized Agents & Nodes
+1. **Search Agent (`search`)**: Targets relevant academic publications, policy documents, and data registries using Tavily.
+2. **Reader Agent (`scrape`)**: Scrapes and extracts full text content from top URLs for grounded context.
+3. **Writer Chain (`writer`)**: Drafts and iteratively refines structured research reports (Introduction, Key Findings, Knowledge Gaps, Methodology, Conclusion, Citations).
+4. **Truth Guard Fact-Verifier (`verifier`)**: Uses **`meta/llama-3.1-8b-instruct`** on NVIDIA NIM with structured Pydantic schemas to verify claims against scraped source text in ~1–2s.
+5. **Critic LLM-as-a-Judge (`critic`)**: Evaluates drafts across 5 dimensions (*Faithfulness, Relevance, Completeness, Evidence Quality, Clarity & Coherence*), enforcing quality thresholds.
+6. **Follow-Up Explorer (`follow_up`)**: Generates targeted research questions to pivot into subsequent investigations.
+
+---
+
+## 🎨 Workspace Features (SciSpace-Inspired)
+
+- **40 / 60 Split-Screen Layout**:
+  - **Left Column (40%)**: Conversational Research Copilot with user message bubbles, agent responses, follow-up prompt chips, and a persistent query bar.
+  - **Right Column (60%)**: Dedicated multi-tab Research Studio.
+- **Horizontal Agent Planner Rail**: Pinned progress stepper showing live sub-tasks (`Search → Reader → Writer → Verifier → Critic → Follow-Up`) with animated pulses and per-node duration metrics.
+- **Editorial Serif Prose (`Newsreader`)**: Synthesis reports rendered in editorial serif typography for superior academic readability.
+- **Literature Review Matrix**: Multi-column comparative data table mapping *Source/Title*, *Key Contributions*, *Methodology*, and centered *Verification Status* badges.
+- **Truth Guard Audit**: Live trace of claim validations and 5-dimension quality critique tables.
+- **Research Scratchpad & Export**: Live note-taking drawer with one-click `.md` and `.txt` export capabilities.
 
 ---
 
 ## 📁 Repository Structure
 
 ```text
-├── agents.py                 # Core agent & LLM instantiation (NVIDIA NIM)
-├── pipeline.py               # LangGraph state definitions, nodes, and graph compilation
-├── tools.py                  # Custom LangChain tools (Tavily search & BeautifulSoup scraper)
-├── diagnostic_test.py        # Stream execution & environment diagnostic test utility
+├── app.py                    # Streamlit split-screen research workspace
+├── theme.py                  # Aurora Dark design tokens, Newsreader typography, & Stepper CSS
+├── ui_adapter.py             # Thread-safe pipeline execution runner & state container
+├── pipeline.py               # LangGraph state definitions, nodes, conditional routing logic
+├── agents.py                 # Core agent chains & NVIDIA NIM SLM configurations
+├── tools.py                  # Tavily search & BeautifulSoup reader tools
+├── assets/                   # UI screenshots & visual assets
+├── diagnostic_test.py        # Streaming execution & environment diagnostic utility
 ├── requirements.txt          # Python project dependencies
-├── .env.example              # Template for project environment variables
-└── .gitignore                # Git ignore patterns (Python, IDE, system files)
+├── .env.example              # Template for API keys
+└── .gitignore                # Git ignore configuration
 ```
 
 ---
 
-## 🚀 Setup & Installation
+## 🚀 Getting Started
 
-### 1. Clone & Initialize
-Clone the repository to your local machine:
+### 1. Set Up Virtual Environment
+
 ```bash
+# Clone the repository
 git clone <your-repository-url>
-cd <repository-folder-name>
-```
+cd thoth
 
-### 2. Set Up a Virtual Environment
-It is highly recommended to run this project in a virtual environment:
-```bash
 # Create virtual environment
 python3 -m venv venv
 
-# Activate on macOS/Linux
+# Activate virtual environment
+# On macOS / Linux:
 source venv/bin/activate
-
-# Activate on Windows (Command Prompt)
-# venv\Scripts\activate.bat
+# On Windows:
+# venv\Scripts\activate
 ```
 
-### 3. Install Dependencies
+### 2. Install Dependencies
+
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
-Copy the `.env.example` template to create your `.env` file:
+### 3. Configure Environment Variables
+
+Create a `.env` file from the `.env.example` template:
+
 ```bash
 cp .env.example .env
 ```
-Open `.env` and fill in your API keys:
+
+Add your API keys to `.env`:
 - **`NVIDIA_API_KEY`**: Obtain from the [NVIDIA API Catalog](https://build.nvidia.com).
 - **`TAVILY_API_KEY`**: Obtain from [Tavily](https://tavily.com).
 
 ---
 
-## ⚙️ Running the Project
+## 💻 Execution Commands
 
-### Run the Diagnostic Test
-Before running the full pipeline, verify your API keys and LangGraph streaming execution by running:
+### A. Launch the Streamlit Research Workspace (Recommended)
+
 ```bash
-python diagnostic_test.py
+streamlit run app.py
 ```
-This utility will:
-- Check for required environment variables.
-- Instantiate the NVIDIA NIM LLM.
-- Run a live diagnostic research stream step-by-step with real-time model thinking / reasoning output.
+*(Or `./venv/bin/streamlit run app.py`)*
 
-### Run the Main Pipeline
-Execute the full state graph and print the final report and evaluation:
+Open **`http://localhost:8501`** in your browser.
+
+---
+
+### B. Run CLI Headless Mode
+
 ```bash
 python pipeline.py
 ```
 
+---
 
+### C. Run Diagnostics
+
+Verify API keys, model connectivity, and token streaming:
+
+```bash
+python diagnostic_test.py
+```

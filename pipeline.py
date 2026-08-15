@@ -57,7 +57,6 @@ def search_node(state: ResearchState) -> dict:
     results = search_result["messages"][-1].content
     print("\nSearch Results:\n", results)
     
-    time.sleep(2)
     return {"search_results": results}
 
 def scrape_node(state: ResearchState) -> dict:
@@ -85,10 +84,8 @@ def scrape_node(state: ResearchState) -> dict:
             scraped_content += reader_result["messages"][-1].content
         except Exception as e:
             scraped_content += f"\n\n--- Source: {url} ---\n(Failed to scrape: {e})"
-        time.sleep(1)
         
     print("\nScraped Content length:", len(scraped_content))
-    time.sleep(2)
     return {"scraped_content": scraped_content}
 
 def writer_node(state: ResearchState) -> dict:
@@ -127,7 +124,6 @@ def writer_node(state: ResearchState) -> dict:
     })
     
     print("\nDrafted Report:\n", report[:1000] + "\n...[TRUNCATED]")
-    time.sleep(2)
     # Clear feedback items since they've been incorporated
     return {
         "report": report,
@@ -168,7 +164,6 @@ def verifier_node(state: ResearchState) -> dict:
     else:
         print("\nAll claims successfully verified by the Truth Guard.")
         
-    time.sleep(2)
     return {"verifier_feedback": verifier_feedback}
 
 def critic_node(state: ResearchState) -> dict:
@@ -185,7 +180,6 @@ def critic_node(state: ResearchState) -> dict:
     print("\nCritic Feedback:\n", feedback)
     print(f"\nOverall Score: {score}/10")
     
-    time.sleep(2)
     return {"feedback": feedback, "score": score}
 
 def follow_up_node(state: ResearchState) -> dict:
@@ -218,7 +212,6 @@ def follow_up_node(state: ResearchState) -> dict:
     for i, q in enumerate(questions, 1):
         print(f"  {i}. {q}")
         
-    time.sleep(2)
     return {"follow_up_questions": questions}
 
 # 3. Routing Edges
@@ -244,7 +237,7 @@ def route_after_critic(state: ResearchState):
     return "writer"
 
 # 4. Pipeline Orchestration
-def run_research_pipeline(
+def build_research_graph(
     topic: str,
     role: str = "senior academic researcher",
     tone: str = "formal and analytical",
@@ -252,8 +245,7 @@ def run_research_pipeline(
     scrape_top_n: int = 2,
     min_score: float = 6.5,
     max_retries: int = 2,
-) -> dict:
-    
+):
     # Build Graph
     builder = StateGraph(ResearchState)
     
@@ -312,11 +304,65 @@ def run_research_pipeline(
         "follow_up_questions": []
     }
     
-    # Execute Graph
-    final_state = graph.invoke(initial_state)
+    return graph, initial_state
+
+def stream_research_pipeline(
+    topic: str,
+    role: str = "senior academic researcher",
+    tone: str = "formal and analytical",
+    language: str = "English",
+    scrape_top_n: int = 2,
+    min_score: float = 6.5,
+    max_retries: int = 2,
+    cancel_event=None
+):
+    """Streams node updates from the compiled LangGraph pipeline."""
+    graph, initial_state = build_research_graph(
+        topic=topic,
+        role=role,
+        tone=tone,
+        language=language,
+        scrape_top_n=scrape_top_n,
+        min_score=min_score,
+        max_retries=max_retries
+    )
+    
+    current_state = dict(initial_state)
+    for chunk in graph.stream(initial_state, stream_mode="updates"):
+        if cancel_event and cancel_event.is_set():
+            print("[PIPELINE CANCELLED] Cancellation event detected. Stopping execution.")
+            break
+            
+        for node_name, update in chunk.items():
+            current_state.update(update)
+            yield node_name, update, current_state
+
+def run_research_pipeline(
+    topic: str,
+    role: str = "senior academic researcher",
+    tone: str = "formal and analytical",
+    language: str = "English",
+    scrape_top_n: int = 2,
+    min_score: float = 6.5,
+    max_retries: int = 2,
+    cancel_event=None
+) -> dict:
+    """Executes the pipeline synchronously and returns final state."""
+    final_state = {}
+    for node_name, update, current_state in stream_research_pipeline(
+        topic=topic,
+        role=role,
+        tone=tone,
+        language=language,
+        scrape_top_n=scrape_top_n,
+        min_score=min_score,
+        max_retries=max_retries,
+        cancel_event=cancel_event
+    ):
+        final_state = current_state
     return final_state
 
 if __name__ == "__main__":
     topic = "humans of bihar and ai"
-    print(f"\nRunning pipeline for topic: '{topic}'")
+    print(f"Running pipeline for topic: '{topic}'")
     run_research_pipeline(topic)
