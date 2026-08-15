@@ -12,7 +12,7 @@ from theme import (
 from ui_adapter import ResearchPipelineRunner, NODE_LABEL_MAP, NODE_ORDER
 
 st.set_page_config(
-    page_title="Thoth: AI Research Agent",
+    page_title="Thoth: Agentic Research ✦",
     page_icon="✦",
     layout="wide",
     initial_sidebar_state="collapsed"

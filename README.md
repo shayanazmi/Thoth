@@ -1,8 +1,8 @@
-# Thoth: AI Research Copilot ✦
+# Thoth: Agentic Research ✦
 
-An autonomous, multi-agent academic research and synthesis workspace inspired by **SciSpace**, powered by **LangGraph**, **LangChain**, **NVIDIA AI Endpoints**, and **Streamlit**.
+**Thoth** is an autonomous, multi-agent academic research and synthesis engine designed to systematically discover, extract, cross-verify, and synthesize complex scientific, technical, and policy literature into structured, evidence-backed research reports.
 
-Thoth transforms natural language queries into comprehensive, verifiable research syntheses by querying live web registries, scraping academic sources, fact-checking claims with a dedicated 8B SLM **Truth Guard**, critiquing drafts with an **LLM-as-a-Judge**, and structuring findings into an interactive **Literature Review Matrix**.
+Traditional Large Language Model (LLM) generation often suffers from hallucinations, source conflations, and temporal knowledge cutoffs. Thoth mitigates these challenges by decoupling the research process into a **cyclic, self-correcting state graph** powered by **LangGraph**. The system orchestrates high-signal live web discovery, real-time DOM document parsing, schema-enforced Small Language Model (SLM) fact-verification (**Truth Guard**), and multi-dimensional **LLM-as-a-Judge** quality gating before presenting synthesized findings in an interactive research studio.
 
 ---
 
@@ -18,7 +18,7 @@ Thoth transforms natural language queries into comprehensive, verifiable researc
 
 ## 🏗️ Multi-Agent Architecture
 
-Thoth implements a stateful looping graph using **LangGraph**:
+Thoth implements a deterministic, stateful looping graph using **LangGraph**:
 
 ```mermaid
 graph TD
@@ -40,26 +40,45 @@ graph TD
     style Verifier fill:#7C3AED,stroke:#4C1D95,stroke-width:2px,color:#fff
 ```
 
-### Specialized Agents & Nodes
-1. **Search Agent (`search`)**: Targets relevant academic publications, policy documents, and data registries using Tavily.
-2. **Reader Agent (`scrape`)**: Scrapes and extracts full text content from top URLs for grounded context.
-3. **Writer Chain (`writer`)**: Drafts and iteratively refines structured research reports (Introduction, Key Findings, Knowledge Gaps, Methodology, Conclusion, Citations).
-4. **Truth Guard Fact-Verifier (`verifier`)**: Uses **`meta/llama-3.1-8b-instruct`** on NVIDIA NIM with structured Pydantic schemas to verify claims against scraped source text in ~1–2s.
-5. **Critic LLM-as-a-Judge (`critic`)**: Evaluates drafts across 5 dimensions (*Faithfulness, Relevance, Completeness, Evidence Quality, Clarity & Coherence*), enforcing quality thresholds.
-6. **Follow-Up Explorer (`follow_up`)**: Generates targeted research questions to pivot into subsequent investigations.
+### Specialized Agents & Graph Nodes
+1. **Search Agent (`search`)**: Targets relevant academic publications, policy registries, and institutional datasets using Tavily Search with dynamic date grounding.
+2. **Reader Agent (`scrape`)**: Parses and extracts primary text content from discovered URLs using BeautifulSoup to ground downstream synthesis in factual source text.
+3. **Synthesis Engine (`writer`)**: Drafts and iteratively refines comprehensive reports containing:
+   - **Introduction**: Contextual overview and societal/technical significance.
+   - **Key Findings**: Evidence-backed analytical pillars.
+   - **Knowledge Gaps**: Open literature questions with actionable follow-up query strings.
+   - **Methodology**: Research retrieval parameters and analytical bounds.
+   - **Conclusion**: Key takeaways and actionable insights.
+   - **Sources**: Non-fabricated, traceable source references.
+4. **SLM Truth Guard (`verifier`)**: Employs **`meta/llama-3.1-8b-instruct`** on NVIDIA NIM with Pydantic structured output models to extract and test individual factual claims against source text in ~1–2 seconds. If conflations or contradictions are identified, the graph automatically loops back to the Writer node with explicit remediation instructions.
+5. **Critic LLM-as-a-Judge (`critic`)**: Evaluates drafts across 5 orthogonal dimensions (*Faithfulness, Relevance, Completeness, Evidence Quality, Clarity & Coherence*), enforcing quality thresholds (default: ≥ 6.5/10) before authorizing publication.
+6. **Follow-Up Explorer (`follow_up`)**: Generates targeted investigative threads to enable immediate pivot research.
 
 ---
 
-## 🎨 Workspace Features (SciSpace-Inspired)
+## 🧠 100% Open-Weights & Open-Source AI Stack
 
-- **40 / 60 Split-Screen Layout**:
-  - **Left Column (40%)**: Conversational Research Copilot with user message bubbles, agent responses, follow-up prompt chips, and a persistent query bar.
-  - **Right Column (60%)**: Dedicated multi-tab Research Studio.
-- **Horizontal Agent Planner Rail**: Pinned progress stepper showing live sub-tasks (`Search → Reader → Writer → Verifier → Critic → Follow-Up`) with animated pulses and per-node duration metrics.
-- **Editorial Serif Prose (`Newsreader`)**: Synthesis reports rendered in editorial serif typography for superior academic readability.
-- **Literature Review Matrix**: Multi-column comparative data table mapping *Source/Title*, *Key Contributions*, *Methodology*, and centered *Verification Status* badges.
-- **Truth Guard Audit**: Live trace of claim validations and 5-dimension quality critique tables.
-- **Research Scratchpad & Export**: Live note-taking drawer with one-click `.md` and `.txt` export capabilities.
+Thoth is powered entirely by state-of-the-art open-weights models and open-source agent frameworks, guaranteeing transparency, data privacy control, and scientific reproducibility without lock-in to proprietary closed-source APIs:
+
+| Component | Model / Technology | Architecture / Provider | License | Purpose |
+|---|---|---|---|---|
+| **Primary Synthesis LLM** | `nvidia/nemotron-3.5-lightning-30b-a3b` | NVIDIA Nemotron 30B MoE | Open Weights | Multi-source reasoning, long-form academic synthesis, and LLM-as-a-Judge quality critique. |
+| **SLM Fact-Verifier (Truth Guard)** | `meta/llama-3.1-8b-instruct` | Meta Llama 3.1 8B | Llama 3.1 Community | Ultra-fast (~1–2s) structured Pydantic claim verification and contradiction detection. |
+| **Agent State Machine** | `LangGraph` + `LangChain` | LangChain Framework | MIT License | Stateful cyclic graphs with conditional routing loops and runtime retry management. |
+| **Document & Web Parsing** | `BeautifulSoup` + `Tavily` | Open Python Libraries | MIT / Apache 2.0 | Real-time DOM extraction, semantic filtering, and primary registry retrieval. |
+
+---
+
+## 🎨 Research Workspace Features
+
+- **40 / 60 Split-Screen Workspace**:
+  - **Left Column (40%)**: Conversational Research Copilot with chat history, follow-up prompt chips, and a persistent query input.
+  - **Right Column (60%)**: Multi-tabbed research studio with sticky tab navigation.
+- **Horizontal Agent Planner Rail**: Pinned progress stepper displaying real-time agent execution status (`Search → Reader → Writer → Verifier → Critic → Follow-Up`) with animated pulses and per-node duration tags.
+- **Editorial Serif Prose (`Newsreader`)**: Long-form synthesis reports formatted in high-legibility serif typography with generous line-height (`1.78`).
+- **Literature Review Matrix**: Interactive multi-column comparative data table mapping *Source/Title*, *Key Contributions*, *Methodology*, and centered *Verification Status* badges.
+- **Truth Guard Audit Tab**: Full trace of claim validations, contradiction analyses, and the LLM-as-a-Judge critique scorecard.
+- **Research Scratchpad & Export**: Integrated note-taking drawer supporting one-click `.md` and `.txt` exports.
 
 ---
 

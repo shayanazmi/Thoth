@@ -512,8 +512,8 @@ def render_header():
         """
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
             <div>
-                <span style="font-weight: 700; font-size: 1.5rem; background: var(--aurora); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✦ Thoth</span>
-                <span style="color: var(--text-muted); font-size: 0.9rem; margin-left: 8px;">AI Research Workspace</span>
+                <span style="font-weight: 700; font-size: 1.5rem; background: var(--aurora); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✦ Thoth: Agentic Research ✦</span>
+                <span style="color: var(--text-muted); font-size: 0.9rem; margin-left: 8px;">Autonomous Multi-Agent Workspace</span>
             </div>
         </div>
         """,
