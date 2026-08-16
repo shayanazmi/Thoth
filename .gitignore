@@ -164,3 +164,9 @@ yarn-error.log*
 # User temporary study notes
 handling api limit like feynman/
 
+# Gemini / Antigravity IDE
+.gemini/
+.agents/
+
+# Streamlit
+.streamlit/

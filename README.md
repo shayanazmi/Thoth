@@ -174,10 +174,19 @@ python pipeline.py
 
 ---
 
-### C. Run Diagnostics
+### C. Run Deep 7-Layer Diagnostics (with GLM-5.2 AI Reviewer)
 
-Verify API keys, model connectivity, and token streaming:
+Verify credentials, tool scraping, SLM verification, graph pipeline, multi-turn QA, source tracking matrix, and run GLM-5.2 AI evaluation:
 
 ```bash
 python diagnostic_test.py
 ```
+
+---
+
+## 🛠️ Advanced Features & Architecture
+
+1. **Interactive Concept Mind Map (`vis.js`)**: Dynamic force-directed graph visualizing relationships between Topics, Sub-Themes, Findings, Sources, and Follow-Up Probes.
+2. **Multi-Turn Follow-Up Explorer**: Support for `Context QA`, `Live Web Probe`, and `Living Report Expansion` with 1-click merging into the master synthesis report.
+3. **Proactive Rolling Summarizer**: Keeps conversational context compact (< 3,500 tokens) for infinite multi-turn inquiry.
+4. **GLM-5.2 AI Reviewer Suite**: Integrated 7-layer diagnostic suite evaluated live by `z-ai/glm-5.2` for architectural rigor.

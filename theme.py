@@ -495,6 +495,42 @@ div[data-testid="stExpander"] summary * {
     overflow-y: auto;
     white-space: pre-wrap;
 }
+
+/* Follow-up Route Badges */
+.route-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    margin-bottom: 6px;
+}
+.route-badge.local-qa {
+    background: rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(124, 58, 237, 0.35);
+    color: #C4B5FD;
+}
+.route-badge.web-search {
+    background: rgba(6, 182, 212, 0.15);
+    border: 1px solid rgba(6, 182, 212, 0.35);
+    color: #67E8F9;
+}
+.route-badge.report-expansion {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #6EE7B7;
+}
+
+/* Mind Map Container */
+.mindmap-frame {
+    background: #090A0E;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-top: var(--space-2);
+}
 </style>
 """
 
@@ -530,6 +566,7 @@ def render_planner_stepper(active_idx: int, statuses: list, durations: dict = No
         ("Writer", "Drafting synthesis"),
         ("Verifier", "Fact verification"),
         ("Critic", "Quality evaluation"),
+        ("Mind Map", "Concept graph"),
         ("Follow-Up", "Deep dive ready")
     ]
     durations = durations or {}
@@ -550,6 +587,176 @@ def render_planner_stepper(active_idx: int, statuses: list, durations: dict = No
             
     stepper_html = f'<div class="planner-stepper">{"".join(items_html)}</div>'
     st.markdown(stepper_html, unsafe_allow_html=True)
+
+def render_interactive_mindmap(mindmap_data: dict, height: int = 500):
+    """
+    Renders a dynamic, dark-themed interactive force-directed graph (Concept Mind Map)
+    using vis.js within an isolated HTML component.
+    """
+    if not mindmap_data or not mindmap_data.get("nodes"):
+        st.info("✦ Concept Mind Map will appear here once initial research synthesis is completed.")
+        return
+
+    # Palette configurations for node types
+    COLOR_MAP = {
+        "topic": {"bg": "#7C3AED", "border": "#A78BFA", "highlight": "#C4B5FD"},
+        "subtopic": {"bg": "#0284C7", "border": "#38BDF8", "highlight": "#7DD3FC"},
+        "finding": {"bg": "#059669", "border": "#34D399", "highlight": "#6EE7B7"},
+        "source": {"bg": "#D97706", "border": "#FBBF24", "highlight": "#FDE68A"},
+        "followup": {"bg": "#DB2777", "border": "#F472B6", "highlight": "#FBCFE8"}
+    }
+
+    vis_nodes = []
+    for n in mindmap_data.get("nodes", []):
+        ntype = n.get("type", "finding")
+        colors = COLOR_MAP.get(ntype, COLOR_MAP["finding"])
+        label = n.get("label", "Concept")
+        details = n.get("details", "")
+        url = n.get("url", "")
+        
+        # Tooltip HTML
+        title_tooltip = f"<b>{label}</b><br><span style='font-size:11px;color:#CBD5E1;'>{details}</span>"
+        if url:
+            title_tooltip += f"<br><a href='{url}' target='_blank' style='color:#38BDF8;font-size:10px;'>{url}</a>"
+            
+        vis_nodes.append({
+            "id": n.get("id"),
+            "label": label if len(label) < 28 else label[:25] + "...",
+            "title": title_tooltip,
+            "shape": "box" if ntype in ["topic", "subtopic"] else "dot",
+            "size": 25 if ntype == "topic" else (18 if ntype == "subtopic" else 12),
+            "color": {
+                "background": colors["bg"],
+                "border": colors["border"],
+                "highlight": {"background": colors["highlight"], "border": "#FFFFFF"}
+            },
+            "font": {
+                "color": "#FFFFFF",
+                "face": "Inter, sans-serif",
+                "size": 13 if ntype == "topic" else (11 if ntype == "subtopic" else 10)
+            },
+            "margin": 8,
+            "borderWidth": 1.5,
+            "shadow": {"enabled": True, "color": "rgba(0,0,0,0.5)", "size": 6}
+        })
+
+    vis_edges = []
+    for e in mindmap_data.get("edges", []):
+        vis_edges.append({
+            "from": e.get("from") or e.get("source"),
+            "to": e.get("to") or e.get("target"),
+            "label": e.get("label", ""),
+            "color": {"color": "rgba(255,255,255,0.18)", "highlight": "#A78BFA"},
+            "font": {"color": "#94A3B8", "size": 9, "align": "middle"},
+            "arrows": "to",
+            "smooth": {"type": "cubicBezier", "roundness": 0.4}
+        })
+
+    nodes_json = json.dumps(vis_nodes)
+    edges_json = json.dumps(vis_edges)
+
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+        <style>
+            html, body {{
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                background: #090A0E;
+                overflow: hidden;
+                font-family: 'Inter', sans-serif;
+            }}
+            #mindmap-container {{
+                width: 100%;
+                height: {height}px;
+                background: radial-gradient(circle at center, #13151F 0%, #090A0E 100%);
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 10px;
+            }}
+            .legend {{
+                position: absolute;
+                bottom: 12px;
+                left: 12px;
+                background: rgba(12, 13, 18, 0.85);
+                backdrop-filter: blur(8px);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 8px;
+                padding: 6px 12px;
+                display: flex;
+                gap: 12px;
+                font-size: 11px;
+                color: #94A3B8;
+                pointer-events: none;
+                z-index: 10;
+            }}
+            .legend-item {{
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }}
+            .legend-dot {{
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="mindmap-container"></div>
+        <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#7C3AED;"></div> Topic</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#0284C7;"></div> Sub-Theme</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#059669;"></div> Finding</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#D97706;"></div> Source</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#DB2777;"></div> Follow-Up</div>
+        </div>
+
+        <script type="text/javascript">
+            const nodes = new vis.DataSet({nodes_json});
+            const edges = new vis.DataSet({edges_json});
+
+            const container = document.getElementById('mindmap-container');
+            const data = {{ nodes: nodes, edges: edges }};
+            const options = {{
+                nodes: {{
+                    borderWidthSelected: 2
+                }},
+                edges: {{
+                    width: 1.2
+                }},
+                physics: {{
+                    solver: 'forceAtlas2Based',
+                    forceAtlas2Based: {{
+                        gravitationalConstant: -38,
+                        centralGravity: 0.008,
+                        springLength: 80,
+                        springConstant: 0.12,
+                        damping: 0.88
+                    }},
+                    stabilization: {{ iterations: 120 }}
+                }},
+                interaction: {{
+                    hover: true,
+                    tooltipDelay: 100,
+                    zoomView: true,
+                    dragView: true
+                }}
+            }};
+
+            const network = new vis.Network(container, data, options);
+        </script>
+    </body>
+    </html>
+    """
+    if hasattr(st, "html"):
+        st.html(html_code)
+    else:
+        components.html(html_code, height=height + 10)
 
 def render_copy_widget(text_to_copy: str, button_label: str = "Copy Markdown"):
     """Renders a fast HTML/JS copy-to-clipboard widget."""
@@ -600,3 +807,4 @@ def render_copy_widget(text_to_copy: str, button_label: str = "Copy Markdown"):
 
 # Backwards compatibility alias
 render_pipeline = render_planner_stepper
+

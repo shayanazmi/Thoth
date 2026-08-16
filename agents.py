@@ -1,38 +1,41 @@
 from langchain.agents import create_agent
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from tools import web_search, scrape_url
 from dotenv import load_dotenv
 import os
+import json
+import re
 import warnings
-from langchain_nvidia_ai_endpoints import ChatNVIDIA, register_model, Model
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
 
 # Suppress harmless model-type and tool-binding UserWarnings from NVIDIA endpoints library
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_nvidia_ai_endpoints")
 
 load_dotenv()
 
-# Fast Primary LLM for agents & chains
+# Fast Primary LLM for reasoning, drafting & mind map structuring
 llm = ChatNVIDIA(
-  model="nvidia/nemotron-3.5-lightning-30b-a3b",
-  api_key=os.getenv("NVIDIA_API_KEY"),
-  temperature=0.6,
-  max_completion_tokens=3000,
-  timeout=60,
-  model_kwargs={
-      "chat_template_kwargs": {"enable_thinking": True},
-      "reasoning_budget": 512  # Streamlined reasoning for fast generation
-  }
+    model="nvidia/nemotron-3.5-lightning-30b-a3b",
+    api_key=os.getenv("NVIDIA_API_KEY"),
+    temperature=0.6,
+    max_completion_tokens=8192,
+    timeout=120,
+    model_kwargs={
+        "chat_template_kwargs": {"enable_thinking": True},
+        "reasoning_budget": 512  # Streamlined reasoning for fast generation
+    }
 )
 
-# Ultra-Fast 8B SLM for Truth Guard Fact-Verification
+# Ultra-Fast 8B SLM for Truth Guard Fact-Verification & Local Q&A
 verifier_llm = ChatNVIDIA(
-  model="meta/llama-3.1-8b-instruct",
-  api_key=os.getenv("NVIDIA_API_KEY"),
-  temperature=0.1,  # Strict factual consistency
-  max_completion_tokens=1024,
-  timeout=60,
+    model="meta/llama-3.1-8b-instruct",
+    api_key=os.getenv("NVIDIA_API_KEY"),
+    temperature=0.1,  # Strict factual consistency
+    max_completion_tokens=1024,
+    timeout=60,
 )
 
 # 1st Agent: Web Search Expert
@@ -56,9 +59,6 @@ def build_render_agent():
     )
 
 # Pydantic models for structured verification response
-from pydantic import BaseModel, Field
-from typing import List
-
 class VerificationResult(BaseModel):
     claim: str = Field(description="The claim being verified from the report")
     is_valid: bool = Field(description="True if supported by sources/web search, False if contradicted or unsupported")
@@ -149,16 +149,201 @@ Evaluate the report now.""")
 
 critic_chain = critic_prompt | llm | StrOutputParser()
 
-# Follow-up Questions Agent
+# Follow-up Questions Generator Chain
 follow_up_prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are an inquisitive research editor. Given a research report on a topic, generate 3 clear, specific, and highly relevant follow-up questions that a user might want to ask next to explore the topic deeper.
-    Format your response as a JSON array of strings. Do not include any formatting, markdown code blocks (like ```json), or conversational filler. Output ONLY the JSON array.
-    Example output format:
-    ["What is the exact timeline for the implementation of the AI CoE in Patna?", "How does the Kisan e-Mitra app assist farmers in Bihar?"]"""),
+    ("system", """You are an inquisitive research editor. Given a research report on a topic and any recent conversation turns, generate 3 clear, concise, and highly relevant follow-up questions that a user might want to click next to explore deeper.
+Format your response as a JSON array of 3 strings. Do NOT include markdown blocks (```json) or conversational commentary.
+Example output format:
+["What are the primary computational bottlenecks of this architecture?", "How does this compare with the latest 2026 benchmarks?", "What are the practical deployment steps?"]"""),
     ("human", """Topic: {topic}
     
 Report:
-{report}""")
+{report}
+
+Recent Context / Questions:
+{recent_context}""")
 ])
 
 follow_up_chain = follow_up_prompt | llm | StrOutputParser()
+
+# --- Mind Map Extractor Chain (Co-STORM Style Hierarchical Concept Graph) ---
+mindmap_extractor_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are an expert knowledge graph architect. Your job is to extract an intuitive, hierarchical concept graph (Mind Map) from a research report.
+
+The graph consists of:
+1. Root node: Type 'topic' (The main research theme).
+2. Sub-topic nodes: Type 'subtopic' (3-5 core themes/sections from the report).
+3. Finding nodes: Type 'finding' (1-2 key facts/evidence nuggets under each subtopic).
+4. Source nodes: Type 'source' (Domain/URL where findings were discovered).
+
+Output strictly valid JSON with this exact schema:
+{{
+  "nodes": [
+    {{"id": "node_0", "label": "Topic Name", "type": "topic", "details": "Brief summary", "group": "topic"}},
+    {{"id": "node_1", "label": "Sub-theme Title", "type": "subtopic", "details": "Explanation", "group": "subtopic"}},
+    {{"id": "node_2", "label": "Key Finding Title", "type": "finding", "details": "Detailed verified claim", "url": "https://...", "group": "finding"}},
+    {{"id": "node_3", "label": "Source: domain.com", "type": "source", "url": "https://...", "group": "source"}}
+  ],
+  "edges": [
+    {{"from": "node_0", "to": "node_1", "label": "explores"}},
+    {{"from": "node_1", "to": "node_2", "label": "evidence"}},
+    {{"from": "node_2", "to": "node_3", "label": "cited_in"}}
+  ]
+}}
+
+Ensure all node IDs are unique strings. Ensure all edges connect existing node IDs.
+Output ONLY the JSON object, with NO markdown code block or backticks."""),
+    ("human", """Topic: {topic}
+
+Report:
+{report}
+
+Extracted Sources:
+{sources}""")
+])
+
+mindmap_extractor_chain = mindmap_extractor_prompt | llm | StrOutputParser()
+
+# --- Follow-Up Intent Router Chain ---
+router_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are an autonomous Research Query Router.
+Analyze the user's follow-up request against the existing research mind map and report to choose the most efficient execution path.
+
+Choose ONE of the following 3 routes:
+1. "LOCAL_QA": The question can be answered completely and accurately from the existing report and Mind Map findings. (Fastest, 0 web search needed).
+2. "WEB_SEARCH": The question asks for new information, specific stats, latest updates, entities, or topics NOT covered in the current report/mindmap. (Triggers 1 focused web probe).
+3. "REPORT_EXPANSION": The user explicitly wants to add a new section, revise, or expand the master Synthesis Report itself.
+
+Respond with ONLY a JSON object formatted as follows:
+{{
+  "route": "LOCAL_QA" | "WEB_SEARCH" | "REPORT_EXPANSION",
+  "reasoning": "One concise sentence explaining the routing decision",
+  "search_query": "If WEB_SEARCH, the exact single targeted search query to execute; otherwise empty string"
+}}
+Output NO markdown code blocks, backticks, or extra commentary."""),
+    ("human", """Topic: {topic}
+
+Mind Map Summary:
+{mindmap_summary}
+
+Report Summary:
+{report_summary}
+
+User Follow-Up Query:
+{user_query}""")
+])
+
+router_chain = router_prompt | verifier_llm | StrOutputParser()
+
+# --- Mind Map Grounded Q&A Chain ---
+mindmap_qa_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are Thoth's conversational research assistant.
+Answer the user's follow-up question accurately using the provided Research Mind Map context, synthesis report, and prior conversation history.
+
+Rules:
+1. Provide a direct, well-structured, and clear answer.
+2. Ground your claims in the provided knowledge base. If citing a source or URL from the context, include a clickable markdown link: `[Source Name](URL)`.
+3. If the knowledge base does not contain sufficient details to answer fully, answer what is known and state the remaining knowledge gap.
+4. Keep the tone academic, insightful, and concise."""),
+    ("human", """Topic: {topic}
+
+Context / Mind Map Sub-Tree:
+{context}
+
+Conversation History / Summary:
+{history_summary}
+
+User Question:
+{user_query}""")
+])
+
+mindmap_qa_chain = mindmap_qa_prompt | llm | StrOutputParser()
+
+# --- Mind Map Updater Chain (For Merging Follow-up Mini-Researches) ---
+mindmap_updater_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are a Knowledge Graph Editor. Given an existing Mind Map JSON and new mini-research findings from a follow-up probe, update the Mind Map JSON.
+
+Rules:
+1. Keep all existing valid nodes and edges.
+2. Add a new 'followup' or 'finding' sub-branch connected to the relevant subtopic or root topic.
+3. If new URLs were discovered, add 'source' nodes and connect them with 'cited_in' edges.
+4. Maintain unique node IDs (e.g. use prefix 'fu_node_1', 'fu_node_2', etc.).
+5. Output ONLY the updated JSON object with "nodes" and "edges" keys. No markdown backticks or commentary."""),
+    ("human", """Existing Mind Map JSON:
+{existing_mindmap_json}
+
+Follow-Up Query:
+{followup_query}
+
+New Mini-Research Findings:
+{new_research}""")
+])
+
+mindmap_updater_chain = mindmap_updater_prompt | llm | StrOutputParser()
+
+# --- Rolling Conversation Summarizer Chain ---
+summarizer_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are a research conversation compressor. Condense the previous dialogue history into a dense, high-signal bulleted summary of key facts established, user queries asked, and insights discovered.
+Keep the summary under 200 words. Do not drop key domain entities, names, or source URLs."""),
+    ("human", """Existing Summary:
+{existing_summary}
+
+Recent Conversation Turns to Incorporate:
+{recent_turns}""")
+])
+
+conversation_summarizer_chain = summarizer_prompt | verifier_llm | StrOutputParser()
+
+# --- Report Section Expander Chain ---
+report_expander_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are an academic research editor.
+The user wants to expand or add a new section to the master Synthesis Report based on their follow-up request and new research data.
+
+Write the new or updated section in markdown format.
+Include clear heading (e.g. `### Section Title`), evidence-backed paragraphs, and source links.
+Do not repeat the entire report; generate the focused section to be appended or merged."""),
+    ("human", """Original Topic: {topic}
+
+Follow-Up Request:
+{user_query}
+
+Research Evidence:
+{research_data}
+
+Current Report Overview:
+{report_overview}
+
+Draft the section expansion now.""")
+])
+
+report_expander_chain = report_expander_prompt | llm | StrOutputParser()
+
+
+# Helper function to parse JSON safely
+def safe_extract_json(raw_text: str, default: Any = None) -> Any:
+    """Extracts JSON object or array from LLM response safely, removing markdown codeblocks."""
+    if not raw_text:
+        return default
+    text = raw_text.strip()
+    # Remove markdown code blocks
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\s*```$", "", text, flags=re.MULTILINE)
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except Exception:
+        # Try finding the first '{' and last '}' or '[' and ']'
+        try:
+            start_bracket = text.find('[')
+            end_bracket = text.rfind(']')
+            if start_bracket != -1 and end_bracket != -1 and end_bracket > start_bracket:
+                return json.loads(text[start_bracket:end_bracket+1])
+            
+            start_brace = text.find('{')
+            end_brace = text.rfind('}')
+            if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+                return json.loads(text[start_brace:end_brace+1])
+        except Exception:
+            pass
+    return default
+

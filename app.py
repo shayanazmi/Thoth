@@ -2,11 +2,13 @@ import streamlit as st
 import time
 import json
 import re
+import datetime
 from theme import (
     inject_theme,
     render_blobs,
     render_header,
     render_planner_stepper,
+    render_interactive_mindmap,
     render_copy_widget
 )
 from ui_adapter import ResearchPipelineRunner, NODE_LABEL_MAP, NODE_ORDER
@@ -22,8 +24,12 @@ st.set_page_config(
 inject_theme()
 render_blobs()
 
-# 2. Initialize Session State
-if "runner" not in st.session_state:
+# 2. Initialize Session State — auto-migrate stale runner objects
+if (
+    "runner" not in st.session_state
+    or getattr(st.session_state.runner, "_schema_version", 0)
+       != ResearchPipelineRunner.SCHEMA_VERSION
+):
     st.session_state.runner = ResearchPipelineRunner()
 
 runner: ResearchPipelineRunner = st.session_state.runner
@@ -32,7 +38,7 @@ if "active_node" not in st.session_state:
     st.session_state.active_node = ""
 
 if "node_statuses" not in st.session_state:
-    st.session_state.node_statuses = ["pending"] * 6
+    st.session_state.node_statuses = ["pending"] * 7
 
 if "node_durations" not in st.session_state:
     st.session_state.node_durations = {}
@@ -44,6 +50,7 @@ if "node_logs" not in st.session_state:
         "writer": "",
         "verifier": "",
         "critic": "",
+        "mindmap": "",
         "follow_up": ""
     }
 
@@ -56,18 +63,42 @@ if "topic_input" not in st.session_state:
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
+if "followup_mode" not in st.session_state:
+    st.session_state.followup_mode = "auto"
+
 if "scratchpad_text" not in st.session_state:
     st.session_state.scratchpad_text = ""
 
 # Sync background runner updates
-if runner.is_running() or runner.is_completed:
+if runner.is_running() or runner.is_completed or runner.followup_completed:
     st.session_state.active_node = runner.active_node
     st.session_state.node_statuses = list(runner.node_statuses)
     st.session_state.node_durations = dict(runner.node_durations)
     st.session_state.node_logs = dict(runner.node_logs)
-    st.session_state.final_state = dict(runner.final_state)
+    if runner.final_state:
+        st.session_state.final_state.update(runner.final_state)
 
-# 3. Sidebar Configuration (Minimal, clean controls)
+    # Thread-safely consume completed follow-up response in main Streamlit thread
+    f_payload = runner.consume_followup_payload()
+    if f_payload:
+        q_title = f_payload.get("user_query", "Follow-up")
+        st.session_state.chat_history.append({
+            "role": "agent",
+            "text": f_payload.get("answer", ""),
+            "route": f_payload.get("route", "LOCAL_QA"),
+            "citations": f_payload.get("citations", []),
+            "query_title": q_title[:30]
+        })
+        if "mindmap" in f_payload and f_payload["mindmap"]:
+            st.session_state.final_state["mindmap"] = f_payload["mindmap"]
+        if "cumulative_sources" in f_payload and f_payload["cumulative_sources"]:
+            st.session_state.final_state["cumulative_sources"] = f_payload["cumulative_sources"]
+        if "follow_up_questions" in f_payload and f_payload["follow_up_questions"]:
+            st.session_state.final_state["follow_up_questions"] = f_payload["follow_up_questions"]
+        if f_payload.get("route") == "REPORT_EXPANSION" and "report" in f_payload:
+            st.session_state.final_state["report"] = f_payload["report"]
+
+# 3. Sidebar Configuration
 with st.sidebar:
     st.markdown('<div style="font-weight: 700; font-size: 1.1rem; color: #FFFFFF; margin-bottom: 1rem;">Configuration</div>', unsafe_allow_html=True)
     
@@ -97,7 +128,7 @@ render_header()
 col_chat, col_workspace = st.columns([40, 60], gap="large")
 
 # ==============================================================================
-# LEFT PANE: RESEARCH COPILOT CHAT (40% Width, Max 680px Content Capped)
+# LEFT PANE: RESEARCH COPILOT CHAT (40% Width)
 # ==============================================================================
 with col_chat:
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
@@ -126,15 +157,13 @@ with col_chat:
             st.warning("Please enter a research topic to proceed.")
         else:
             st.session_state.topic_input = research_query.strip()
-            st.session_state.node_statuses = ["active"] + ["pending"] * 5
+            st.session_state.node_statuses = ["active"] + ["pending"] * 6
             st.session_state.node_logs = {k: "" for k in st.session_state.node_logs}
             st.session_state.final_state = {}
             st.session_state.node_durations = {}
+            st.session_state.chat_history = []
             
-            # Record user chat message
-            st.session_state.chat_history.append({"role": "user", "text": research_query.strip()})
-            
-            # Start background pipeline execution
+            # Start initial research pipeline
             runner.start(
                 topic=research_query.strip(),
                 role=role.lower(),
@@ -142,7 +171,8 @@ with col_chat:
                 language=language,
                 scrape_top_n=scrape_top_n,
                 min_score=min_score,
-                max_retries=int(max_retries)
+                max_retries=int(max_retries),
+                on_complete=lambda final_state, durations: st.session_state.final_state.update(final_state)
             )
             st.rerun()
 
@@ -151,77 +181,119 @@ with col_chat:
     follow_ups = st.session_state.final_state.get("follow_up_questions", [])
     
     # Display conversation messages
-    for msg in st.session_state.chat_history:
+    for idx, msg in enumerate(st.session_state.chat_history):
         if msg["role"] == "user":
             st.markdown(f'<div class="chat-msg-user">{msg["text"]}</div>', unsafe_allow_html=True)
         else:
-            st.markdown(f'<div class="chat-msg-agent">{msg["text"]}</div>', unsafe_allow_html=True)
+            route = msg.get("route", "LOCAL_QA")
+            badge_class = "local-qa" if route == "LOCAL_QA" else ("web-search" if route == "WEB_SEARCH" else "report-expansion")
+            badge_label = "✦ Context QA" if route == "LOCAL_QA" else ("🌐 Live Web Probe" if route == "WEB_SEARCH" else "📝 Living Report Expansion")
             
-    if runner.is_running():
+            st.markdown(
+                f'<div class="route-badge {badge_class}">{badge_label}</div>'
+                f'<div class="chat-msg-agent">{msg["text"]}</div>',
+                unsafe_allow_html=True
+            )
+            
+            # 1-Click Merge to Synthesis Report Button
+            col_m1, col_m2 = st.columns([2, 1])
+            with col_m2:
+                if st.button("✦ Merge to Report", key=f"merge_btn_{idx}", help="Append this finding into the Synthesis Report"):
+                    current_rep = st.session_state.final_state.get("report", "")
+                    merge_section = f"\n\n### Follow-Up Investigation: {msg.get('query_title', 'Key Finding')}\n{msg['text']}"
+                    st.session_state.final_state["report"] = current_rep + merge_section
+                    st.success("Merged into Synthesis Report!")
+                    st.rerun()
+
+    # Streaming / Status Indicators
+    if runner.is_active:
         st.markdown(
             '<div class="chat-msg-agent" style="color: var(--text-muted);">'
-            '✦ Thoth agents are actively searching registries, scraping sources, and verifying claims...'
+            '✦ Thoth agents are actively searching registries, scraping sources, and synthesizing mind map...'
             '</div>',
             unsafe_allow_html=True
         )
-    elif final_report:
-        # Agent response summary
+    elif runner.is_followup_active:
+        ev = runner.active_followup_event or "processing"
+        st.markdown(
+            f'<div class="chat-msg-agent" style="color: #38BDF8; font-weight: 500;">'
+            f'✦ Executing follow-up probe: <code>{ev}</code> (querying registries & Mind Map)...'
+            '</div>',
+            unsafe_allow_html=True
+        )
+    elif final_report and not st.session_state.chat_history:
         st.markdown(
             '<div class="chat-msg-agent">'
-            '✦ Verified research synthesis compiled across sources. Review the structured report, '
-            'literature matrix, and Truth Guard audit in the workspace on the right.'
+            '✦ Verified research synthesis & Concept Mind Map generated. You can ask any follow-up question below '
+            'or click a suggested exploration vector.'
             '</div>',
             unsafe_allow_html=True
         )
+
+    # Multi-Turn Follow-Up Controls (Only shown once initial report is ready)
+    if final_report and not runner.is_active:
+        st.markdown("<div style='margin-top: 1.2rem;'></div>", unsafe_allow_html=True)
         
-        # Follow-up Suggestions (Single Horizontal Scrollable Row)
+        # Mode Selector
+        col_m_label, col_mode = st.columns([1, 2])
+        with col_m_label:
+            st.markdown("<span style='font-size:0.82rem; font-weight:600; color:var(--text-secondary);'>Route Mode:</span>", unsafe_allow_html=True)
+        with col_mode:
+            mode_choice = st.radio(
+                "Follow-up Mode",
+                ["Auto ✦", "⚡ Fast QA", "🌐 Web Probe", "📝 Expand Report"],
+                horizontal=True,
+                label_visibility="collapsed",
+                key="mode_radio"
+            )
+            mode_map = {
+                "Auto ✦": "auto",
+                "⚡ Fast QA": "local_qa",
+                "🌐 Web Probe": "web_probe",
+                "📝 Expand Report": "expand_report"
+            }
+            st.session_state.followup_mode = mode_map.get(mode_choice, "auto")
+
+        # Proactive Follow-up Suggestion Pills
         suggestions = follow_ups if follow_ups else [
-            f"Practical limitations of {st.session_state.topic_input[:28]}...",
-            f"Compare methodology with alternatives...",
-            f"Policy and investment implications..."
+            f"What are the practical solutions and interventions to address these challenges?",
+            f"Compare these findings against latest 2026 empirical benchmarks",
+            f"What are the major policy and funding implications?"
         ]
         
-        st.markdown("<div style='font-size:0.8rem; color:var(--text-muted); margin-top:1rem; margin-bottom:0.3rem;'>Suggested Follow-Ups:</div>", unsafe_allow_html=True)
-        for i, q in enumerate(suggestions):
-            if st.button(f"✦ {q}", key=f"chat_pill_{i}", use_container_width=True):
-                st.session_state.topic_input = f"{st.session_state.topic_input}: {q}"
+        st.markdown("<div style='font-size:0.8rem; color:var(--text-muted); margin-top:0.6rem; margin-bottom:0.3rem;'>Suggested Follow-Ups:</div>", unsafe_allow_html=True)
+        for i, q in enumerate(suggestions[:3]):
+            if st.button(f"✦ {q}", key=f"chat_pill_{i}", use_container_width=True, disabled=runner.is_running()):
+                # Trigger follow-up turn asynchronously
                 st.session_state.chat_history.append({"role": "user", "text": q})
-                runner.start(
-                    topic=st.session_state.topic_input,
-                    role=role.lower(),
-                    tone=tone.lower(),
-                    language=language,
-                    scrape_top_n=scrape_top_n,
-                    min_score=min_score,
-                    max_retries=int(max_retries)
+                runner.start_followup(
+                    current_state=st.session_state.final_state,
+                    user_query=q,
+                    mode_override=st.session_state.followup_mode
                 )
                 st.rerun()
 
-        # Follow-up Chat Input Bar
-        st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+        # Follow-up Free-Form Chat Input Bar
+        st.markdown("<div style='margin-top: 0.8rem;'></div>", unsafe_allow_html=True)
         col_fq1, col_fq2 = st.columns([4, 1])
         with col_fq1:
             chat_followup_input = st.text_input(
                 "Ask a follow-up question",
-                placeholder="Ask a follow-up or pivot topic...",
+                placeholder="Ask any follow-up question or probe new angle...",
                 label_visibility="collapsed",
-                key="chat_followup_input"
+                key="chat_followup_input",
+                disabled=runner.is_running()
             )
         with col_fq2:
-            send_followup_btn = st.button("✦ Ask", key="send_chat_followup", use_container_width=True)
+            send_followup_btn = st.button("✦ Ask", key="send_chat_followup", use_container_width=True, disabled=runner.is_running())
             
         if send_followup_btn and chat_followup_input.strip():
-            new_q = chat_followup_input.strip()
-            st.session_state.topic_input = f"{st.session_state.topic_input} — {new_q}"
-            st.session_state.chat_history.append({"role": "user", "text": new_q})
-            runner.start(
-                topic=st.session_state.topic_input,
-                role=role.lower(),
-                tone=tone.lower(),
-                language=language,
-                scrape_top_n=scrape_top_n,
-                min_score=min_score,
-                max_retries=int(max_retries)
+            user_q = chat_followup_input.strip()
+            st.session_state.chat_history.append({"role": "user", "text": user_q})
+            runner.start_followup(
+                current_state=st.session_state.final_state,
+                user_query=user_q,
+                mode_override=st.session_state.followup_mode
             )
             st.rerun()
 
@@ -239,9 +311,10 @@ with col_workspace:
         durations=st.session_state.node_durations
     )
     
-    # 2. Workspace Tabs
-    tab_report, tab_matrix, tab_audit, tab_notes = st.tabs([
+    # 2. Workspace Tabs (Featuring Concept Mind Map)
+    tab_report, tab_mindmap, tab_matrix, tab_audit, tab_notes = st.tabs([
         "Synthesis Report",
+        "✦ Concept Mind Map",
         "Literature Matrix",
         "Truth Guard Audit",
         "Notes & Export"
@@ -252,16 +325,15 @@ with col_workspace:
     # --------------------------------------------------------------------------
     with tab_report:
         if final_report:
-            # Render Source Domain Chips
-            search_results = st.session_state.final_state.get("search_results", "")
-            found_urls = re.findall(r'https?://[^\s)\]]+', search_results)
-            if found_urls:
-                unique_urls = list(dict.fromkeys(found_urls))[:6]
+            # Render Source Domain Chips from cumulative sources
+            cum_sources = st.session_state.final_state.get("cumulative_sources", [])
+            if cum_sources:
                 chips_html = ["<div style='margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 6px;'>"]
-                for idx, u in enumerate(unique_urls, 1):
-                    domain = u.split("/")[2] if len(u.split("/")) > 2 else u
+                for idx, s in enumerate(cum_sources[:8], 1):
+                    url = s.get("url", "#")
+                    domain = s.get("domain", url)
                     chips_html.append(
-                        f'<a class="chip" href="{u}" target="_blank">'
+                        f'<a class="chip" href="{url}" target="_blank">'
                         f'<span class="chip-dot" style="background:var(--ok);"></span>'
                         f'[{idx}] {domain}'
                         f'</a>'
@@ -269,7 +341,7 @@ with col_workspace:
                 chips_html.append("</div>")
                 st.markdown("".join(chips_html), unsafe_allow_html=True)
                 
-            # Render Prose with Editorial Serif (Newsreader)
+            # Render Prose with Editorial Serif
             st.markdown(f'<div class="editorial-prose">{final_report}</div>', unsafe_allow_html=True)
             
             # Action Buttons Row
@@ -296,25 +368,47 @@ with col_workspace:
             )
 
     # --------------------------------------------------------------------------
-    # TAB 2: LITERATURE REVIEW MATRIX (Dense Data Table)
+    # TAB 2: CONCEPT MIND MAP (Interactive Dynamic Knowledge Graph)
+    # --------------------------------------------------------------------------
+    with tab_mindmap:
+        mindmap_data = st.session_state.final_state.get("mindmap", {})
+        if mindmap_data and mindmap_data.get("nodes"):
+            st.markdown(
+                "<div style='font-size:0.85rem; color:var(--text-secondary); margin-bottom: 8px;'>"
+                "Interactive concept graph with drag, zoom, and live follow-up expansion. Hover over nodes to inspect evidence."
+                "</div>",
+                unsafe_allow_html=True
+            )
+            render_interactive_mindmap(mindmap_data, height=520)
+        elif runner.is_running():
+            st.info("Concept Mind Map will be generated once research drafting completes...")
+        else:
+            st.markdown(
+                '<div style="color: var(--text-muted); padding: 3rem 1rem; text-align: center;">'
+                'The interactive Concept Mind Map will appear here after initial research synthesis completes.'
+                '</div>',
+                unsafe_allow_html=True
+            )
+
+    # --------------------------------------------------------------------------
+    # TAB 3: LITERATURE REVIEW MATRIX (Cumulative Deduplicated Sources)
     # --------------------------------------------------------------------------
     with tab_matrix:
-        search_results = st.session_state.final_state.get("search_results", "")
-        scraped_content = st.session_state.final_state.get("scraped_content", "")
-        
-        if search_results or final_report:
-            # Extract URLs to build matrix rows
-            raw_urls = re.findall(r'https?://[^\s)\]]+', search_results)
-            urls = list(dict.fromkeys(raw_urls))[:5] if raw_urls else ["https://example.org/source-1", "https://example.org/source-2"]
-            
+        cum_sources = st.session_state.final_state.get("cumulative_sources", [])
+        if cum_sources:
             rows_html = []
-            for i, u in enumerate(urls, 1):
-                domain = u.split("/")[2] if len(u.split("/")) > 2 else u
+            for i, s in enumerate(cum_sources, 1):
+                url = s.get("url", "#")
+                domain = s.get("domain", url)
+                title = s.get("title", f"Source {i}")
+                turn = s.get("added_in_turn", 0)
+                turn_label = "Initial Synthesis" if turn == 0 else f"Follow-up #{turn}"
+                
                 rows_html.append(
                     f'<tr>'
-                    f'<td style="width: 25%; font-weight: 500; color: #FFFFFF;">Source #{i}: <a href="{u}" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">{domain}</a></td>'
-                    f'<td style="width: 30%;">Sector-specific AI deployment, policy frameworks, and infrastructure benchmarks.</td>'
-                    f'<td style="width: 25%;">Empirical policy analysis, platform registry audit, multi-stakeholder assessment.</td>'
+                    f'<td style="width: 25%; font-weight: 500; color: #FFFFFF;">Source #{i}: <a href="{url}" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">{domain}</a></td>'
+                    f'<td style="width: 35%;">{title}</td>'
+                    f'<td style="width: 20%; color: var(--text-muted);">{turn_label}</td>'
                     f'<td style="width: 20%; text-align: center;"><span class="status-pill verified">✓ Verified</span></td>'
                     f'</tr>'
                 )
@@ -323,9 +417,9 @@ with col_workspace:
             <table class="matrix-table">
                 <thead>
                     <tr>
-                        <th style="width: 25%;">Source / Title</th>
-                        <th style="width: 30%;">Key Findings & Contribution</th>
-                        <th style="width: 25%;">Methodology</th>
+                        <th style="width: 25%;">Source / Domain</th>
+                        <th style="width: 35%;">Extracted Title / Scope</th>
+                        <th style="width: 20%;">Discovery Vector</th>
                         <th style="width: 20%; text-align: center;">Status</th>
                     </tr>
                 </thead>
@@ -338,13 +432,13 @@ with col_workspace:
         else:
             st.markdown(
                 '<div style="color: var(--text-muted); padding: 3rem 1rem; text-align: center;">'
-                'The extraction matrix will populate automatically with extracted papers, methodology, and findings once research begins.'
+                'The literature matrix will populate automatically with verified sources and follow-up probes.'
                 '</div>',
                 unsafe_allow_html=True
             )
 
     # --------------------------------------------------------------------------
-    # TAB 3: TRUTH GUARD AUDIT & QUALITY EVALUATION
+    # TAB 4: TRUTH GUARD AUDIT & QUALITY EVALUATION
     # --------------------------------------------------------------------------
     with tab_audit:
         verifier_log = st.session_state.node_logs.get("verifier", "")
@@ -366,10 +460,10 @@ with col_workspace:
             )
 
     # --------------------------------------------------------------------------
-    # TAB 4: RESEARCH NOTES & SCRATCHPAD
+    # TAB 5: RESEARCH NOTES & SCRATCHPAD
     # --------------------------------------------------------------------------
     with tab_notes:
-        st.markdown("<div style='font-weight: 600; font-size: 0.95rem; margin-bottom: 0.4rem; color: #FFFFFF;'>Research Scratchpad</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-weight: 600; font-size: 0.95rem; margin-bottom: 0.4rem; color: #FFFFFF;'>Research Scratchpad & Synthesis Export</div>", unsafe_allow_html=True)
         st.session_state.scratchpad_text = st.text_area(
             "Scratchpad Notes",
             value=st.session_state.scratchpad_text,
@@ -389,3 +483,4 @@ with col_workspace:
 if runner.is_running():
     time.sleep(1.0)
     st.rerun()
+
