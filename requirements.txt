@@ -1,44 +1,48 @@
-# Core LLM + LangChain ecosystem
+# ==============================================================================
+# Thoth · Core Dependencies
+# ==============================================================================
+
+# Frontend Application
+streamlit>=1.35.0
+
+# Core LLM + LangChain Ecosystem
 langchain>=0.2.0
 langchain-core>=0.2.0
 langchain-community>=0.2.0
 langchain-openai>=0.1.0
 langchain-nvidia-ai-endpoints>=0.1.0
+langchain-groq>=0.1.0
 
-# OpenAI
+# Providers
 openai>=1.30.0
+groq>=0.9.0
 
-# Tavily Search Tool
+# Scholarly & Web Search
 tavily-python>=0.3.0
-
-# Web scraping
-beautifulsoup4>=4.12.0
+httpx>=0.27.0
 requests>=2.31.0
+beautifulsoup4>=4.12.0
 lxml>=5.0.0
+html5lib>=1.1
 
-# Environment variables
-python-dotenv>=1.0.0
+# Memory Vault, Embeddings & Vector Search
+sentence-transformers>=2.7.0
+torch>=2.2.0
+torchvision>=0.17.0
+numpy>=1.24.0
+pyyaml>=6.0.1
 
-# Async support (important for agents/tools)
-aiohttp>=3.9.0
-
-# Data handling (optional but useful in pipelines)
-pandas>=2.0.0
-
-# Token counting / text utils
+# Token Counting & Text Utilities
 tiktoken>=0.6.0
 
-# Logging / debugging (optional but recommended)
-rich>=13.7.0
-
-# Retry + robustness
-tenacity>=8.2.0
-
-# JSON handling improvements
+# Data Handling & Structured Schemas
+pydantic>=2.5.0
+pandas>=2.0.0
 orjson>=3.9.0
 
-# Typing support (helps in bigger projects)
-pydantic>=2.5.0
-
-# Optional (for advanced parsing / HTML cleanup)
-html5lib>=1.1
+# Robustness, Retries & Async
+tenacity>=8.2.0
+aiohttp>=3.9.0
+python-dotenv>=1.0.0
+rich>=13.7.0
+watchdog>=6.0.0

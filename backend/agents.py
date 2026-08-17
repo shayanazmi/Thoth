@@ -1,8 +1,8 @@
 from langchain.agents import create_agent
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from tools import web_search, scrape_url
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+from backend.tools import web_search, scrape_url
 from dotenv import load_dotenv
 import os
 import json
@@ -11,13 +11,68 @@ import warnings
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
+from langchain_core.runnables import Runnable
+from langchain_openai import ChatOpenAI
+import logging
+
+logger = logging.getLogger("ThothLLM")
+
 # Suppress harmless model-type and tool-binding UserWarnings from NVIDIA endpoints library
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_nvidia_ai_endpoints")
 
 load_dotenv()
 
+class FallbackLLMWrapper(Runnable):
+    """Wrapper that invokes primary LLM and falls back to secondary LLM on network/5xx errors."""
+    primary_llm: Any
+    fallback_llm: Optional[Any]
+    primary_name: str
+    fallback_name: str
+
+    def __init__(self, primary_llm: Any, fallback_llm: Optional[Any] = None, primary_name: str = "NVIDIA NIM", fallback_name: str = "Fallback Provider"):
+        super().__init__()
+        self.primary_llm = primary_llm
+        self.fallback_llm = fallback_llm
+        self.primary_name = primary_name
+        self.fallback_name = fallback_name
+
+    def invoke(self, input: Any, config: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
+        try:
+            res = self.primary_llm.invoke(input, config=config, **kwargs)
+            logger.info(f"[LLM Call] Served by primary provider: {self.primary_name}")
+            return res
+        except Exception as primary_err:
+            if self.fallback_llm is not None:
+                msg_warn = f"[LLM Call] Primary provider ({self.primary_name}) failed: {primary_err}. Retrying with fallback ({self.fallback_name})..."
+                logger.warning(msg_warn)
+                print(f"\n[WARNING] {msg_warn}")
+                try:
+                    res = self.fallback_llm.invoke(input, config=config, **kwargs)
+                    msg_fb = f"[LLM Call] Served by fallback provider: {self.fallback_name}"
+                    logger.info(msg_fb)
+                    print(f"[INFO] {msg_fb}")
+                    return res
+                except Exception as fallback_err:
+                    msg_err = f"[LLM Call] Fallback provider ({self.fallback_name}) also failed: {fallback_err}"
+                    logger.error(msg_err)
+                    raise fallback_err from primary_err
+            else:
+                logger.error(f"[LLM Call] Primary provider ({self.primary_name}) failed: {primary_err}. No fallback provider configured.")
+                raise primary_err
+
+    def bind_tools(self, tools: Any, **kwargs: Any) -> "FallbackLLMWrapper":
+        primary_bound = self.primary_llm.bind_tools(tools, **kwargs) if hasattr(self.primary_llm, "bind_tools") else self.primary_llm
+        fallback_bound = self.fallback_llm.bind_tools(tools, **kwargs) if (self.fallback_llm and hasattr(self.fallback_llm, "bind_tools")) else None
+        return FallbackLLMWrapper(
+            primary_llm=primary_bound,
+            fallback_llm=fallback_bound,
+            primary_name=self.primary_name,
+            fallback_name=self.fallback_name
+        )
+
+
 # Fast Primary LLM for reasoning, drafting & mind map structuring
-llm = ChatNVIDIA(
+_primary_llm = ChatNVIDIA(
     model="nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key=os.getenv("NVIDIA_API_KEY"),
     temperature=0.6,
@@ -30,13 +85,33 @@ llm = ChatNVIDIA(
 )
 
 # Ultra-Fast 8B SLM for Truth Guard Fact-Verification & Local Q&A
-verifier_llm = ChatNVIDIA(
+_primary_verifier_llm = ChatNVIDIA(
     model="meta/llama-3.1-8b-instruct",
     api_key=os.getenv("NVIDIA_API_KEY"),
     temperature=0.1,  # Strict factual consistency
     max_completion_tokens=1024,
     timeout=60,
 )
+
+# Configure Fallback Provider (Groq / OpenAI / OpenAI-Compatible)
+groq_key = os.getenv("GROQ_API_KEY")
+openai_key = os.getenv("OPENAI_API_KEY")
+
+if groq_key and len(groq_key) > 10 and not groq_key.startswith("dummy"):
+    _fallback_llm = ChatOpenAI(model="llama-3.1-70b-versatile", api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.6, timeout=60)
+    _fallback_verifier_llm = ChatOpenAI(model="llama-3.1-8b-instant", api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.1, timeout=30)
+    _fb_name = "Groq"
+elif openai_key and len(openai_key) > 10 and not openai_key.startswith("sk-dummy") and not openai_key.startswith("dummy"):
+    _fallback_llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0.6, timeout=60)
+    _fallback_verifier_llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0.1, timeout=30)
+    _fb_name = "OpenAI"
+else:
+    _fallback_llm = None
+    _fallback_verifier_llm = None
+    _fb_name = "None"
+
+llm = FallbackLLMWrapper(primary_llm=_primary_llm, fallback_llm=_fallback_llm, primary_name="NVIDIA-Nemotron-30B", fallback_name=_fb_name)
+verifier_llm = FallbackLLMWrapper(primary_llm=_primary_verifier_llm, fallback_llm=_fallback_verifier_llm, primary_name="NVIDIA-Llama-8B", fallback_name=_fb_name)
 
 # 1st Agent: Web Search Expert
 def build_search_agent():
@@ -51,37 +126,69 @@ def build_search_agent():
         )
     )
 
-# 2nd Agent: Reader Scraping Agent
-def build_render_agent():
-    return create_agent(
-        model=llm,
-        tools=[scrape_url]
-    )
-
 # Pydantic models for structured verification response
 class VerificationResult(BaseModel):
     claim: str = Field(description="The claim being verified from the report")
     is_valid: bool = Field(description="True if supported by sources/web search, False if contradicted or unsupported")
-    reason_if_failed: str = Field(description="Clear explanation of the contradiction or why it is unsupported; empty if verified")
+    reason_if_failed: str = Field(default="", description="Clear explanation of the contradiction or why it is unsupported; empty if verified")
+    supporting_source_id: Optional[str] = Field(default="", description="The exact source identifier (e.g. 'src-...' or '[src-...]') that supports this claim; populated ONLY when is_valid is true, empty string otherwise")
 
 class FactVerificationReport(BaseModel):
     results: List[VerificationResult] = Field(description="List of verification results for all key claims in the report")
 
-# 3rd Agent: Fact-Verifier SLM Agent (The Truth Guard)
+# Pydantic model for structured Critic quality evaluation
+class CriticScore(BaseModel):
+    faithfulness: float = Field(description="Score out of 10 for factual grounding in sources with no hallucinations")
+    relevance: float = Field(description="Score out of 10 for directly addressing the research topic")
+    completeness: float = Field(description="Score out of 10 for presence and depth of all required sections")
+    evidence_quality: float = Field(description="Score out of 10 for findings backed by traceable real sources")
+    clarity_and_coherence: float = Field(description="Score out of 10 for logical structure and readability")
+    overall_score: float = Field(description="Overall score out of 10, computed as average of all 5 dimensions")
+    strengths: List[str] = Field(description="2-3 specific things the report did well")
+    areas_to_improve: List[str] = Field(description="2-3 specific actionable improvement suggestions")
+    verdict: str = Field(description="One sentence summarizing report quality and readiness")
+    reasoning: str = Field(description="Detailed evaluation reasoning behind the assigned scores")
+
+# 3rd Agent: Fact-Verifier SLM Chain (The Truth Guard)
+verifier_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are the Fact-Verifier Agent (The Truth Guard). Today's date is {current_date}.
+
+Your job is to analyze key factual claims in the drafted research report and verify them against the provided source material.
+Each source in the source material is labeled with an explicit identifier like `[src-identifier]` or `Source 1 (src-identifier): ...`.
+
+Rules:
+1. For each key claim in the report, determine if it is VERIFIED (is_valid: true) or CONFLATED/UNSUPPORTED (is_valid: false).
+2. If is_valid is true: You MUST specify the exact `supporting_source_id` (e.g. "src-arxiv_1311_2485" or "src-scaling_laws") matching the source label that directly supports this claim. If multiple sources support it, provide the primary supporting source ID.
+3. If is_valid is false: set `supporting_source_id` to "" and provide a clear explanation of the contradiction or lack of support in `reason_if_failed`.
+4. If any facts are contradicted or unsupported, flag them with is_valid: false.
+
+Output strictly valid JSON matching this schema:
+{{
+  "results": [
+    {{
+      "claim": "The claim being verified",
+      "is_valid": true,
+      "reason_if_failed": "",
+      "supporting_source_id": "src-exact_source_id"
+    }}
+  ]
+}}
+
+Output ONLY the JSON object, with NO markdown code block or backticks."""),
+    ("human", """Source Material:
+{sources}
+
+Drafted Report to Verify:
+{report}
+
+Perform the factual verification audit now.""")
+])
+
+verifier_chain = verifier_prompt | verifier_llm | StrOutputParser()
+
 def build_verifier_agent():
-    import datetime
-    current_date = datetime.datetime.now().strftime("%B %d, %Y")
-    return create_agent(
-        model=verifier_llm,
-        tools=[web_search],
-        response_format=FactVerificationReport,
-        system_prompt=(
-            f"You are the Fact-Verifier Agent (The Truth Guard). Today's date is {current_date}.\n\n"
-            "Your job is to analyze claims in the drafted research report and verify them against either the scraped local text or by using the web_search tool to look up live facts.\n"
-            "For each claim, determine if it is VERIFIED (is_valid: true) or CONFLATED/UNSUPPORTED (is_valid: false).\n"
-            "If any facts are wrong (like mixing up different people with the same name, or claiming someone holds a job/degree they do not), flag it as a contradiction (is_valid: false) and explain why."
-        )
-    )
+    """Helper returning verifier_chain for backward compatibility."""
+    return verifier_chain
 
 # Writer Chain
 writer_prompt = ChatPromptTemplate.from_messages([
@@ -106,48 +213,31 @@ Write the research report.""")
  
 writer_chain = writer_prompt | llm | StrOutputParser()
 
-# Critic Chain (LLM-as-a-Judge)
+# Critic Chain (LLM-as-a-Judge with Structured JSON Output)
+critic_parser = JsonOutputParser(pydantic_object=CriticScore)
+
 critic_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a rigorous research quality evaluator (LLM-as-a-Judge).
 
 Score the report across these 5 dimensions, each out of 10:
-- **Faithfulness** (10): Are all claims grounded in the source data? No hallucinations?
-- **Relevance** (10): Does the report directly address the research topic?
-- **Completeness** (10): Are all required sections present and sufficiently detailed?
-- **Evidence Quality** (10): Are findings backed by traceable, real sources?
-- **Clarity & Coherence** (10): Is the writing logical, well-structured, and readable?
+- **faithfulness** (10): Are all claims grounded in the source data? No hallucinations?
+- **relevance** (10): Does the report directly address the research topic?
+- **completeness** (10): Are all required sections present and sufficiently detailed?
+- **evidence_quality** (10): Are findings backed by traceable, real sources?
+- **clarity_and_coherence** (10): Is the writing logical, well-structured, and readable?
 
-Compute: Overall Score = average of all 5 dimensions (out of 10).
+Compute overall_score as the average of all 5 dimensions (out of 10).
 
-Your response must follow this structure:
-
-**Scores**
-| Dimension | Score /10 |
-|---|---|
-| Faithfulness | X |
-| Relevance | X |
-| Completeness | X |
-| Evidence Quality | X |
-| Clarity & Coherence | X |
-| **Overall** | **X.X** |
-
-**Strengths**
-- [2-3 specific things the report did well]
-
-**Areas to Improve**
-- [2-3 specific, actionable suggestions]
-
-**Verdict**
-[One sentence summarising the report's quality and readiness]"""),
+{format_instructions}"""),
     ("human", """Topic: {topic}
 
 Report to evaluate:
 {report}
 
 Evaluate the report now.""")
-])
+]).partial(format_instructions=critic_parser.get_format_instructions())
 
-critic_chain = critic_prompt | llm | StrOutputParser()
+critic_chain = critic_prompt | llm | critic_parser
 
 # Follow-up Questions Generator Chain
 follow_up_prompt = ChatPromptTemplate.from_messages([
@@ -244,7 +334,8 @@ Rules:
 1. Provide a direct, well-structured, and clear answer.
 2. Ground your claims in the provided knowledge base. If citing a source or URL from the context, include a clickable markdown link: `[Source Name](URL)`.
 3. If the knowledge base does not contain sufficient details to answer fully, answer what is known and state the remaining knowledge gap.
-4. Keep the tone academic, insightful, and concise."""),
+4. Keep the tone academic, insightful, and concise.
+5. Output ONLY the clean answer without internal chain-of-thought, reasoning monologue, or conversational meta-commentary."""),
     ("human", """Topic: {topic}
 
 Context / Mind Map Sub-Tree:
@@ -299,9 +390,11 @@ report_expander_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are an academic research editor.
 The user wants to expand or add a new section to the master Synthesis Report based on their follow-up request and new research data.
 
-Write the new or updated section in markdown format.
-Include clear heading (e.g. `### Section Title`), evidence-backed paragraphs, and source links.
-Do not repeat the entire report; generate the focused section to be appended or merged."""),
+Rules:
+1. Write the new or updated section in clean markdown format.
+2. Include a clear section heading (e.g. `### Section Title`), evidence-grounded paragraphs, and source links.
+3. Do NOT repeat the entire report; generate only the focused section to be appended or merged.
+4. CRITICAL: Do NOT include internal monologue, chain-of-thought, reasoning steps, or preamble like "Let me outline...", "I will write...", "The full prior report...". Output ONLY the final markdown section starting immediately with the section heading."""),
     ("human", """Original Topic: {topic}
 
 Follow-Up Request:
@@ -313,10 +406,29 @@ Research Evidence:
 Current Report Overview:
 {report_overview}
 
-Draft the section expansion now.""")
+Draft the section expansion now. Start immediately with the `### ` heading.""")
 ])
 
 report_expander_chain = report_expander_prompt | llm | StrOutputParser()
+
+
+def strip_chain_of_thought(text: str) -> str:
+    """Removes <think> tags, reasoning traces, and preamble from LLM responses."""
+    if not text:
+        return ""
+    # Strip <think>...</think> blocks
+    cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    
+    # If the text has reasoning preamble before the actual markdown title (e.g. "Let's do it.", "I'll draft...", etc.)
+    # and contains a heading like "### " or "## " or "# "
+    match = re.search(r"(?m)^(#{1,4}\s+.+)$", cleaned)
+    if match and match.start() > 0:
+        preamble = cleaned[:match.start()].strip()
+        meta_phrases = ["let me", "i need to", "i will", "the user wants", "i should", "let's do", "let draft", "i'll draft", "i'll write", "structure:"]
+        if any(phrase in preamble.lower() for phrase in meta_phrases):
+            cleaned = cleaned[match.start():].strip()
+
+    return cleaned
 
 
 # Helper function to parse JSON safely
@@ -345,5 +457,5 @@ def safe_extract_json(raw_text: str, default: Any = None) -> Any:
                 return json.loads(text[start_brace:end_brace+1])
         except Exception:
             pass
-    return default
 
+    return default

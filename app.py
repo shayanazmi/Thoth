@@ -1,84 +1,86 @@
-import streamlit as st
+"""
+Thoth · Agentic Research Command Center & Verification Studio
+============================================================
+A clean, robust Streamlit interface for launching, verifying, and testing the
+Thoth multi-agent autonomous research engine, Obsidian memory vault, and SQLite persistence.
+"""
+
+import os
+import sys
 import time
 import json
-import re
-import datetime
-from theme import (
-    inject_theme,
-    render_blobs,
-    render_header,
-    render_planner_stepper,
-    render_interactive_mindmap,
-    render_copy_widget
-)
-from ui_adapter import ResearchPipelineRunner, NODE_LABEL_MAP, NODE_ORDER
+import subprocess
+import streamlit as st
 
+# Ensure project root is in sys.path
+_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _CURRENT_DIR not in sys.path:
+    sys.path.insert(0, _CURRENT_DIR)
+
+from frontend.ui_adapter import (
+    ResearchPipelineRunner,
+    NODE_ORDER,
+    NODE_LABEL_MAP,
+    list_stored_sessions,
+    list_stored_reports,
+    get_stored_report_by_id,
+    search_memory_vault,
+    list_vault_notes,
+    read_vault_note,
+    traverse_vault_graph,
+    get_telemetry_status,
+)
+
+# ------------------------------------------------------------------------------
+# 1. Page Configuration
+# ------------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Thoth: Agentic Research ✦",
+    page_title="Thoth · Agentic Research Engine",
     page_icon="✦",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# 1. Inject Visual Theme & Styling
-inject_theme()
-render_blobs()
-
-# 2. Initialize Session State — auto-migrate stale runner objects
-if (
-    "runner" not in st.session_state
-    or getattr(st.session_state.runner, "_schema_version", 0)
-       != ResearchPipelineRunner.SCHEMA_VERSION
-):
+# ------------------------------------------------------------------------------
+# 2. Session State Initialization
+# ------------------------------------------------------------------------------
+if "runner" not in st.session_state:
     st.session_state.runner = ResearchPipelineRunner()
 
 runner: ResearchPipelineRunner = st.session_state.runner
 
-if "active_node" not in st.session_state:
-    st.session_state.active_node = ""
-
-if "node_statuses" not in st.session_state:
-    st.session_state.node_statuses = ["pending"] * 7
-
-if "node_durations" not in st.session_state:
-    st.session_state.node_durations = {}
-
-if "node_logs" not in st.session_state:
-    st.session_state.node_logs = {
-        "search": "",
-        "scrape": "",
-        "writer": "",
-        "verifier": "",
-        "critic": "",
-        "mindmap": "",
-        "follow_up": ""
-    }
+if "topic_input" not in st.session_state:
+    st.session_state.topic_input = "Quantum Error Correction in Neutral Atom Qubits 2026"
 
 if "final_state" not in st.session_state:
     st.session_state.final_state = {}
-
-if "topic_input" not in st.session_state:
-    st.session_state.topic_input = "Latest breakthroughs in Quantum Computing and AI algorithms 2026"
+    try:
+        from backend.memory.db import get_latest_report
+        latest_rep = get_latest_report()
+        if latest_rep:
+            st.session_state.final_state = {
+                "topic": latest_rep.get("topic", ""),
+                "report": latest_rep.get("content", ""),
+                "score": latest_rep.get("score", 0.0),
+                "verifier_feedback": latest_rep.get("verifier_feedback", ""),
+                "mindmap": latest_rep.get("mindmap", {})
+            }
+            if latest_rep.get("topic"):
+                st.session_state.topic_input = latest_rep.get("topic")
+    except Exception:
+        pass
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-if "followup_mode" not in st.session_state:
-    st.session_state.followup_mode = "auto"
+if "selected_vault_note" not in st.session_state:
+    st.session_state.selected_vault_note = ""
 
-if "scratchpad_text" not in st.session_state:
-    st.session_state.scratchpad_text = ""
-
-# Sync background runner updates
+# Synchronize runner state
 if runner.is_running() or runner.is_completed or runner.followup_completed:
-    st.session_state.active_node = runner.active_node
-    st.session_state.node_statuses = list(runner.node_statuses)
-    st.session_state.node_durations = dict(runner.node_durations)
-    st.session_state.node_logs = dict(runner.node_logs)
     if runner.final_state:
         st.session_state.final_state.update(runner.final_state)
 
-    # Thread-safely consume completed follow-up response in main Streamlit thread
     f_payload = runner.consume_followup_payload()
     if f_payload:
         q_title = f_payload.get("user_query", "Follow-up")
@@ -98,389 +100,387 @@ if runner.is_running() or runner.is_completed or runner.followup_completed:
         if f_payload.get("route") == "REPORT_EXPANSION" and "report" in f_payload:
             st.session_state.final_state["report"] = f_payload["report"]
 
-# 3. Sidebar Configuration
+
+# ------------------------------------------------------------------------------
+# 3. Sidebar Navigation & Scope Controls
+# ------------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div style="font-weight: 700; font-size: 1.1rem; color: #FFFFFF; margin-bottom: 1rem;">Configuration</div>', unsafe_allow_html=True)
-    
-    role = st.selectbox(
-        "Target Role",
-        ["Senior Academic Researcher", "Technical Copywriter", "Financial Analyst", "Staff Software Engineer", "Biomedical Scientist"]
+    st.title("✦ THOTH")
+    st.caption("Autonomous Multi-Agent Research Platform")
+    st.divider()
+
+    st.subheader("⚙ Research Scope")
+    scribe_role = st.selectbox(
+        "Target Persona",
+        ["Senior Academic Researcher", "Technical Copywriter", "Financial Analyst", "Staff Software Engineer"],
+        index=0
     )
-    tone = st.selectbox(
+    scribe_tone = st.selectbox(
         "Tone",
-        ["Formal & Analytical", "Informative & Casual", "Executive Summary", "Investigative & In-Depth"]
+        ["Formal & Analytical", "Informative & Casual", "Executive Summary", "Investigative & In-Depth"],
+        index=0
     )
-    language = st.selectbox(
-        "Language",
-        ["English", "Hindi", "Spanish", "French", "German", "Japanese"]
-    )
-    scrape_top_n = st.slider("Pages to Scrape", min_value=1, max_value=5, value=2)
-    
-    with st.expander("Advanced Thresholds", expanded=False):
-        min_score = st.slider("Min Quality Score", min_value=0.0, max_value=10.0, value=6.5, step=0.5)
-        max_retries = st.number_input("Max Critic Retries", min_value=1, max_value=5, value=2)
-        st.caption("Customizes multi-agent state graph thresholds and SLM verification loops.")
+    scribe_depth = st.slider("Primary Sources Scrape Depth", min_value=1, max_value=15, value=5)
+    scribe_score = st.slider("Min Quality Gate Threshold", min_value=5.0, max_value=9.0, value=6.5, step=0.5)
+    scribe_retries = st.selectbox("Max Critic Retries", [1, 2, 3], index=1)
 
-# 4. Top Header
-render_header()
+    st.divider()
+    telemetry = get_telemetry_status()
+    cb_state = telemetry.get("circuit_breaker_state", "CLOSED")
+    st.markdown(f"**Circuit Breaker:** `{cb_state}`")
+    st.markdown(f"**Primary LLM:** `{telemetry.get('primary_provider')}`")
+    st.markdown(f"**Fallback LLM:** `{telemetry.get('fallback_provider')}`")
+    st.markdown(f"**Vault Notes:** `{telemetry.get('vault_notes_count', 0)}`")
+    st.markdown(f"**DB Size:** `{telemetry.get('db_size_kb', 0)} KB`")
 
-# 5. Split-Screen Layout: 40/60 (Chat Pane / Workspace Pane)
-col_chat, col_workspace = st.columns([40, 60], gap="large")
+
+# ------------------------------------------------------------------------------
+# 4. Main Tabs Navigation
+# ------------------------------------------------------------------------------
+tab_lab, tab_constellation, tab_vault, tab_history, tab_diagnostics = st.tabs([
+    "✦ Research Lab",
+    "✧ Concept Graph",
+    "🗄 Memory Vault",
+    "📜 Codex History",
+    "⚙ Diagnostics & Telemetry"
+])
+
 
 # ==============================================================================
-# LEFT PANE: RESEARCH COPILOT CHAT (40% Width)
+# TAB 1: RESEARCH LAB
 # ==============================================================================
-with col_chat:
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    
-    # Main Query Prompt Input Box
-    research_query = st.text_area(
-        "Research Objective",
+with tab_lab:
+    st.header("✦ Deep Research Laboratory")
+    st.write("Submit an inquiry to orchestrate autonomous multi-agent search, full-text scraping, verified drafting, SLM fact-checking, and concept mapping.")
+
+    # Preset Topic Buttons
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        if st.button("⚛ Quantum Error Correction 2026", use_container_width=True):
+            st.session_state.topic_input = "Quantum Error Correction in Neutral Atom Qubits 2026"
+            st.rerun()
+    with col_p2:
+        if st.button("🤖 Agentic AI Reasoning Benchmarks", use_container_width=True):
+            st.session_state.topic_input = "State of Agentic AI Reasoning Benchmarks and Multi-Agent Orchestration 2026"
+            st.rerun()
+    with col_p3:
+        if st.button("🔋 Solid-State Battery Breakthroughs", use_container_width=True):
+            st.session_state.topic_input = "Next-Generation Solid-State Battery Electrolytes and Commercial Milestones"
+            st.rerun()
+
+    query = st.text_area(
+        "Research Objective / Topic",
         value=st.session_state.topic_input,
-        placeholder="Enter research topic, question, or hypothesis...",
         height=85,
-        label_visibility="collapsed"
+        placeholder="Enter a research topic, technical hypothesis, or question..."
     )
-    
-    col_btn1, col_btn2 = st.columns([3, 1])
-    with col_btn1:
-        start_btn = st.button("✦ Launch Research", key="start_research_btn", use_container_width=True)
-    with col_btn2:
-        cancel_btn = st.button("Cancel", key="cancel_research_btn", use_container_width=True)
-        
-    if cancel_btn and runner.is_running():
+
+    col_b1, col_b2 = st.columns([4, 1])
+    with col_b1:
+        start_btn = st.button(
+            "✦ Launch Research Cycle",
+            type="primary",
+            use_container_width=True,
+            disabled=runner.is_running()
+        )
+    with col_b2:
+        cancel_btn = st.button("Halt", use_container_width=True, disabled=not runner.is_running())
+
+    if cancel_btn:
         runner.cancel()
-        st.info("Cancellation signal sent to agent pipeline.")
-        
+        st.warning("Cancellation signal sent to pipeline.")
+
     if start_btn:
-        if not research_query.strip():
-            st.warning("Please enter a research topic to proceed.")
+        if not query.strip():
+            st.error("Please enter a research topic first.")
         else:
-            st.session_state.topic_input = research_query.strip()
-            st.session_state.node_statuses = ["active"] + ["pending"] * 6
-            st.session_state.node_logs = {k: "" for k in st.session_state.node_logs}
+            st.session_state.topic_input = query.strip()
             st.session_state.final_state = {}
-            st.session_state.node_durations = {}
             st.session_state.chat_history = []
-            
-            # Start initial research pipeline
             runner.start(
-                topic=research_query.strip(),
-                role=role.lower(),
-                tone=tone.lower(),
-                language=language,
-                scrape_top_n=scrape_top_n,
-                min_score=min_score,
-                max_retries=int(max_retries),
-                on_complete=lambda final_state, durations: st.session_state.final_state.update(final_state)
+                topic=query.strip(),
+                role=scribe_role.lower(),
+                tone=scribe_tone.lower(),
+                scrape_top_n=scribe_depth,
+                min_score=scribe_score,
+                max_retries=int(scribe_retries)
             )
             st.rerun()
 
-    # Chat Message Thread
-    final_report = st.session_state.final_state.get("report", "")
-    follow_ups = st.session_state.final_state.get("follow_up_questions", [])
-    
-    # Display conversation messages
-    for idx, msg in enumerate(st.session_state.chat_history):
-        if msg["role"] == "user":
-            st.markdown(f'<div class="chat-msg-user">{msg["text"]}</div>', unsafe_allow_html=True)
-        else:
-            route = msg.get("route", "LOCAL_QA")
-            badge_class = "local-qa" if route == "LOCAL_QA" else ("web-search" if route == "WEB_SEARCH" else "report-expansion")
-            badge_label = "✦ Context QA" if route == "LOCAL_QA" else ("🌐 Live Web Probe" if route == "WEB_SEARCH" else "📝 Living Report Expansion")
-            
-            st.markdown(
-                f'<div class="route-badge {badge_class}">{badge_label}</div>'
-                f'<div class="chat-msg-agent">{msg["text"]}</div>',
-                unsafe_allow_html=True
-            )
-            
-            # 1-Click Merge to Synthesis Report Button
-            col_m1, col_m2 = st.columns([2, 1])
-            with col_m2:
-                if st.button("✦ Merge to Report", key=f"merge_btn_{idx}", help="Append this finding into the Synthesis Report"):
-                    current_rep = st.session_state.final_state.get("report", "")
-                    merge_section = f"\n\n### Follow-Up Investigation: {msg.get('query_title', 'Key Finding')}\n{msg['text']}"
-                    st.session_state.final_state["report"] = current_rep + merge_section
-                    st.success("Merged into Synthesis Report!")
-                    st.rerun()
+    # Agent Step Progression Status
+    st.divider()
+    st.subheader("Agent Deliberation Timeline")
 
-    # Streaming / Status Indicators
+    step_cols = st.columns(len(NODE_ORDER))
+    for idx, (node_key, c) in enumerate(zip(NODE_ORDER, step_cols)):
+        label = NODE_LABEL_MAP.get(node_key, node_key.capitalize())
+        status = runner.node_statuses[idx] if idx < len(runner.node_statuses) else "pending"
+        duration = runner.node_durations.get(node_key)
+
+        with c:
+            if status == "completed":
+                st.success(f"✓ {label}" + (f"\n`{duration:.1f}s`" if duration else ""))
+            elif status == "active":
+                st.info(f"⏳ **{label}**\n*(running)*")
+            else:
+                st.caption(f"○ {label}")
+
     if runner.is_active:
-        st.markdown(
-            '<div class="chat-msg-agent" style="color: var(--text-muted);">'
-            '✦ Thoth agents are actively searching registries, scraping sources, and synthesizing mind map...'
-            '</div>',
-            unsafe_allow_html=True
-        )
+        st.info("✦ Agents are deliberating: searching scholarly APIs, scraping evidence, drafting, and verifying claims…")
     elif runner.is_followup_active:
-        ev = runner.active_followup_event or "processing"
-        st.markdown(
-            f'<div class="chat-msg-agent" style="color: #38BDF8; font-weight: 500;">'
-            f'✦ Executing follow-up probe: <code>{ev}</code> (querying registries & Mind Map)...'
-            '</div>',
-            unsafe_allow_html=True
-        )
-    elif final_report and not st.session_state.chat_history:
-        st.markdown(
-            '<div class="chat-msg-agent">'
-            '✦ Verified research synthesis & Concept Mind Map generated. You can ask any follow-up question below '
-            'or click a suggested exploration vector.'
-            '</div>',
-            unsafe_allow_html=True
-        )
+        st.info(f"✦ Processing follow-up query: `{runner.active_followup_event}`")
 
-    # Multi-Turn Follow-Up Controls (Only shown once initial report is ready)
-    if final_report and not runner.is_active:
-        st.markdown("<div style='margin-top: 1.2rem;'></div>", unsafe_allow_html=True)
-        
-        # Mode Selector
-        col_m_label, col_mode = st.columns([1, 2])
-        with col_m_label:
-            st.markdown("<span style='font-size:0.82rem; font-weight:600; color:var(--text-secondary);'>Route Mode:</span>", unsafe_allow_html=True)
-        with col_mode:
-            mode_choice = st.radio(
-                "Follow-up Mode",
-                ["Auto ✦", "⚡ Fast QA", "🌐 Web Probe", "📝 Expand Report"],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="mode_radio"
+    # Research Synthesis Output
+    final_report = st.session_state.final_state.get("report", "")
+    if final_report:
+        st.divider()
+        st.subheader("Verified Synthesis & Findings")
+
+        score_val = st.session_state.final_state.get("score", 0.0)
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            st.metric("Quality Score", f"{score_val:.1f} / 10" if score_val else "Verified")
+        with col_m2:
+            st.metric("Word Count", f"{len(final_report.split()):,} words")
+        with col_m3:
+            cum_sources = st.session_state.final_state.get("cumulative_sources", [])
+            st.metric("Literature Grounding", f"{len(cum_sources)} Primary Sources")
+
+        tab_rep_view, tab_sources_view, tab_audit_view, tab_chat_view = st.tabs([
+            "Synthesis Report",
+            "Literature Matrix",
+            "Truth Guard & Critic Audit",
+            "Copilot Dialogue"
+        ])
+
+        with tab_rep_view:
+            st.markdown(final_report)
+            st.download_button(
+                "📥 Download Synthesis (.md)",
+                data=final_report,
+                file_name=f"thoth_research_{int(time.time())}.md",
+                mime="text/markdown"
             )
-            mode_map = {
-                "Auto ✦": "auto",
-                "⚡ Fast QA": "local_qa",
-                "🌐 Web Probe": "web_probe",
-                "📝 Expand Report": "expand_report"
-            }
-            st.session_state.followup_mode = mode_map.get(mode_choice, "auto")
 
-        # Proactive Follow-up Suggestion Pills
-        suggestions = follow_ups if follow_ups else [
-            f"What are the practical solutions and interventions to address these challenges?",
-            f"Compare these findings against latest 2026 empirical benchmarks",
-            f"What are the major policy and funding implications?"
-        ]
-        
-        st.markdown("<div style='font-size:0.8rem; color:var(--text-muted); margin-top:0.6rem; margin-bottom:0.3rem;'>Suggested Follow-Ups:</div>", unsafe_allow_html=True)
-        for i, q in enumerate(suggestions[:3]):
-            if st.button(f"✦ {q}", key=f"chat_pill_{i}", use_container_width=True, disabled=runner.is_running()):
-                # Trigger follow-up turn asynchronously
-                st.session_state.chat_history.append({"role": "user", "text": q})
+        with tab_sources_view:
+            cum_sources = st.session_state.final_state.get("cumulative_sources", [])
+            if cum_sources:
+                for idx, s in enumerate(cum_sources, 1):
+                    url = s.get("url", "#")
+                    title = s.get("title", f"Source {idx}")
+                    turn = s.get("added_in_turn", 0)
+                    is_pdf = url.endswith(".pdf") or "arxiv.org/pdf" in url
+                    pdf_tag = " `[PDF]`" if is_pdf else ""
+
+                    st.markdown(f"**{idx}. [{title}]({url})**{pdf_tag}")
+                    st.caption(f"URL: {url} | Discovered: Turn {turn}")
+            else:
+                st.info("No sources recorded yet.")
+
+        with tab_audit_view:
+            col_v1, col_v2 = st.columns(2)
+            with col_v1:
+                st.markdown("#### Truth Guard SLM Fact-Adjudication")
+                verifier_log = runner.node_logs.get("verifier") or st.session_state.final_state.get("verifier_feedback", "")
+                if verifier_log:
+                    st.code(verifier_log, language="markdown")
+                else:
+                    st.info("No verifier log recorded.")
+            with col_v2:
+                st.markdown("#### LLM-as-a-Judge Critic Scorecard")
+                critic_log = runner.node_logs.get("critic", "")
+                if critic_log:
+                    st.code(critic_log, language="markdown")
+                else:
+                    st.info("No critic scorecard recorded.")
+
+        with tab_chat_view:
+            st.markdown("#### Research Copilot Dialogue")
+            for msg in st.session_state.chat_history:
+                if msg["role"] == "user":
+                    st.chat_message("user").write(msg["text"])
+                else:
+                    route = msg.get("route", "LOCAL_QA")
+                    badge = "✦ Vault QA" if route == "LOCAL_QA" else ("🌐 Web Probe" if route == "WEB_SEARCH" else "📝 Expanded Report")
+                    st.chat_message("assistant").write(f"**[{badge}]** {msg['text']}")
+
+            follow_up_input = st.text_input("Ask a follow-up inquiry", placeholder="Ask about specific findings, methodology, or comparison...", disabled=runner.is_running())
+            mode_choice = st.radio("Routing Mode", ["Auto (Smart Routing)", "Vault QA Only", "Academic Web Search", "Expand Main Report"], horizontal=True)
+            mode_map = {
+                "Auto (Smart Routing)": "auto",
+                "Vault QA Only": "local_qa",
+                "Academic Web Search": "web_probe",
+                "Expand Main Report": "expand_report"
+            }
+
+            if st.button("Send Follow-Up", disabled=runner.is_running()) and follow_up_input.strip():
+                user_q = follow_up_input.strip()
+                st.session_state.chat_history.append({"role": "user", "text": user_q})
                 runner.start_followup(
                     current_state=st.session_state.final_state,
-                    user_query=q,
-                    mode_override=st.session_state.followup_mode
+                    user_query=user_q,
+                    mode_override=mode_map.get(mode_choice, "auto")
                 )
                 st.rerun()
 
-        # Follow-up Free-Form Chat Input Bar
-        st.markdown("<div style='margin-top: 0.8rem;'></div>", unsafe_allow_html=True)
-        col_fq1, col_fq2 = st.columns([4, 1])
-        with col_fq1:
-            chat_followup_input = st.text_input(
-                "Ask a follow-up question",
-                placeholder="Ask any follow-up question or probe new angle...",
-                label_visibility="collapsed",
-                key="chat_followup_input",
-                disabled=runner.is_running()
-            )
-        with col_fq2:
-            send_followup_btn = st.button("✦ Ask", key="send_chat_followup", use_container_width=True, disabled=runner.is_running())
-            
-        if send_followup_btn and chat_followup_input.strip():
-            user_q = chat_followup_input.strip()
-            st.session_state.chat_history.append({"role": "user", "text": user_q})
-            runner.start_followup(
-                current_state=st.session_state.final_state,
-                user_query=user_q,
-                mode_override=st.session_state.followup_mode
-            )
-            st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# RIGHT PANE: TABBED RESEARCH WORKSPACE (60% Width)
+# TAB 2: KNOWLEDGE CONSTELLATION
 # ==============================================================================
-with col_workspace:
-    # 1. Pinned Horizontal Stepper Rail
-    active_idx = NODE_ORDER.index(st.session_state.active_node) if st.session_state.active_node in NODE_ORDER else 0
-    render_planner_stepper(
-        active_idx=active_idx,
-        statuses=st.session_state.node_statuses,
-        durations=st.session_state.node_durations
-    )
-    
-    # 2. Workspace Tabs (Featuring Concept Mind Map)
-    tab_report, tab_mindmap, tab_matrix, tab_audit, tab_notes = st.tabs([
-        "Synthesis Report",
-        "✦ Concept Mind Map",
-        "Literature Matrix",
-        "Truth Guard Audit",
-        "Notes & Export"
-    ])
-    
-    # --------------------------------------------------------------------------
-    # TAB 1: SYNTHESIS REPORT (Editorial Serif Typography)
-    # --------------------------------------------------------------------------
-    with tab_report:
-        if final_report:
-            # Render Source Domain Chips from cumulative sources
-            cum_sources = st.session_state.final_state.get("cumulative_sources", [])
-            if cum_sources:
-                chips_html = ["<div style='margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 6px;'>"]
-                for idx, s in enumerate(cum_sources[:8], 1):
-                    url = s.get("url", "#")
-                    domain = s.get("domain", url)
-                    chips_html.append(
-                        f'<a class="chip" href="{url}" target="_blank">'
-                        f'<span class="chip-dot" style="background:var(--ok);"></span>'
-                        f'[{idx}] {domain}'
-                        f'</a>'
-                    )
-                chips_html.append("</div>")
-                st.markdown("".join(chips_html), unsafe_allow_html=True)
-                
-            # Render Prose with Editorial Serif
-            st.markdown(f'<div class="editorial-prose">{final_report}</div>', unsafe_allow_html=True)
-            
-            # Action Buttons Row
-            st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
-            col_a1, col_a2 = st.columns([1, 1])
-            with col_a1:
-                st.download_button(
-                    label="Download Report (.md)",
-                    data=final_report,
-                    file_name=f"thoth_synthesis_{int(time.time())}.md",
-                    mime="text/markdown",
-                    use_container_width=True
+with tab_constellation:
+    st.header("✧ Knowledge Constellation")
+    st.write("Visual and structural representation of extracted concept nodes and typed relationships.")
+
+    mindmap_data = st.session_state.final_state.get("mindmap", {})
+    if mindmap_data and mindmap_data.get("nodes"):
+        nodes = mindmap_data.get("nodes", [])
+        edges = mindmap_data.get("edges", [])
+
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            st.metric("Concept Nodes", len(nodes))
+        with col_c2:
+            st.metric("Typed Relationships", len(edges))
+
+        col_n1, col_n2 = st.columns([1, 1])
+        with col_n1:
+            st.subheader("Concept Nodes")
+            for n in nodes:
+                st.markdown(f"- **{n.get('label')}** (`{n.get('type')}`): {n.get('details', '')}")
+        with col_n2:
+            st.subheader("Graph Edges")
+            for e in edges:
+                st.markdown(f"- `{e.get('from')}` ➔ **{e.get('label', 'relates')}** ➔ `{e.get('to')}`")
+
+        with st.expander("Inspect Raw Mind Map JSON"):
+            st.json(mindmap_data)
+    else:
+        st.info("Run a research cycle in the Research Lab tab to generate the concept graph.")
+
+
+# ==============================================================================
+# TAB 3: MEMORY VAULT EXPLORER
+# ==============================================================================
+with tab_vault:
+    st.header("🗄 Obsidian Memory Vault & Hybrid Search")
+    st.write("Query atomic notes with Reciprocal Rank Fusion (FTS5 BM25 + Dense Semantic Vector Search).")
+
+    search_query = st.text_input("Hybrid Search Query", placeholder="Search memory vault across topics, entities, and sources...")
+    cat_filter = st.selectbox("Category Filter", ["All", "topics", "sources", "entities", "sessions"])
+
+    col_vlist, col_vview = st.columns([4, 6])
+
+    with col_vlist:
+        if search_query.strip():
+            hits = search_memory_vault(search_query.strip(), top_k=10)
+            st.markdown(f"**Found {len(hits)} matching notes:**")
+            for h in hits:
+                nid = h.get("note_id", "")
+                ntype = h.get("type", "")
+                score = h.get("rrf_score", 0.0)
+                if st.button(f"📄 {nid} (RRF: {score:.4f})", key=f"vhit_{nid}", use_container_width=True):
+                    st.session_state.selected_vault_note = nid
+        else:
+            cat = None if cat_filter == "All" else cat_filter
+            all_notes = list_vault_notes(note_type=cat)
+            st.markdown(f"**Vault Notes ({len(all_notes)}):**")
+            for nid in all_notes[:30]:
+                if st.button(f"📄 {nid}", key=f"vnote_{nid}", use_container_width=True):
+                    st.session_state.selected_vault_note = nid
+
+    with col_vview:
+        sel_id = st.session_state.get("selected_vault_note")
+        if sel_id:
+            note = read_vault_note(sel_id)
+            if note:
+                st.subheader(f"Note: {sel_id}")
+                st.json(note.get("frontmatter", {}))
+                st.markdown("### Content")
+                st.markdown(note.get("content", ""))
+
+                neighbors = traverse_vault_graph(start_note=sel_id, max_depth=1)
+                if neighbors:
+                    st.markdown("### 1-Hop Connected Notes")
+                    for nb in neighbors:
+                        st.markdown(f"- `{nb.get('target')}` (*{nb.get('relation')}*)")
+            else:
+                st.error("Could not load note content.")
+        else:
+            st.info("Select a note from the left to inspect its contents and YAML frontmatter.")
+
+
+# ==============================================================================
+# TAB 4: CODEX HISTORY
+# ==============================================================================
+with tab_history:
+    st.header("📜 Codex History & Persistent SQLite Archive")
+    st.write("Access previously generated research reports and multi-turn sessions stored in SQLite.")
+
+    reports = list_stored_reports(limit=25)
+    if reports:
+        for r in reports:
+            rid = r.get("report_id", "")
+            topic = r.get("topic", "Untitled")
+            score = r.get("score", 0.0)
+            created = r.get("created_at", "")
+            content = r.get("content", "")
+
+            with st.container():
+                st.markdown(f"### {topic}")
+                st.caption(f"ID: `{rid}` | Saved: {created[:19]} | Score: **{score:.1f}/10**")
+
+                col_hr1, col_hr2 = st.columns([1, 4])
+                with col_hr1:
+                    if st.button("✦ Restore to Lab", key=f"restore_{rid}"):
+                        st.session_state.topic_input = topic
+                        st.session_state.final_state = {
+                            "topic": topic,
+                            "report": content,
+                            "score": score,
+                            "verifier_feedback": r.get("verifier_feedback", ""),
+                            "mindmap": json.loads(r["mindmap_json"]) if r.get("mindmap_json") else {}
+                        }
+                        st.session_state.chat_history = []
+                        st.success("Loaded into active workspace!")
+                        st.rerun()
+                with col_hr2:
+                    with st.expander("Preview Text"):
+                        st.markdown(content[:600] + "...")
+                st.divider()
+    else:
+        st.info("No reports stored in SQLite database yet.")
+
+
+# ==============================================================================
+# TAB 5: DIAGNOSTICS & TELEMETRY
+# ==============================================================================
+with tab_diagnostics:
+    st.header("⚙ System Diagnostics & Health HUD")
+    st.write("Verify all 7 architectural layers: credentials, hybrid vault search, dispatcher circuit breaker, orchestrator mock, multi-turn memory, and frontier AI review.")
+
+    run_diag = st.button("▶ Run Full 7-Layer Diagnostic Test", type="primary")
+    if run_diag:
+        st.info("Executing `diagnostic_test.py` across all 7 layers...")
+        with st.spinner("Running diagnostic suite..."):
+            try:
+                res = subprocess.run(
+                    [sys.executable, "diagnostic_test.py"],
+                    capture_output=True,
+                    text=True,
+                    cwd=_CURRENT_DIR,
+                    timeout=120
                 )
-            with col_a2:
-                render_copy_widget(final_report, "Copy Markdown")
-        elif runner.is_running():
-            st.info("Agents are actively drafting and synthesizing the research report...")
-        else:
-            st.markdown(
-                '<div style="color: var(--text-muted); padding: 3rem 1rem; text-align: center;">'
-                'Enter a research objective on the left and click <strong>Launch Research</strong> to generate a verified synthesis report.'
-                '</div>',
-                unsafe_allow_html=True
-            )
+                if res.returncode == 0:
+                    st.success("✓ All 7 Diagnostic Layers Passed Successfully!")
+                else:
+                    st.warning(f"Diagnostics exited with code {res.returncode}")
+                st.code(res.stdout, language="text")
+                if res.stderr:
+                    st.code(res.stderr, language="text")
+            except Exception as e:
+                st.error(f"Error executing diagnostic test: {e}")
 
-    # --------------------------------------------------------------------------
-    # TAB 2: CONCEPT MIND MAP (Interactive Dynamic Knowledge Graph)
-    # --------------------------------------------------------------------------
-    with tab_mindmap:
-        mindmap_data = st.session_state.final_state.get("mindmap", {})
-        if mindmap_data and mindmap_data.get("nodes"):
-            st.markdown(
-                "<div style='font-size:0.85rem; color:var(--text-secondary); margin-bottom: 8px;'>"
-                "Interactive concept graph with drag, zoom, and live follow-up expansion. Hover over nodes to inspect evidence."
-                "</div>",
-                unsafe_allow_html=True
-            )
-            render_interactive_mindmap(mindmap_data, height=520)
-        elif runner.is_running():
-            st.info("Concept Mind Map will be generated once research drafting completes...")
-        else:
-            st.markdown(
-                '<div style="color: var(--text-muted); padding: 3rem 1rem; text-align: center;">'
-                'The interactive Concept Mind Map will appear here after initial research synthesis completes.'
-                '</div>',
-                unsafe_allow_html=True
-            )
-
-    # --------------------------------------------------------------------------
-    # TAB 3: LITERATURE REVIEW MATRIX (Cumulative Deduplicated Sources)
-    # --------------------------------------------------------------------------
-    with tab_matrix:
-        cum_sources = st.session_state.final_state.get("cumulative_sources", [])
-        if cum_sources:
-            rows_html = []
-            for i, s in enumerate(cum_sources, 1):
-                url = s.get("url", "#")
-                domain = s.get("domain", url)
-                title = s.get("title", f"Source {i}")
-                turn = s.get("added_in_turn", 0)
-                turn_label = "Initial Synthesis" if turn == 0 else f"Follow-up #{turn}"
-                
-                rows_html.append(
-                    f'<tr>'
-                    f'<td style="width: 25%; font-weight: 500; color: #FFFFFF;">Source #{i}: <a href="{url}" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">{domain}</a></td>'
-                    f'<td style="width: 35%;">{title}</td>'
-                    f'<td style="width: 20%; color: var(--text-muted);">{turn_label}</td>'
-                    f'<td style="width: 20%; text-align: center;"><span class="status-pill verified">✓ Verified</span></td>'
-                    f'</tr>'
-                )
-                
-            matrix_html = f"""
-            <table class="matrix-table">
-                <thead>
-                    <tr>
-                        <th style="width: 25%;">Source / Domain</th>
-                        <th style="width: 35%;">Extracted Title / Scope</th>
-                        <th style="width: 20%;">Discovery Vector</th>
-                        <th style="width: 20%; text-align: center;">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {"".join(rows_html)}
-                </tbody>
-            </table>
-            """
-            st.markdown(matrix_html, unsafe_allow_html=True)
-        else:
-            st.markdown(
-                '<div style="color: var(--text-muted); padding: 3rem 1rem; text-align: center;">'
-                'The literature matrix will populate automatically with verified sources and follow-up probes.'
-                '</div>',
-                unsafe_allow_html=True
-            )
-
-    # --------------------------------------------------------------------------
-    # TAB 4: TRUTH GUARD AUDIT & QUALITY EVALUATION
-    # --------------------------------------------------------------------------
-    with tab_audit:
-        verifier_log = st.session_state.node_logs.get("verifier", "")
-        critic_log = st.session_state.node_logs.get("critic", "")
-        
-        if verifier_log or critic_log:
-            if verifier_log:
-                st.markdown("<div style='font-weight: 600; font-size: 0.95rem; margin-bottom: 0.4rem; color: #FFFFFF;'>SLM Fact-Verifier (Truth Guard)</div>", unsafe_allow_html=True)
-                st.markdown(f'<div class="log-pane">{verifier_log}</div>', unsafe_allow_html=True)
-            if critic_log:
-                st.markdown("<div style='font-weight: 600; font-size: 0.95rem; margin-top: 1rem; margin-bottom: 0.4rem; color: #FFFFFF;'>LLM-as-a-Judge Quality Audit</div>", unsafe_allow_html=True)
-                st.markdown(f'<div class="log-pane">{critic_log}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(
-                '<div style="color: var(--text-muted); padding: 3rem 1rem; text-align: center;">'
-                'Verification audit logs and quality evaluation scores will appear here during pipeline execution.'
-                '</div>',
-                unsafe_allow_html=True
-            )
-
-    # --------------------------------------------------------------------------
-    # TAB 5: RESEARCH NOTES & SCRATCHPAD
-    # --------------------------------------------------------------------------
-    with tab_notes:
-        st.markdown("<div style='font-weight: 600; font-size: 0.95rem; margin-bottom: 0.4rem; color: #FFFFFF;'>Research Scratchpad & Synthesis Export</div>", unsafe_allow_html=True)
-        st.session_state.scratchpad_text = st.text_area(
-            "Scratchpad Notes",
-            value=st.session_state.scratchpad_text,
-            placeholder="Jot down notes, citations, hypothesis thoughts, or snippets from the report...",
-            height=260,
-            label_visibility="collapsed"
-        )
-        if st.session_state.scratchpad_text:
-            st.download_button(
-                label="Export Notes (.txt)",
-                data=st.session_state.scratchpad_text,
-                file_name=f"thoth_notes_{int(time.time())}.txt",
-                mime="text/plain"
-            )
-
-# 6. Auto-poll UI while background worker thread is active
+# Auto-rerun loop while background thread is working
 if runner.is_running():
     time.sleep(1.0)
     st.rerun()
-

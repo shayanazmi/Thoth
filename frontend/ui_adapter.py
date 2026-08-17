@@ -1,7 +1,7 @@
 import threading
 import time
 from typing import Callable, Optional, Dict, Any, List
-from pipeline import stream_research_pipeline, stream_followup_turn
+from backend.pipeline import stream_research_pipeline, stream_followup_turn
 
 NODE_LABEL_MAP = {
     "search": "Search",
@@ -40,6 +40,7 @@ class ResearchPipelineRunner:
         }
         self.final_state: Dict[str, Any] = {}
         self.run_start_time: float = 0.0
+        self.current_session_id: str = ""
         
         # Follow-up turn runner state
         self.is_followup_active = False
@@ -72,6 +73,7 @@ class ResearchPipelineRunner:
         scrape_top_n: int = 2,
         min_score: float = 6.5,
         max_retries: int = 2,
+        session_id: Optional[str] = None,
         on_node_update: Optional[Callable[[str, Dict[str, Any], Dict[str, Any], Dict[str, float]], None]] = None,
         on_complete: Optional[Callable[[Dict[str, Any], Dict[str, float]], None]] = None,
         on_error: Optional[Callable[[Exception], None]] = None
@@ -80,6 +82,8 @@ class ResearchPipelineRunner:
         if self.is_active or self.is_followup_active:
             raise RuntimeError("Pipeline or follow-up is already running!")
             
+        import uuid
+        self.current_session_id = session_id or f"sess_{uuid.uuid4().hex[:12]}"
         self.cancel_event.clear()
         self.is_active = True
         self.reset()
@@ -144,6 +148,23 @@ class ResearchPipelineRunner:
                     self.node_statuses = ["done"] * 7
                     self.active_node = "done"
                     self.is_completed = True
+                    
+                    # Persist session & report to SQLite database
+                    try:
+                        from backend.memory.db import save_session, save_report
+                        sess_id = self.current_session_id
+                        top = self.final_state.get("topic", topic)
+                        rep_content = self.final_state.get("report", "")
+                        sc = self.final_state.get("score", 0.0)
+                        v_fb = self.final_state.get("verifier_feedback", "")
+                        mm = self.final_state.get("mindmap", {})
+                        save_session(session_id=sess_id, title=top, summary=rep_content[:300])
+                        if rep_content:
+                            rep_id = f"rep_{uuid.uuid4().hex[:10]}"
+                            save_report(report_id=rep_id, session_id=sess_id, topic=top, content=rep_content, score=sc, verifier_feedback=v_fb, mindmap=mm)
+                    except Exception as db_err:
+                        print(f"[UI ADAPTER DB PERSIST ERROR] {db_err}")
+
                     if on_complete:
                         try:
                             on_complete(self.final_state, self.node_durations)
@@ -250,4 +271,107 @@ class ResearchPipelineRunner:
 
     def is_running(self) -> bool:
         return self.is_active or self.is_followup_active
+
+
+# ==============================================================================
+# WORKSPACE DATA BRIDGE HELPERS
+# ==============================================================================
+
+def list_stored_sessions(limit: int = 50) -> List[Dict[str, Any]]:
+    """Fetches past research sessions from SQLite."""
+    try:
+        from backend.memory.db import list_sessions
+        return list_sessions(limit=limit)
+    except Exception as e:
+        print(f"[UI ADAPTER] Error listing sessions: {e}")
+        return []
+
+def list_stored_reports(limit: int = 50) -> List[Dict[str, Any]]:
+    """Fetches stored research reports from SQLite."""
+    try:
+        from backend.memory.db import list_reports
+        return list_reports(limit=limit)
+    except Exception as e:
+        print(f"[UI ADAPTER] Error listing reports: {e}")
+        return []
+
+def get_stored_report_by_id(report_id: str) -> Optional[Dict[str, Any]]:
+    """Fetches a specific stored report by ID."""
+    try:
+        from backend.memory.db import get_report
+        return get_report(report_id)
+    except Exception as e:
+        print(f"[UI ADAPTER] Error fetching report {report_id}: {e}")
+        return None
+
+def search_memory_vault(query: str, top_k: int = 8) -> List[Dict[str, Any]]:
+    """Performs real-time Reciprocal Rank Fusion hybrid search on the Obsidian vault."""
+    try:
+        from backend.memory.index import hybrid_search
+        return hybrid_search(query=query, top_k=top_k)
+    except Exception as e:
+        print(f"[UI ADAPTER] Vault search error: {e}")
+        return []
+
+def list_vault_notes(note_type: Optional[str] = None) -> List[str]:
+    """Lists note IDs in the Obsidian vault, optionally filtered by type."""
+    try:
+        from backend.memory.vault import list_notes
+        return list_notes(note_type=note_type)
+    except Exception as e:
+        print(f"[UI ADAPTER] Error listing vault notes: {e}")
+        return []
+
+def read_vault_note(note_id: str) -> Optional[Dict[str, Any]]:
+    """Reads a note's frontmatter and content from the Obsidian vault."""
+    try:
+        from backend.memory.vault import read_note
+        return read_note(note_id)
+    except Exception as e:
+        print(f"[UI ADAPTER] Error reading vault note {note_id}: {e}")
+        return None
+
+def traverse_vault_graph(start_note: str, relation: Optional[str] = None, max_depth: int = 2) -> List[Dict[str, Any]]:
+    """Traverses knowledge graph edges from a start note."""
+    try:
+        from backend.memory.graph import traverse
+        return traverse(start_note=start_note, relation=relation, max_depth=max_depth)
+    except Exception as e:
+        print(f"[UI ADAPTER] Error traversing graph for {start_note}: {e}")
+        return []
+
+def get_telemetry_status() -> Dict[str, Any]:
+    """Fetches live telemetry and health status from backend components."""
+    import os
+    from backend.dispatcher import default_dispatcher
+    
+    cb_state = default_dispatcher.state if hasattr(default_dispatcher, "state") else "CLOSED"
+    time_until_retry = max(0.0, getattr(default_dispatcher, "_last_failure_time", 0.0) + getattr(default_dispatcher, "cooloff_seconds", 30.0) - time.time()) if cb_state == "OPEN" else 0.0
+    
+    has_nvidia = bool(os.getenv("NVIDIA_API_KEY"))
+    has_groq = bool(os.getenv("GROQ_API_KEY"))
+    has_openai = bool(os.getenv("OPENAI_API_KEY"))
+    has_tavily = bool(os.getenv("TAVILY_API_KEY"))
+    
+    primary_provider = "NVIDIA NIM (Nemotron-30B & Llama-8B)" if has_nvidia else "Unconfigured"
+    fallback_provider = "Groq (Llama-3.3-70B)" if has_groq else ("OpenAI Compatible" if has_openai else "None")
+    
+    # Check database size
+    db_size_kb = 0
+    if os.path.exists("store.db"):
+        db_size_kb = round(os.path.getsize("store.db") / 1024, 1)
+        
+    vault_notes_count = len(list_vault_notes())
+    
+    return {
+        "circuit_breaker_state": cb_state,
+        "circuit_breaker_cooloff": round(time_until_retry, 1),
+        "primary_provider": primary_provider,
+        "fallback_provider": fallback_provider,
+        "scholarly_sources": ["arXiv", "OpenAlex", "Semantic Scholar"],
+        "web_search_available": has_tavily,
+        "db_size_kb": db_size_kb,
+        "vault_notes_count": vault_notes_count,
+        "concurrency_limit": getattr(default_dispatcher, "max_concurrent", 3)
+    }
 
