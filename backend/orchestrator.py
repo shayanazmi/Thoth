@@ -11,6 +11,7 @@ from backend.memory.db import DEFAULT_DB_PATH
 from backend.memory.index import index_note
 from backend.pipeline import (
     search_node,
+    snowball_node,
     writer_node,
     verifier_node,
     critic_node,
@@ -19,8 +20,26 @@ from backend.pipeline import (
     _extract_domain,
     _extract_urls_from_text
 )
+from backend.telemetry import observe
 
 logger = logging.getLogger("ThothOrchestrator")
+
+
+class ResearchFSMState:
+    """Explicit Finite State Machine States for Autonomous Research Orchestrator."""
+    PLAN = "PLAN"
+    SEARCH = "SEARCH"
+    SNOWBALL = "SNOWBALL"
+    SCRAPE = "SCRAPE"
+    DRAFT = "DRAFT"
+    TRUTH_GUARD = "TRUTH_GUARD"
+    CRITIC = "CRITIC"
+    REPLAN = "REPLAN"
+    MINDMAP = "MINDMAP"
+    VAULT = "VAULT"
+    FOLLOW_UP = "FOLLOW_UP"
+    COMPLETE = "COMPLETE"
+
 
 # Default pipeline dispatcher for concurrency capping and resilience
 pipeline_dispatcher = Dispatcher(
@@ -30,6 +49,7 @@ pipeline_dispatcher = Dispatcher(
     max_consecutive_failures=5,
     cooloff_seconds=30.0
 )
+
 
 
 def create_initial_state(
@@ -61,10 +81,13 @@ def create_initial_state(
         "mindmap": {"nodes": [], "edges": []},
         "cumulative_sources": [],
         "conversation_summary": "",
-        "chat_turns": []
+        "chat_turns": [],
+        "rejected_claims": [],
+        "circular_replan_warnings": []
     }
 
 
+@observe(type="tool", description="Concurrently scrapes and extracts readable text from candidate URLs")
 async def concurrent_scrape_urls(urls: List[str], dispatcher: Dispatcher = pipeline_dispatcher) -> Tuple[str, List[Dict[str, Any]]]:
     """
     Fans out scraping calls for all target URLs concurrently using asyncio.gather.
@@ -104,18 +127,35 @@ async def concurrent_verifier_and_critic(state: Dict[str, Any], dispatcher: Disp
     """
     Executes verifier_node and critic_node concurrently against the draft report using asyncio.gather.
     Both nodes perform independent reads of the same draft data.
+    Gracefully handles CircuitBreakerOpenError or provider errors by returning partial fallback updates.
     """
     logger.info("[ORCHESTRATOR CONCURRENCY] Running Verifier and Critic concurrently in parallel...")
     print("\n[INFO] [ORCHESTRATOR] Running Verifier and Critic concurrently in parallel...")
 
-    # Wrap sync node calls into dispatcher
-    verifier_task = dispatcher.call(verifier_node, state)
-    critic_task = dispatcher.call(critic_node, state)
+    results = await asyncio.gather(
+        dispatcher.call(verifier_node, state),
+        dispatcher.call(critic_node, state),
+        return_exceptions=True
+    )
 
-    verifier_update, critic_update = await asyncio.gather(verifier_task, critic_task)
+    verifier_res, critic_res = results
+
+    if isinstance(verifier_res, Exception):
+        logger.error(f"[ORCHESTRATOR CONCURRENCY] Verifier execution error / circuit trip: {verifier_res}")
+        verifier_update = {"verifier_feedback": "", "verification_results": [], "verification_status": f"UNAVAILABLE ({verifier_res})"}
+    else:
+        verifier_update = verifier_res
+
+    if isinstance(critic_res, Exception):
+        logger.error(f"[ORCHESTRATOR CONCURRENCY] Critic execution error / circuit trip: {critic_res}")
+        critic_update = {"score": 7.0, "feedback": f"Quality evaluation unavailable: {critic_res}"}
+    else:
+        critic_update = critic_res
+
     return verifier_update, critic_update
 
 
+@observe(type="agent", available_tools=["search_scholarly_sources", "scrape_url", "writer_node", "verifier_node", "critic_node", "mindmap_node", "follow_up_node"])
 def stream_research_pipeline(
     topic: str,
     role: str = "senior academic researcher",
@@ -151,17 +191,28 @@ def stream_research_pipeline(
         logger.info("[ORCHESTRATOR] Cancel event detected before search.")
         return
 
-    # ACT 1: Execute Web Search Node
+    # ACT 1: Execute Web & Scholarly Search Node
     logger.info(f"[ORCHESTRATOR - PLAN] Initiating search for topic: '{topic}'")
     search_update = search_node(state)
     state.update(search_update)
     yield "search", search_update, dict(state)
 
     if cancel_event and cancel_event.is_set():
+        logger.info("[ORCHESTRATOR] Cancel event detected before snowball.")
+        return
+
+    # ACT 1.5: Execute Snowballing Node (Citation Graph & Neural Recommendations)
+    logger.info(f"[ORCHESTRATOR - SNOWBALL] Expanding citation graph and recommendations for '{topic}'...")
+    snowball_update = snowball_node(state)
+    state.update(snowball_update)
+    yield "snowball", snowball_update, dict(state)
+
+    if cancel_event and cancel_event.is_set():
         logger.info("[ORCHESTRATOR] Cancel event detected before scrape.")
         return
 
     # ACT 2: Execute Reader Concurrent Scrape Fan-Out Node
+
     existing_sources = state.get("cumulative_sources", [])
     candidate_urls = [s.get("url") for s in existing_sources if s.get("url")][:state["scrape_top_n"]]
     if not candidate_urls:
@@ -200,6 +251,21 @@ def stream_research_pipeline(
         logger.info(f"[ORCHESTRATOR - ACT] Writer drafting report (attempt {attempt})...")
         writer_update = writer_node(state)
         state.update(writer_update)
+
+        # On replan attempts, detect if the regenerated draft reintroduces previously rejected unverified claims
+        if attempt > 1 and state.get("rejected_claims"):
+            from backend.eval.logical_integrity import detect_circular_replan
+            draft_text = state.get("report", "")
+            # Split draft into sentences/bullet claims
+            draft_claims = [s.strip() for s in re.split(r"[\n\.\?!]", draft_text) if len(s.strip()) > 15]
+            circular_findings = detect_circular_replan(state["rejected_claims"], draft_claims)
+            if circular_findings:
+                state.setdefault("circular_replan_warnings", []).extend(circular_findings)
+                logger.warning(
+                    f"[ORCHESTRATOR - CIRCULAR REPLAN] Regenerated draft reintroduces {len(circular_findings)} "
+                    f"previously rejected unverified claims without new evidence."
+                )
+
         yield "writer", writer_update, dict(state)
 
         if cancel_event and cancel_event.is_set():
@@ -224,9 +290,16 @@ def stream_research_pipeline(
         logger.info(f"[ACT PHASE TIMING] Act phase (concurrent fan-out scrape + parallel verifier/critic) completed in {act_duration}s.")
         print(f"\n[TIMING] [ACT PHASE] Completed in {act_duration}s (Concurrent fan-out active).")
 
-        # OBSERVE 1: Evaluate Verifier Audit Results
+        # OBSERVE 1: Evaluate Verifier Audit Results & Collect Rejected Claims
         verifier_feedback = state.get("verifier_feedback", "")
         if verifier_feedback:
+            # Extract failed claim lines from verifier feedback to prevent circular reintroduction
+            for line in verifier_feedback.split("\n"):
+                clean_line = line.strip().lstrip("-*• ")
+                if clean_line and len(clean_line) > 10 and not clean_line.startswith("Verification"):
+                    if clean_line not in state.get("rejected_claims", []):
+                        state.setdefault("rejected_claims", []).append(clean_line)
+
             if state["attempt"] <= state["max_retries"]:
                 logger.warning(f"[ORCHESTRATOR - REPLAN] Truth Guard flagged factual contradictions. Looping back to Writer (attempt {state['attempt']}/{state['max_retries']}).")
                 print(f"\n[REPLAN] Truth Guard flagged contradictions. Routing back to Writer to revise...")
@@ -466,6 +539,7 @@ def persist_turn_to_vault(
     }
 
 
+@observe(type="agent", available_tools=["search_scholarly_sources", "scrape_url", "writer_node", "verifier_node", "critic_node", "mindmap_node", "follow_up_node"])
 def run_research_pipeline(
     topic: str,
     role: str = "senior academic researcher",

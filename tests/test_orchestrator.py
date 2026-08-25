@@ -39,7 +39,7 @@ class TestOrchestrator(unittest.TestCase):
             yielded_nodes.append(node_name)
 
         # Assert full Plan -> Act -> Observe -> Replan flow sequence
-        expected_nodes = ["search", "scrape", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
+        expected_nodes = ["search", "snowball", "scrape", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
         self.assertEqual(yielded_nodes, expected_nodes)
 
     @patch("backend.orchestrator.search_node")
@@ -71,9 +71,10 @@ class TestOrchestrator(unittest.TestCase):
         for node_name, update, current_state in stream_research_pipeline(topic="Low Score Topic", min_score=6.5, max_retries=2):
             yielded_nodes.append(node_name)
 
-        # Expected flow: search -> scrape -> writer (1) -> verifier -> critic (5.0) -> REPLAN -> writer (2) -> verifier -> critic (8.5) -> vault -> mindmap -> follow_up
-        expected = ["search", "scrape", "writer", "verifier", "critic", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
+        # Expected flow: search -> snowball -> scrape -> writer (1) -> verifier -> critic (5.0) -> REPLAN -> writer (2) -> verifier -> critic (8.5) -> vault -> mindmap -> follow_up
+        expected = ["search", "snowball", "scrape", "writer", "verifier", "critic", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
         self.assertEqual(yielded_nodes, expected)
+
 
     @patch("backend.orchestrator.search_node")
     def test_orchestrator_cancellation_event(self, mock_search):

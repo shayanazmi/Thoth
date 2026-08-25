@@ -70,6 +70,42 @@ class TestCriticScoreAndNode(unittest.TestCase):
         
         self.assertIn("Failed to parse structured CriticScore", str(cm.exception))
 
+    @patch.object(RunnableSequence, "invoke")
+    def test_critic_node_handles_thinking_preamble_and_markdown(self, mock_invoke):
+        mock_invoke.return_value = (
+            "Thinking Process:\n"
+            "Now I need to evaluate the research report carefully across all 5 dimensions.\n"
+            "Let's double-check the scores before producing the JSON.\n\n"
+            "```json\n"
+            "{\n"
+            '  "faithfulness": 8.5,\n'
+            '  "relevance": 9.0,\n'
+            '  "completeness": 8.0,\n'
+            '  "evidence_quality": 8.5,\n'
+            '  "clarity_and_coherence": 9.0,\n'
+            '  "overall_score": 8.6,\n'
+            '  "strengths": ["Clear methodology", "Actionable findings"],\n'
+            '  "areas_to_improve": ["Broaden domain coverage"],\n'
+            '  "verdict": "Very thorough synthesis report.",\n'
+            '  "reasoning": "Strong evidence base with clear structure."\n'
+            "}\n"
+            "```\n"
+            "Final verification complete."
+        )
+
+        state: ResearchState = {
+            "topic": "AI Testing",
+            "report": "Sample report text",
+            "role": "", "tone": "", "language": "", "scrape_top_n": 2, "min_score": 6.5,
+            "max_retries": 2, "attempt": 1, "search_results": "", "scraped_content": "",
+            "feedback": "", "verifier_feedback": "", "score": 0.0, "follow_up_questions": [],
+            "mindmap": {"nodes": [], "edges": []}, "cumulative_sources": [],
+            "conversation_summary": "", "chat_turns": []
+        }
+        res = critic_node(state)
+        self.assertEqual(res["score"], 8.6)
+        self.assertIn("**Overall** | **8.6**", res["feedback"])
+
 
 if __name__ == "__main__":
     unittest.main()

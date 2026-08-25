@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THOTH · The Divine Scribe | Autonomous Multi-Agent Research</title>
+  
+  <!-- Favicon / Vector Emblem -->
+  <link rel="icon" type="image/svg+xml" href="/assets/thoth_emblem.svg">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="/css/styles.css">
+  
+  <!-- CDN Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- ============================================================================
+       APP HEADER & TOP TELEMETRY NAVIGATION BAR
+       ============================================================================ -->
+  <header class="app-header">
+    <div class="brand-badge" id="brandHomeBtn">
+      <img src="/assets/thoth_emblem.svg" alt="Thoth" class="brand-emblem">
+      <div>
+        <div class="brand-title">THOTH</div>
+        <div class="brand-subtitle">The Divine Scribe of Ma'at</div>
+      </div>
+    </div>
+
+    <!-- Live Telemetry Status HUD -->
+    <div class="header-telemetry">
+      <div class="telemetry-pill">
+        <span class="status-dot pulse"></span>
+        <span>Agent Dispatcher Active</span>
+      </div>
+      <div class="telemetry-pill">
+        <i data-lucide="database" style="width:12px;height:12px;color:#c99a6b;"></i>
+        <span id="vaultCountBadge">0 notes</span>
+      </div>
+    </div>
+
+    <!-- View Switcher Tabs -->
+    <div class="view-tabs">
+      <button class="view-tab-btn active" id="tabLandingBtn">
+        <i data-lucide="compass" style="width:14px;height:14px;"></i> Overview
+      </button>
+      <button class="view-tab-btn" id="tabStudioBtn">
+        <i data-lucide="bot" style="width:14px;height:14px;"></i> Research Studio
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================================
+       MAIN APP CONTAINER (DUAL-VIEW SPA)
+       ============================================================================ -->
+  <main class="app-container">
+
+    <!-- ==========================================================================
+         VIEW 1: 3D HERO LANDING & ARCHITECTURE SHOWCASE
+         ========================================================================== -->
+    <section class="view-section landing-view" id="landingView">
+      
+      <!-- Hero Section -->
+      <div class="hero-grid">
+        <div class="hero-content">
+          <div class="hero-tag">
+            <i data-lucide="feather" style="width:14px;height:14px;"></i> The Scales of Truth & Rigor
+          </div>
+          <h1 class="hero-title">
+            Ancient Wisdom.<br>
+            <span>Autonomous Intelligence.</span>
+          </h1>
+          <p class="hero-description">
+            Thoth synthesizes vast academic literature through an 8-agent swarm: deep scholarly discovery, neural citation snowballing, SLM fact-checking against the Scales of Ma'at, and automatic Obsidian Vault knowledge indexing.
+          </p>
+
+          <!-- Metrics Row -->
+          <div class="hero-stats-row">
+            <div class="stat-card">
+              <div class="stat-value">8</div>
+              <div class="stat-label">Specialized Agents</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">100%</div>
+              <div class="stat-label">Grounded Fact Audit</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">&lt;400ms</div>
+              <div class="stat-label">FTS5 Vault Retrieval</div>
+            </div>
+          </div>
+
+          <!-- Prompt Launcher Box -->
+          <div class="prompt-launcher-box">
+            <div class="prompt-input-wrapper">
+              <input type="text" id="heroPromptInput" class="prompt-input" placeholder="Enter research objective (e.g. Quantum Error Correction with Surface Codes)...">
+              <button class="btn-primary" id="heroLaunchBtn">
+                <span>Investigate</span>
+                <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
+              </button>
+            </div>
+            <div class="prompt-presets">
+              <span style="font-size:0.75rem;color:hsl(var(--muted-foreground));">Presets:</span>
+              <button class="preset-chip" data-query="Quantum Computing Surface Codes Error Correction">Quantum Error Correction</button>
+              <button class="preset-chip" data-query="CRISPR-Cas9 Prime Editing off-target fidelity breakthroughs">CRISPR Prime Editing</button>
+              <button class="preset-chip" data-query="LLM Mechanistic Interpretability sparse autoencoders">Mechanistic Interpretability</button>
+              <button class="preset-chip" data-query="Post-Keynesian Stock-Flow Consistent macro models">Macroeconomic SFC Models</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D Deity Parallax Column -->
+        <div class="hero-visual-col perspective-container">
+          <div class="deity-showcase-card card-3d">
+            <div class="card-3d-glare"></div>
+            <div class="deity-image-wrapper">
+              <img src="/assets/thoth_hero.jpg" alt="Thoth Deity Sculpture" class="deity-img">
+            </div>
+            <div class="deity-card-meta">
+              <div>
+                <div class="deity-card-title">DJEHUTY · MASTER OF MA'AT</div>
+                <div class="deity-card-desc">Basalt & Bronze Sculpture · Divine Scribe of Records</div>
+              </div>
+              <i data-lucide="shield-check" style="width:20px;height:20px;color:#c99a6b;"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Architecture Swarm Showcase -->
+      <div class="architecture-section">
+        <div class="section-header">
+          <h2 class="section-title">The 8-Agent Research Swarm</h2>
+          <p class="section-subtitle">A coordinated multi-agent workflow eliminating hallucinations and enforcing primary source attribution.</p>
+        </div>
+
+        <div class="agents-grid">
+          <div class="agent-feature-card">
+            <div class="agent-icon-badge"><i data-lucide="search"></i></div>
+            <div class="agent-name">1. Searcher Agent</div>
+            <div class="agent-role-desc">Discovers primary academic papers across Semantic Scholar, arXiv, and peer-reviewed indices.</div>
+          </div>
+          <div class="agent-feature-card">
+            <div class="agent-icon-badge"><i data-lucide="git-branch"></i></div>
+            <div class="agent-name">2. Snowballer Agent</div>
+            <div class="agent-role-desc">Recursively traversers citation graphs and neural co-citation graphs to uncover hidden prior art.</div>
+          </div>
+          <div class="agent-feature-card">
+            <div class="agent-icon-badge"><i data-lucide="file-text"></i></div>
+            <div class="agent-name">3. Reader Agent</div>
+            <div class="agent-role-desc">Fans out concurrent scraping and text extraction across candidate URLs through the rate limiter.</div>
+          </div>
+          <div class="agent-feature-card">
+            <div class="agent-icon-badge"><i data-lucide="pen-tool"></i></div>
+            <div class="agent-name">4. Scribe Writer</div>
+            <div class="agent-role-desc">Drafts comprehensive, structured synthesis reports with inline citation tags and LaTeX math.</div>
+          </div>
+          <div class="agent-feature-card">
+            <div class="agent-icon-badge"><i data-lucide="scale"></i></div>
+            <div class="agent-name">5. Truth Guard</div>
+            <div class="agent-role-desc">Evaluates every atomic claim against extracted evidence, discarding ungrounded statements.</div>
+          </div>
+          <div class="agent-feature-card">
+            <div class="agent-icon-badge"><i data-lucide="award"></i></div>
+            <div class="agent-name">6. Critic Evaluator</div>
+            <div class="agent-role-desc">Multi-dimensional rubric scoring across faithfulness, relevance, evidence depth, and coherence.</div>
+          </div>
+          <div class="agent-feature-card">
+            <div class="agent-icon-badge"><i data-lucide="network"></i></div>
+            <div class="agent-name">7. Mind Map Agent</div>
+            <div class="agent-role-desc">Generates interactive knowledge graphs linking discovered concepts and research boundaries.</div>
+          </div>
+          <div class="agent-feature-card">
+            <div class="agent-icon-badge"><i data-lucide="folder-archive"></i></div>
+            <div class="agent-name">8. Vault Indexer</div>
+            <div class="agent-role-desc">Persists Obsidian-ready Markdown notes and indexes all content into local SQLite FTS5.</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==========================================================================
+         VIEW 2: CONVERSATIONAL CHATBOT & ARTIFACTS STUDIO
+         ========================================================================== -->
+    <section class="view-section studio-view hidden" id="studioView">
+      
+      <!-- 1. Left Sidebar: Vault & Past Notes -->
+      <aside class="studio-sidebar">
+        <div class="sidebar-header">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-weight:700;font-size:0.85rem;color:#fff;"><i data-lucide="folder" style="width:14px;height:14px;color:#c99a6b;vertical-align:middle;"></i> Obsidian Vault</span>
+            <button class="preset-chip" onclick="window.app.loadVaultNotes()"><i data-lucide="refresh-cw" style="width:10px;height:10px;"></i></button>
+          </div>
+          <div class="sidebar-search-box">
+            <i data-lucide="search" style="width:14px;height:14px;color:hsl(var(--muted-foreground));"></i>
+            <input type="text" id="vaultSearchInput" class="sidebar-search-input" placeholder="Filter vault notes...">
+          </div>
+        </div>
+
+        <div class="sidebar-section-title">Indexed Notes</div>
+        <div class="vault-notes-tree" id="vaultNotesList">
+          <!-- Dynamic note items -->
+        </div>
+      </aside>
+
+      <!-- 2. Center Column: Chat Cockpit -->
+      <main class="studio-center">
+        
+        <!-- Topic & Stepper Header -->
+        <div class="topic-header-bar">
+          <div class="current-topic-label">
+            <i data-lucide="book-open" style="width:16px;height:16px;color:#c99a6b;"></i>
+            <span id="currentTopicDisplay">Awaiting Research Topic</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="preset-chip" onclick="window.app.switchArtifactTab('report')">
+              <i data-lucide="file-text" style="width:12px;height:12px;"></i> View Report
+            </button>
+            <button class="preset-chip" onclick="window.app.switchArtifactTab('truth')">
+              <i data-lucide="scale" style="width:12px;height:12px;"></i> Scales of Ma'at
+            </button>
+          </div>
+        </div>
+
+        <!-- Real-Time Pipeline Stepper -->
+        <div class="pipeline-stepper-bar" id="pipelineStepperBar">
+          <!-- Dynamic step badges -->
+        </div>
+
+        <!-- Conversational Chat Feed -->
+        <div class="chat-scroll-feed" id="chatFeed">
+          <div class="chat-message-row assistant">
+            <div class="chat-avatar">
+              <img src="/assets/thoth_bust.jpg" alt="Thoth">
+            </div>
+            <div class="chat-bubble">
+              <div class="prose">
+                <p><strong>Greetings, Scholar.</strong> I am Thoth, the Divine Scribe. Select a mode or type your query below to conduct autonomous literature discovery, rigorous truth verification, and knowledge synthesis.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modern ChatGPT / Gemini Style Chat Input Bar -->
+        <div class="chat-input-bar">
+          
+          <!-- Floating Action / Tool Menu (Pop-up on '+' click) -->
+          <div class="floating-tool-menu hidden" id="floatingToolMenu">
+            <div class="tool-menu-item active" data-mode="auto">
+              <div class="tool-item-icon"><i data-lucide="sparkles"></i></div>
+              <div class="tool-item-meta">
+                <div class="tool-item-title">Autonomous Router</div>
+                <div class="tool-item-desc">Intelligently classifies intent & selects execution path</div>
+              </div>
+            </div>
+            <div class="tool-menu-item" data-mode="deep_research">
+              <div class="tool-item-icon"><i data-lucide="microscope"></i></div>
+              <div class="tool-item-meta">
+                <div class="tool-item-title">Deep Research Swarm</div>
+                <div class="tool-item-desc">8-agent literature synthesis & Vault indexing</div>
+              </div>
+            </div>
+            <div class="tool-menu-item" data-mode="web_probe">
+              <div class="tool-item-icon"><i data-lucide="globe"></i></div>
+              <div class="tool-item-meta">
+                <div class="tool-item-title">Live Web Search Probe</div>
+                <div class="tool-item-desc">Real-time arXiv & web literature search</div>
+              </div>
+            </div>
+            <div class="tool-menu-item" data-mode="local_qa">
+              <div class="tool-item-icon"><i data-lucide="book-marked"></i></div>
+              <div class="tool-item-meta">
+                <div class="tool-item-title">Vault Knowledge QA</div>
+                <div class="tool-item-desc">Grounded Q&A over indexed notes & mindmap</div>
+              </div>
+            </div>
+            <div class="tool-menu-item" data-mode="expand_report">
+              <div class="tool-item-icon"><i data-lucide="file-plus"></i></div>
+              <div class="tool-item-meta">
+                <div class="tool-item-title">Expand Living Report</div>
+                <div class="tool-item-desc">Draft and append new sections to synthesis</div>
+              </div>
+            </div>
+            <div class="tool-menu-item" data-mode="fast_chat">
+              <div class="tool-item-icon"><i data-lucide="message-square"></i></div>
+              <div class="tool-item-meta">
+                <div class="tool-item-title">Fast Dialogue</div>
+                <div class="tool-item-desc">Direct instant responses without web search</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Input Container -->
+          <div class="chat-input-container">
+            <div class="chat-input-row">
+              <textarea id="chatInput" class="chat-textarea" placeholder="Ask follow-up questions, request sub-topic probes, or type /help..."></textarea>
+            </div>
+            <div class="chat-input-footer">
+              <div class="chat-actions-left">
+                <button class="tool-attach-btn" id="toolAttachBtn" title="Choose Mode & Tools">
+                  <i data-lucide="plus" style="width:16px;height:16px;"></i>
+                </button>
+                <div class="active-mode-badge" id="activeModeBadge" title="Click to change mode">
+                  <i data-lucide="sparkles" style="width:12px;height:12px;"></i>
+                  <span id="activeModeLabel">Auto Router</span>
+                  <i data-lucide="chevron-down" style="width:10px;height:10px;opacity:0.6;"></i>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button class="deep-research-toggle" id="deepResearchToggle" title="Toggle Deep Research">
+                  <i data-lucide="microscope" style="width:13px;height:13px;"></i>
+                  <span>Deep Research</span>
+                </button>
+                <button class="btn-primary" id="chatSendBtn" style="padding:7px 16px;border-radius:var(--radius-full);">
+                  <i data-lucide="arrow-up" style="width:15px;height:15px;"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- 3. Right Column: Slide-in Artifacts -->
+      <aside class="studio-artifacts">
+        <div class="artifact-tabs-header">
+          <button class="artifact-tab-btn active" data-tab="report">
+            <i data-lucide="file-text" style="width:12px;height:12px;vertical-align:middle;"></i> Report
+          </button>
+          <button class="artifact-tab-btn" data-tab="truth">
+            <i data-lucide="scale" style="width:12px;height:12px;vertical-align:middle;"></i> Scales of Ma'at
+          </button>
+          <button class="artifact-tab-btn" data-tab="mindmap">
+            <i data-lucide="network" style="width:12px;height:12px;vertical-align:middle;"></i> Mind Map
+          </button>
+          <button class="artifact-tab-btn" data-tab="sources">
+            <i data-lucide="link" style="width:12px;height:12px;vertical-align:middle;"></i> Sources
+          </button>
+        </div>
+
+        <div class="artifact-pane-body" id="artifactReportPane">
+          <p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">The living synthesis report will render here in real-time as the scribe drafts.</p>
+        </div>
+
+        <div class="artifact-pane-body hidden" id="artifactTruthPane">
+          <p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">Factual claim verification records from the Scales of Ma'at.</p>
+        </div>
+
+        <div class="artifact-pane-body hidden" id="artifactMindmapPane">
+          <p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">Interactive concept mind map graph.</p>
+        </div>
+
+        <div class="artifact-pane-body hidden" id="artifactSourcesPane">
+          <p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">Retrieved bibliography & scholarly sources.</p>
+        </div>
+      </aside>
+
+    </section>
+
+  </main>
+
+  <!-- ============================================================================
+       MODAL DIALOG (OBSIDIAN NOTE READER)
+       ============================================================================ -->
+  <div class="modal-overlay hidden" id="noteModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="serif" style="color:hsl(var(--primary));font-size:1rem;" id="modalTitle">Note Details</h3>
+        <button class="preset-chip" id="modalCloseBtn"><i data-lucide="x" style="width:12px;height:12px;"></i> Close</button>
+      </div>
+      <div class="modal-body prose" id="modalBody">
+        <!-- Note content -->
+      </div>
+    </div>
+  </div>
+
+  <!-- App Scripts -->
+  <script src="/js/animations.js?v=3.4"></script>
+  <script src="/js/app.js?v=3.4"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

@@ -44,7 +44,7 @@ def count_tokens(text: str) -> int:
 
 def truncate_text_to_tokens(text: str, max_tokens: int) -> str:
     """
-    Truncates text to fit within max_tokens limit, logging a warning if truncation occurs.
+    Truncates text to fit within max_tokens limit, preserving structural boundaries where practical.
     """
     if not text or max_tokens <= 0:
         return ""
@@ -57,7 +57,13 @@ def truncate_text_to_tokens(text: str, max_tokens: int) -> str:
                 return text
             logger.warning(f"[TOKEN BUDGET] Truncating text slice from {len(tokens)} to {max_tokens} tokens.")
             print(f"\n[WARNING] [TOKEN BUDGET] Truncating text slice from {len(tokens)} to {max_tokens} tokens.")
-            return enc.decode(tokens[:max_tokens])
+            raw_truncated = enc.decode(tokens[:max_tokens])
+            min_len = int(len(raw_truncated) * 0.75)
+            for delim in ["\n\n--- Source:", "\n\n", ".\n", "\n"]:
+                last_idx = raw_truncated.rfind(delim)
+                if last_idx >= min_len:
+                    return raw_truncated[:last_idx].strip()
+            return raw_truncated
         except Exception:
             pass
 
@@ -65,7 +71,13 @@ def truncate_text_to_tokens(text: str, max_tokens: int) -> str:
     if len(text) > char_limit:
         logger.warning(f"[TOKEN BUDGET] Truncating text from {len(text)} to {char_limit} chars.")
         print(f"\n[WARNING] [TOKEN BUDGET] Truncating text from {len(text)} to {char_limit} chars.")
-        return text[:char_limit]
+        raw_truncated = text[:char_limit]
+        min_len = int(len(raw_truncated) * 0.75)
+        for delim in ["\n\n--- Source:", "\n\n", ".\n", "\n"]:
+            last_idx = raw_truncated.rfind(delim)
+            if last_idx >= min_len:
+                return raw_truncated[:last_idx].strip()
+        return raw_truncated
     return text
 
 

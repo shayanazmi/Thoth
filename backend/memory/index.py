@@ -5,6 +5,7 @@ import sqlite3
 
 from backend.memory.db import init_db, get_connection, DEFAULT_DB_PATH
 from backend.memory.vault import Note, read_note, extract_links, DEFAULT_VAULT_DIR
+from backend.telemetry import observe, update_current_span
 
 # Global lazy-loaded embedding model instance (CPU)
 _embedding_model = None
@@ -177,6 +178,7 @@ def search_semantic(
     return [note_ids[i] for i in top_indices]
 
 
+@observe(type="retriever")
 def hybrid_search(
     query: str,
     top_k: int = 6,
@@ -220,5 +222,9 @@ def hybrid_search(
                 "frontmatter": {},
                 "rrf_score": round(rrf_scores[nid], 6)
             })
+
+    # Propagate retrieved note text to active DeepEval retriever span for RAG evaluation
+    retrieval_contexts = [r.get("content", "") for r in results if r.get("content")]
+    update_current_span(retrieval_context=retrieval_contexts)
 
     return results

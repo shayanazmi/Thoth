@@ -1,10 +1,11 @@
-# Byte-compiled / optimized / DLL files
+# ──────────────────────────────────────────────────────────
+# Thoth · .gitignore
+# ──────────────────────────────────────────────────────────
+
+# Python bytecode & caches
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-
-# C extensions
 *.so
 
 # Distribution / packaging
@@ -46,22 +47,20 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Local SQLite & Databases
+# Databases (generated at runtime)
 store.db
 *.db
 *.db-journal
 *.sqlite
 *.sqlite3
 *.sqlite3-journal
-db.sqlite3
-db.sqlite3-journal
 
-# Jupyter Notebook & IPython
+# Jupyter / IPython
 .ipynb_checkpoints
 profile_default/
 ipython_config.py
 
-# Environments & Secret Variables
+# Environment & secrets
 .env
 .env.*
 *.env
@@ -75,14 +74,14 @@ ENV/
 env.bak/
 venv.bak/
 
-# mypy / Pyre / type checkers
+# Type checkers
 .mypy_cache/
 .dmypy.json
 dmypy.json
 .pyre/
 .pytype/
 
-# OS-specific files
+# OS artifacts
 .DS_Store
 .DS_Store?
 ._*
@@ -98,23 +97,33 @@ Thumbs.db
 *.swo
 *~
 
-# Node / Web dependencies (if any)
+# Node / Web (if any)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# User local study materials & external research reference repos
+# DeepEval / Confident AI local state
+.deepeval/
+.deepeval_cache/
+
+# Stray root-level dump files (auto-generated during dev sessions)
+thoth_chat_summary_with_thinking.md
+thoth_full_chat_history_with_thinking.md
+thoth_modification_plan.md
+diagnostic_test.py
+
+# Research Vault contents — keep directory skeleton, ignore generated notes
+vault/topics/*.md
+vault/sources/*.md
+
+# User local study materials & external reference repos
 handling api limit like feynman/
 handling api limit like feynman
 research_repos/
 research_repos
 
-# Research Vault & Plan Documents
-vault/
-thoth_modification_plan.md
-
-# AI Assistant & IDE metadata
+# AI assistant & IDE metadata
 .gemini/
 .agents/
 

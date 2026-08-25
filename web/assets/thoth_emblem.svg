@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor">
+  <!-- Minimalist Geometric Thoth Emblem (Scales of Ma'at & Scribe's Plume) -->
+  <circle cx="50" cy="50" r="46" stroke="#c99a6b" stroke-width="1.5" stroke-opacity="0.4" stroke-dasharray="2 4"/>
+  <circle cx="50" cy="50" r="42" stroke="#c99a6b" stroke-width="1" stroke-opacity="0.8"/>
+  
+  <!-- Central Column / Plinth -->
+  <line x1="50" y1="22" x2="50" y2="76" stroke="#c99a6b" stroke-width="2.5" stroke-linecap="round"/>
+  <rect x="42" y="74" width="16" height="4" rx="1.5" fill="#c99a6b"/>
+  
+  <!-- Balance Beam -->
+  <path d="M 24 36 Q 50 32 76 36" stroke="#c99a6b" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Left Scale (Evidence) -->
+  <line x1="24" y1="36" x2="20" y2="54" stroke="#c99a6b" stroke-width="1" stroke-opacity="0.7"/>
+  <line x1="24" y1="36" x2="28" y2="54" stroke="#c99a6b" stroke-width="1" stroke-opacity="0.7"/>
+  <path d="M 16 54 Q 24 60 32 54 Z" fill="#141722" stroke="#c99a6b" stroke-width="1.5"/>
+  <circle cx="24" cy="51" r="2" fill="#10b981"/>
+  
+  <!-- Right Scale (Feather of Ma'at) -->
+  <line x1="76" y1="36" x2="72" y2="54" stroke="#c99a6b" stroke-width="1" stroke-opacity="0.7"/>
+  <line x1="76" y1="36" x2="80" y2="54" stroke="#c99a6b" stroke-width="1" stroke-opacity="0.7"/>
+  <path d="M 68 54 Q 76 60 84 54 Z" fill="#141722" stroke="#c99a6b" stroke-width="1.5"/>
+  <path d="M 74 48 Q 78 46 76 52" stroke="#c99a6b" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  
+  <!-- Scribe's Stylus & Crown -->
+  <circle cx="50" cy="22" r="4" fill="#c99a6b"/>
+  <path d="M 44 14 Q 50 8 56 14 Q 50 12 44 14 Z" fill="#c99a6b"/>
+</svg>

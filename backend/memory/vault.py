@@ -36,7 +36,7 @@ def extract_links(content: str) -> List[str]:
     """
     if not content:
         return []
-    links = re.findall(r"\[\[([^\]]+)\]\]", content)
+    links = re.findall(r"\[\[([^\[\]]+)\]\]", content)
     # Deduplicate while preserving order
     seen = set()
     deduped = []

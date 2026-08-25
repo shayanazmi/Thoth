@@ -38,6 +38,8 @@ from backend.memory.graph import (
     infer_edges_from_note,
     traverse,
     get_subgraph,
+    find_contradictions_among_notes,
+    format_vault_context_with_contradictions,
 )
 from backend.memory.session import (
     SessionMemory,
@@ -73,6 +75,8 @@ __all__ = [
     "infer_edges_from_note",
     "traverse",
     "get_subgraph",
+    "find_contradictions_among_notes",
+    "format_vault_context_with_contradictions",
     "SessionMemory",
     "DEFAULT_TOKEN_BUDGET",
     "count_tokens",

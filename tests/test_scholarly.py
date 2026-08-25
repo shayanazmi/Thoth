@@ -206,11 +206,15 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
         with patch("backend.scholarly.search_arxiv", new_callable=AsyncMock) as mock_arxiv, \
              patch("backend.scholarly.search_semantic_scholar", new_callable=AsyncMock) as mock_s2, \
              patch("backend.scholarly.search_openalex", new_callable=AsyncMock) as mock_oa, \
+             patch("backend.scholarly.search_europepmc", new_callable=AsyncMock) as mock_epmc, \
+             patch("backend.scholarly.search_pubmed", new_callable=AsyncMock) as mock_pubmed, \
              patch("backend.scholarly.search_tavily", new_callable=AsyncMock) as mock_tavily:
 
             mock_arxiv.return_value = [cand_arxiv]
             mock_s2.return_value = [cand_s2]
             mock_oa.return_value = [cand_openalex]
+            mock_epmc.return_value = []
+            mock_pubmed.return_value = []
             mock_tavily.return_value = []
 
             results = await search_scholarly_sources("Agentic AI", max_results=5, min_scholarly_results=2, dispatcher=disp)
@@ -235,11 +239,15 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
         with patch("backend.scholarly.search_arxiv", new_callable=AsyncMock) as mock_arxiv, \
              patch("backend.scholarly.search_semantic_scholar", new_callable=AsyncMock) as mock_s2, \
              patch("backend.scholarly.search_openalex", new_callable=AsyncMock) as mock_oa, \
+             patch("backend.scholarly.search_europepmc", new_callable=AsyncMock) as mock_epmc, \
+             patch("backend.scholarly.search_pubmed", new_callable=AsyncMock) as mock_pubmed, \
              patch("backend.scholarly.search_tavily", new_callable=AsyncMock) as mock_tavily:
 
             mock_arxiv.return_value = []
             mock_s2.return_value = []
             mock_oa.return_value = []
+            mock_epmc.return_value = []
+            mock_pubmed.return_value = []
             mock_tavily.return_value = [cand_tavily]
 
             results = await search_scholarly_sources("obscure niche topic", max_results=3, min_scholarly_results=2, dispatcher=disp)
@@ -247,6 +255,7 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(results[0].title, "Fallback Web Title")
             self.assertEqual(results[0].source_api, "tavily")
             mock_tavily.assert_called_once()
+
 
     def test_search_node_scholarly_primary(self):
         from backend.pipeline import search_node

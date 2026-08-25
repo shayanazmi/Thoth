@@ -73,8 +73,9 @@ class TestConcurrentPipelineStream(unittest.TestCase):
         for node_name, update, state in stream_research_pipeline(topic="Concurrent Test"):
             yielded.append(node_name)
 
-        expected = ["search", "scrape", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
+        expected = ["search", "snowball", "scrape", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
         self.assertEqual(yielded, expected)
+
 
 
 if __name__ == "__main__":

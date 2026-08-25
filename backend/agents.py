@@ -89,7 +89,7 @@ _primary_verifier_llm = ChatNVIDIA(
     model="meta/llama-3.1-8b-instruct",
     api_key=os.getenv("NVIDIA_API_KEY"),
     temperature=0.1,  # Strict factual consistency
-    max_completion_tokens=1024,
+    max_completion_tokens=2048,
     timeout=60,
 )
 
@@ -98,7 +98,7 @@ groq_key = os.getenv("GROQ_API_KEY")
 openai_key = os.getenv("OPENAI_API_KEY")
 
 if groq_key and len(groq_key) > 10 and not groq_key.startswith("dummy"):
-    _fallback_llm = ChatOpenAI(model="llama-3.1-70b-versatile", api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.6, timeout=60)
+    _fallback_llm = ChatOpenAI(model="llama-3.3-70b-versatile", api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.6, timeout=60)
     _fallback_verifier_llm = ChatOpenAI(model="llama-3.1-8b-instant", api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.1, timeout=30)
     _fb_name = "Groq"
 elif openai_key and len(openai_key) > 10 and not openai_key.startswith("sk-dummy") and not openai_key.startswith("dummy"):
@@ -113,7 +113,12 @@ else:
 llm = FallbackLLMWrapper(primary_llm=_primary_llm, fallback_llm=_fallback_llm, primary_name="NVIDIA-Nemotron-30B", fallback_name=_fb_name)
 verifier_llm = FallbackLLMWrapper(primary_llm=_primary_verifier_llm, fallback_llm=_fallback_verifier_llm, primary_name="NVIDIA-Llama-8B", fallback_name=_fb_name)
 
+def get_llm():
+    """Returns the configured primary/fallback LLM client."""
+    return llm
+
 # 1st Agent: Web Search Expert
+
 def build_search_agent():
     import datetime
     current_date = datetime.datetime.now().strftime("%B %d, %Y")
@@ -138,12 +143,12 @@ class FactVerificationReport(BaseModel):
 
 # Pydantic model for structured Critic quality evaluation
 class CriticScore(BaseModel):
-    faithfulness: float = Field(description="Score out of 10 for factual grounding in sources with no hallucinations")
-    relevance: float = Field(description="Score out of 10 for directly addressing the research topic")
-    completeness: float = Field(description="Score out of 10 for presence and depth of all required sections")
-    evidence_quality: float = Field(description="Score out of 10 for findings backed by traceable real sources")
-    clarity_and_coherence: float = Field(description="Score out of 10 for logical structure and readability")
-    overall_score: float = Field(description="Overall score out of 10, computed as average of all 5 dimensions")
+    faithfulness: float = Field(ge=0.0, le=10.0, description="Score out of 10 for factual grounding in sources with no hallucinations")
+    relevance: float = Field(ge=0.0, le=10.0, description="Score out of 10 for directly addressing the research topic")
+    completeness: float = Field(ge=0.0, le=10.0, description="Score out of 10 for presence and depth of all required sections")
+    evidence_quality: float = Field(ge=0.0, le=10.0, description="Score out of 10 for findings backed by traceable real sources")
+    clarity_and_coherence: float = Field(ge=0.0, le=10.0, description="Score out of 10 for logical structure and readability")
+    overall_score: float = Field(ge=0.0, le=10.0, description="Overall score out of 10, computed as average of all 5 dimensions")
     strengths: List[str] = Field(description="2-3 specific things the report did well")
     areas_to_improve: List[str] = Field(description="2-3 specific actionable improvement suggestions")
     verdict: str = Field(description="One sentence summarizing report quality and readiness")
@@ -237,7 +242,7 @@ Report to evaluate:
 Evaluate the report now.""")
 ]).partial(format_instructions=critic_parser.get_format_instructions())
 
-critic_chain = critic_prompt | llm | critic_parser
+critic_chain = critic_prompt | llm | StrOutputParser()
 
 # Follow-up Questions Generator Chain
 follow_up_prompt = ChatPromptTemplate.from_messages([
@@ -411,13 +416,31 @@ Draft the section expansion now. Start immediately with the `### ` heading.""")
 
 report_expander_chain = report_expander_prompt | llm | StrOutputParser()
 
+# Direct conversational chat prompt for greetings, meta questions, and fast conversational Q&A
+direct_chat_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are Thoth (Djehuty), the ancient Egyptian deity of wisdom, truth, mathematics, and writing, operating as an autonomous multi-agent research intelligence.
+- For greetings or casual conversation, respond with dignity, warmth, and concise elegance in 2-3 sentences.
+- Inform the user that you are ready to conduct deep, verified autonomous research on any scientific, technical, or humanities topic.
+- Offer 2-3 specific example research topics they can ask you to investigate (e.g., Quantum Error Correction, CRISPR Prime Editing, LLM Alignment).
+- Keep responses concise, direct, and free of fluff or artificial filler."""),
+    ("human", "{user_query}")
+])
 
-def strip_chain_of_thought(text: str) -> str:
+direct_chat_chain = direct_chat_prompt | verifier_llm | StrOutputParser()
+
+
+
+
+def strip_chain_of_thought(text: Any) -> str:
     """Removes <think> tags, reasoning traces, and preamble from LLM responses."""
+    if text is None:
+        return ""
+    if not isinstance(text, str):
+        text = getattr(text, "content", str(text))
     if not text:
         return ""
     # Strip <think>...</think> blocks
-    cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    cleaned = re.sub(r"<think>.*?</think>", "", str(text), flags=re.DOTALL).strip()
     
     # If the text has reasoning preamble before the actual markdown title (e.g. "Let's do it.", "I'll draft...", etc.)
     # and contains a heading like "### " or "## " or "# "
@@ -432,30 +455,74 @@ def strip_chain_of_thought(text: str) -> str:
 
 
 # Helper function to parse JSON safely
-def safe_extract_json(raw_text: str, default: Any = None) -> Any:
-    """Extracts JSON object or array from LLM response safely, removing markdown codeblocks."""
-    if not raw_text:
+def safe_extract_json(raw_text: Any, default: Any = None) -> Any:
+    """Extracts JSON object or array from LLM response safely, removing thinking tokens & markdown codeblocks."""
+    if raw_text is None:
         return default
+    if isinstance(raw_text, (dict, list)):
+        return raw_text
+    if not isinstance(raw_text, str):
+        raw_text = str(raw_text)
+
     text = raw_text.strip()
-    # Remove markdown code blocks
-    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.MULTILINE)
-    text = re.sub(r"\s*```$", "", text, flags=re.MULTILINE)
-    text = text.strip()
+    if not text:
+        return default
+
+    # 1. Try direct parse
     try:
         return json.loads(text)
     except Exception:
-        # Try finding the first '{' and last '}' or '[' and ']'
+        pass
+
+    # 2. Check for markdown code fence contents
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+    if fence_match:
+        fenced_content = fence_match.group(1).strip()
         try:
-            start_bracket = text.find('[')
-            end_bracket = text.rfind(']')
-            if start_bracket != -1 and end_bracket != -1 and end_bracket > start_bracket:
-                return json.loads(text[start_bracket:end_bracket+1])
-            
-            start_brace = text.find('{')
-            end_brace = text.rfind('}')
-            if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
-                return json.loads(text[start_brace:end_brace+1])
+            return json.loads(fenced_content)
         except Exception:
             pass
+
+    # 3. Clean raw markdown code block tags if unbalanced
+    cleaned = re.sub(r"^```(?:json)?\s*", "", text, flags=re.MULTILINE)
+    cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE).strip()
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        pass
+
+    # 4. Extract first outermost JSON object {...} or array [...]
+    try:
+        start_brace = cleaned.find('{')
+        end_brace = cleaned.rfind('}')
+        if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+            return json.loads(cleaned[start_brace:end_brace+1])
+    except Exception:
+        pass
+
+    try:
+        start_bracket = cleaned.find('[')
+        end_bracket = cleaned.rfind(']')
+        if start_bracket != -1 and end_bracket != -1 and end_bracket > start_bracket:
+            return json.loads(cleaned[start_bracket:end_bracket+1])
+    except Exception:
+        pass
+
+    # 5. Salvage complete objects from truncated/unclosed JSON arrays
+    try:
+        start_bracket = cleaned.find('[')
+        if start_bracket != -1:
+            obj_matches = re.findall(r"(\{[^{}]+\})", cleaned[start_bracket:])
+            if obj_matches:
+                salvaged = []
+                for obj_str in obj_matches:
+                    try:
+                        salvaged.append(json.loads(obj_str))
+                    except Exception:
+                        pass
+                if salvaged:
+                    return {"results": salvaged} if any("claim" in p for p in salvaged) else salvaged
+    except Exception:
+        pass
 
     return default

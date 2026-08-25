@@ -6,7 +6,9 @@ import urllib.parse
 import asyncio
 from typing import TypedDict, List, Dict, Any, Optional
 from backend.tools import web_search, scrape_url
-from backend.scholarly import search_scholarly_sources, SourceCandidate
+from backend.scholarly import search_scholarly_sources, snowball_literature_graph, SourceCandidate
+
+
 from backend.agents import (
     build_search_agent, 
     build_verifier_agent,
@@ -31,6 +33,7 @@ from backend.memory.vault import write_note, read_note, DEFAULT_VAULT_DIR
 from backend.memory.db import DEFAULT_DB_PATH
 from backend.memory.index import index_note, hybrid_search
 from backend.memory.session import SessionMemory, DEFAULT_TOKEN_BUDGET
+from backend.telemetry import observe
 
 logger = logging.getLogger("ThothPipeline")
 DEFAULT_MAX_CONTEXT_TOKENS = 6000
@@ -52,7 +55,7 @@ def count_tokens(text: str, model_encoding: str = "cl100k_base") -> int:
         return len(text) // 4
 
 def truncate_text_to_tokens(text: str, max_tokens: int, model_encoding: str = "cl100k_base") -> str:
-    """Truncates text so its token count does not exceed max_tokens."""
+    """Truncates text so its token count does not exceed max_tokens, preserving structural boundaries where practical."""
     if not text or max_tokens <= 0:
         return ""
     try:
@@ -62,13 +65,25 @@ def truncate_text_to_tokens(text: str, max_tokens: int, model_encoding: str = "c
             return text
         logger.warning(f"[TOKEN BUDGET] Truncating context text from {len(tokens)} tokens to {max_tokens} token ceiling.")
         print(f"\n[WARNING] [TOKEN BUDGET] Truncating context text from {len(tokens)} tokens to {max_tokens} token ceiling.")
-        return encoding.decode(tokens[:max_tokens])
+        raw_truncated = encoding.decode(tokens[:max_tokens])
+        min_len = int(len(raw_truncated) * 0.75)
+        for delim in ["\n\n--- Source:", "\n\n", ".\n", "\n"]:
+            last_idx = raw_truncated.rfind(delim)
+            if last_idx >= min_len:
+                return raw_truncated[:last_idx].strip()
+        return raw_truncated
     except Exception:
         char_limit = max_tokens * 4
         if len(text) > char_limit:
             logger.warning(f"[TOKEN BUDGET] Truncating text from {len(text)} chars to {char_limit} chars.")
             print(f"\n[WARNING] [TOKEN BUDGET] Truncating text from {len(text)} chars to {char_limit} chars.")
-            return text[:char_limit]
+            raw_truncated = text[:char_limit]
+            min_len = int(len(raw_truncated) * 0.75)
+            for delim in ["\n\n--- Source:", "\n\n", ".\n", "\n"]:
+                last_idx = raw_truncated.rfind(delim)
+                if last_idx >= min_len:
+                    return raw_truncated[:last_idx].strip()
+            return raw_truncated
         return text
 
 def fit_context_to_token_budget(
@@ -119,6 +134,15 @@ def fit_context_to_token_budget(
     return trimmed_context, trimmed_summary, recent_turns_text
 
 # 1. State Definition
+class MindMapNode(TypedDict, total=False):
+    id: str
+    label: str
+    type: str
+    details: str
+    group: str
+
+MindMapEdge = TypedDict("MindMapEdge", {"from": str, "to": str, "label": str}, total=False)
+
 class ResearchMindMap(TypedDict):
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, Any]]
@@ -173,6 +197,7 @@ def _extract_urls_from_text(text: str) -> List[str]:
     return cleaned
 
 # 2. Node Implementations for Initial Research Graph
+@observe(type="llm")
 def search_node(state: ResearchState) -> dict:
     print("\n" + "= " * 50)
     print("Step 1 - Search Agent is querying scholarly databases & web...")
@@ -258,6 +283,80 @@ def search_node(state: ResearchState) -> dict:
         "cumulative_sources": cumulative_sources
     }
 
+
+@observe(type="tool", description="Expands initial search findings through forward/backward citations and neural recommendations")
+def snowball_node(state: ResearchState) -> dict:
+    print("\n" + "= " * 50)
+    print("Step 1.5 - Snowballing Literature Graph (Citations, References & Recommendations)...")
+    print("=" * 50)
+
+    cumulative_sources = list(state.get("cumulative_sources", []))
+    seed_candidates = []
+    for s in cumulative_sources:
+        if s.get("paper_id") or s.get("doi") or s.get("arxiv_id"):
+            seed_candidates.append(
+                SourceCandidate(
+                    title=s.get("title", ""),
+                    url=s.get("url", ""),
+                    doi=s.get("doi"),
+                    arxiv_id=s.get("arxiv_id"),
+                    paper_id=s.get("paper_id"),
+                    citation_count=s.get("citation_count"),
+                )
+            )
+
+    if not seed_candidates:
+        logger.info("[SNOWBALL NODE] No seed papers with IDs found for snowballing. Skipping.")
+        return {"cumulative_sources": cumulative_sources}
+
+    try:
+        def _run_async_snowball():
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop and loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    return executor.submit(asyncio.run, snowball_literature_graph(seed_candidates[:3])).result()
+            else:
+                return asyncio.run(snowball_literature_graph(seed_candidates[:3]))
+
+        snowballed = _run_async_snowball()
+    except Exception as e:
+        logger.warning(f"[SNOWBALL NODE] Snowballing encountered error: {e}")
+        return {"cumulative_sources": cumulative_sources}
+
+    new_snippets = []
+    for c in snowballed:
+        if c.url:
+            domain = _extract_domain(c.url)
+            if not any(s.get("url") == c.url for s in cumulative_sources):
+                cumulative_sources.append({
+                    "url": c.url,
+                    "domain": domain,
+                    "title": c.title,
+                    "doi": c.doi,
+                    "arxiv_id": c.arxiv_id,
+                    "paper_id": c.paper_id,
+                    "source_api": c.source_api,
+                    "citation_count": c.citation_count,
+                    "relation": c.relation,
+                    "added_in_turn": 0
+                })
+                new_snippets.append(c.to_formatted_snippet())
+
+    search_results = state.get("search_results", "")
+    if new_snippets:
+        search_results += "\n\n--- Snowballed Literature Graph (Citations & Recommendations) ---\n\n" + "\n\n------\n\n".join(new_snippets)
+
+    print(f"Snowballing discovered {len(new_snippets)} new connected papers. Total cumulative sources: {len(cumulative_sources)}")
+    return {
+        "search_results": search_results,
+        "cumulative_sources": cumulative_sources
+    }
+
+
 def scrape_node(state: ResearchState) -> dict:
     print("\n" + "= " * 50)
     print(f"Step 2 - Reader Agent is scraping top {state['scrape_top_n']} resources...")
@@ -296,6 +395,7 @@ def scrape_node(state: ResearchState) -> dict:
         "cumulative_sources": cumulative_sources
     }
 
+@observe(type="llm")
 def writer_node(state: ResearchState) -> dict:
     attempt = state.get("attempt", 0) + 1
     print("\n" + "= " * 50)
@@ -306,12 +406,10 @@ def writer_node(state: ResearchState) -> dict:
     vault_notes_text = ""
     try:
         from backend.memory.index import hybrid_search
+        from backend.memory.graph import format_vault_context_with_contradictions
         hits = hybrid_search(state["topic"], top_k=4)
         if hits:
-            vault_notes_text = "\n\n".join([
-                f"--- Vault Note [{n.get('note_id')}]:\n{n.get('content', '')[:800]}"
-                for n in hits
-            ])
+            vault_notes_text, _ = format_vault_context_with_contradictions(hits, max_char_per_note=800)
     except Exception as e:
         logger.debug(f"[WRITER] Vault memory lookup skipped/empty: {e}")
 
@@ -361,6 +459,7 @@ def writer_node(state: ResearchState) -> dict:
     print("\nDrafted Synthesis Report Preview:\n", report[:400] + "...")
     return {"report": report, "attempt": attempt, "verifier_feedback": "", "feedback": ""}
 
+@observe(type="llm")
 def verifier_node(state: ResearchState) -> dict:
     print("\n" + "= " * 50)
     print("Step 4 - SLM Truth Guard is verifying factual integrity...")
@@ -403,7 +502,7 @@ def verifier_node(state: ResearchState) -> dict:
         try:
             report_obj = FactVerificationReport(**parsed)
             for res in report_obj.results:
-                verification_results.append(res.dict())
+                verification_results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
                 if not res.is_valid:
                     has_issues = True
                     feedback_lines.append(f"- CLAIM: '{res.claim}' -> {res.reason_if_failed}")
@@ -427,6 +526,7 @@ def verifier_node(state: ResearchState) -> dict:
     
     return {"verifier_feedback": feedback, "verification_results": verification_results}
 
+@observe(type="llm")
 def critic_node(state: ResearchState) -> dict:
     print("\n" + "= " * 50)
     print("Step 5 - LLM Critic is evaluating quality and depth...")
@@ -437,13 +537,25 @@ def critic_node(state: ResearchState) -> dict:
         "report": state["report"],
     })
     
+    # Robust extraction supporting reasoning models with thinking enabled
+    parsed_json = None
+    if isinstance(raw_result, str):
+        cleaned_result = strip_chain_of_thought(raw_result)
+        parsed_json = safe_extract_json(cleaned_result, default=None)
+        if parsed_json is None:
+            parsed_json = safe_extract_json(raw_result, default=None)
+    elif isinstance(raw_result, dict):
+        parsed_json = raw_result
+    elif isinstance(raw_result, CriticScore):
+        parsed_json = raw_result.model_dump() if hasattr(raw_result, "model_dump") else dict(raw_result)
+
     try:
-        if isinstance(raw_result, dict):
-            critic_score = CriticScore(**raw_result)
+        if isinstance(parsed_json, dict):
+            critic_score = CriticScore(**parsed_json)
         elif isinstance(raw_result, CriticScore):
             critic_score = raw_result
         else:
-            raise ValueError(f"Unexpected critic_chain output type: {type(raw_result)}")
+            raise ValueError(f"Unable to extract structured JSON matching CriticScore.\nRaw output: {raw_result}")
     except Exception as e:
         raise ValueError(f"Failed to parse structured CriticScore from LLM output: {e}\nRaw output: {raw_result}") from e
         
@@ -471,6 +583,7 @@ def critic_node(state: ResearchState) -> dict:
     
     return {"feedback": feedback, "score": score}
 
+@observe(type="llm")
 def mindmap_node(state: ResearchState) -> dict:
     print("\n" + "= " * 50)
     print("Step 6 - Constructing Concept Mind Map Knowledge Graph...")
@@ -508,6 +621,7 @@ def mindmap_node(state: ResearchState) -> dict:
     print(f"Mind Map constructed with {len(mindmap.get('nodes', []))} nodes and {len(mindmap.get('edges', []))} edges.")
     return {"mindmap": mindmap}
 
+@observe(type="llm")
 def follow_up_node(state: ResearchState) -> dict:
     print("\n" + "= " * 50)
     print("Step 7 - Generating dynamic follow-up questions...")
@@ -549,6 +663,45 @@ def create_initial_state(*args, **kwargs):
 # ==============================================================================
 # 5. Long-Running Conversational Multi-Turn Follow-Up Engine
 # ==============================================================================
+
+@observe(type="llm")
+def route_followup_intent(
+    topic: str,
+    mindmap_summary: str,
+    report_summary: str,
+    user_query: str
+) -> Dict[str, str]:
+    """
+    Evaluates follow-up query against research state to route into LOCAL_QA, WEB_SEARCH, or REPORT_EXPANSION.
+    Applies strict schema confinement against small-model structured output drift.
+    """
+    raw_route = router_chain.invoke({
+        "topic": topic,
+        "mindmap_summary": mindmap_summary,
+        "report_summary": report_summary,
+        "user_query": user_query
+    })
+    cleaned_route = strip_chain_of_thought(raw_route) if isinstance(raw_route, str) else raw_route
+    route_data = safe_extract_json(cleaned_route, default={})
+    if not isinstance(route_data, dict):
+        route_data = {}
+
+    route = str(route_data.get("route", "LOCAL_QA")).upper().strip()
+    if route not in ("LOCAL_QA", "WEB_SEARCH", "REPORT_EXPANSION"):
+        route = "LOCAL_QA"
+
+    reasoning = str(route_data.get("reasoning", "Autonomous routing decision."))
+    search_query = str(route_data.get("search_query", "")).strip()
+    if route == "WEB_SEARCH" and not search_query:
+        search_query = f"{topic} {user_query}"
+
+    return {
+        "route": route,
+        "reasoning": reasoning,
+        "search_query": search_query
+    }
+
+
 def stream_followup_turn(
     current_state: Dict[str, Any],
     user_query: str,
@@ -589,18 +742,15 @@ def stream_followup_turn(
         )
         report_summary = report[:1200]
         
-        raw_route = router_chain.invoke({
-            "topic": topic,
-            "mindmap_summary": mindmap_summary,
-            "report_summary": report_summary,
-            "user_query": user_query
-        })
-        route_data = safe_extract_json(raw_route, default={})
-        route = route_data.get("route", "LOCAL_QA")
-        reasoning = route_data.get("reasoning", "Autonomous routing decision.")
-        search_query = route_data.get("search_query", "")
-        if route == "WEB_SEARCH" and not search_query:
-            search_query = f"{topic} {user_query}"
+        route_dict = route_followup_intent(
+            topic=topic,
+            mindmap_summary=mindmap_summary,
+            report_summary=report_summary,
+            user_query=user_query
+        )
+        route = route_dict["route"]
+        reasoning = route_dict["reasoning"]
+        search_query = route_dict["search_query"]
             
     yield "router", {
         "route": route,
@@ -619,16 +769,15 @@ def stream_followup_turn(
     # 2. Execution Phase
     # Query Vault memory for 4-8 relevant notes via Hybrid Search
     vault_notes = []
+    vault_notes_text = ""
     try:
         from backend.memory.index import hybrid_search
+        from backend.memory.graph import format_vault_context_with_contradictions
         vault_notes = hybrid_search(user_query, top_k=6)
+        if vault_notes:
+            vault_notes_text, _ = format_vault_context_with_contradictions(vault_notes, max_char_per_note=1000)
     except Exception as e:
         logger.debug(f"[FOLLOWUP] Vault hybrid search error: {e}")
-
-    vault_notes_text = "\n\n".join([
-        f"--- Vault Note [{n.get('note_id')}]:\n{n.get('content', '')[:1000]}"
-        for n in vault_notes
-    ]) if vault_notes else ""
 
     from backend.memory.session import SessionMemory, DEFAULT_TOKEN_BUDGET
     session_memory = SessionMemory(
@@ -857,7 +1006,7 @@ def stream_followup_turn(
     total_turns_tokens = sum(count_tokens(t.get('assistant_response', '') + t.get('user_query', '')) for t in chat_turns)
     if len(chat_turns) >= 2 or total_turns_tokens > 1000:
         recent_turns_text = "\n".join([
-            f"User: {t['user_query']}\nAssistant: {t['assistant_response'][:250]}..."
+            f"User: {t.get('user_query', t.get('content', ''))}\nAssistant: {t.get('assistant_response', t.get('content', ''))[:250]}..."
             for t in chat_turns
         ])
         conversation_summary = conversation_summarizer_chain.invoke({

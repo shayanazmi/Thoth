@@ -1,304 +1,228 @@
-# Thoth: Autonomous Multi-Agent Academic Research & Synthesis Engine ✦
+# Thoth · The Divine Scribe
+### Autonomous Multi-Agent Academic Research & Synthesis Engine
 
 <div align="center">
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-orange.svg)](https://github.com/langchain-ai/langgraph)
 [![NVIDIA NIM](https://img.shields.io/badge/inference-NVIDIA%20NIM-76B900.svg)](https://build.nvidia.com)
-[![Streamlit](https://img.shields.io/badge/ui-Streamlit%20Sanctum-FF4B4B.svg)](https://streamlit.io)
+[![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Thoth** is a state-of-the-art, autonomous multi-agent research and synthesis engine designed to systematically discover, extract, cross-verify, and synthesize complex scientific literature, technical documentation, and policy papers into structured, publication-grade intelligence reports.
+**Thoth** is an autonomous multi-agent research and synthesis engine that discovers, scrapes, cross-verifies, and synthesizes complex scientific literature into structured, publication-grade intelligence reports — served through a real-time streaming web studio.
 
 </div>
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
-- [The Problem & Vision](#-the-problem--vision)
-- [Interface Preview](#-interface-preview)
-- [Multi-Agent Architecture & Pipeline](#-multi-agent-architecture--pipeline)
-- [Key Features & Capabilities](#-key-features--capabilities)
-- [100% Open-Weights AI Stack](#-100-open-weights-ai-stack)
-- [Repository Structure](#-repository-structure)
-- [Getting Started](#-getting-started)
-- [Running Thoth](#-running-thoth)
-- [Diagnostics & Testing](#-diagnostics--testing)
-- [Environment Configuration](#-environment-configuration)
-- [License](#-license)
+- [Vision & Problem](#vision--problem)
+- [Architecture](#architecture)
+- [Agent Pipeline](#agent-pipeline)
+- [Chatbot Modes](#chatbot-modes)
+- [Tech Stack](#tech-stack)
+- [Repository Structure](#repository-structure)
+- [Getting Started](#getting-started)
+- [Environment Configuration](#environment-configuration)
+- [Known Issues & Roadmap](#known-issues--roadmap)
 
 ---
 
-## 💡 The Problem & Vision
+## Vision & Problem
 
-Traditional Large Language Model (LLM) generation often suffers from hallucinations, source conflations, and temporal knowledge cutoffs. Standard Retrieval-Augmented Generation (RAG) often performs shallow top-k vector chunk retrieval without verifying factual claims, evaluating methodology rigor, or tracing cross-domain connections.
+Standard LLM generation hallucinates. Standard RAG does shallow top-k vector retrieval without verifying claims or tracing cross-domain connections.
 
-**Thoth** resolves these challenges by decoupling the research process into a **deterministic, cyclic self-correcting state graph** powered by **LangGraph**:
-1. **Live Scholarly Retrieval**: Discovers primary academic papers across arXiv, Semantic Scholar, PubMed / Europe PMC, and Tavily AI Search.
-2. **Deterministic DOM Scraping**: Cleans and normalizes full-text web and paper bodies using resilient BeautifulSoup scrapers.
-3. **Small Language Model (SLM) Truth Guard**: Employs fast structured claim extraction to test factual statements against grounded source texts before publication.
-4. **LLM-as-a-Judge Quality Gating**: Evaluates drafts across 5 orthogonal academic dimensions (*Faithfulness, Relevance, Completeness, Evidence Quality, Clarity*).
-5. **Obsidian-Compatible Knowledge Vault**: Automatically compiles bidirectional `[[wikilinks]]`, persistent SQLite metadata, and an interactive force-directed knowledge graph.
+**Thoth** resolves this by splitting the research process into a **deterministic, cyclic self-correcting LangGraph state machine**:
 
----
-
-## 📸 Interface Preview
-
-### 1. Research Launchpad & Horizontal Agent Stepper
-![Thoth Workspace Initial Launchpad](assets/thoth_workspace_landing.jpg)
-
-### 2. Split-Screen Copilot & Verified Synthesis Report
-![Thoth Research Synthesis & Copilot](assets/thoth_workspace_synthesis.jpg)
+1. **Live Scholarly Retrieval** — arXiv, Semantic Scholar, PubMed, Europe PMC, Tavily
+2. **Citation Graph Expansion (Snowball)** — forward/backward reference traversal
+3. **Deterministic DOM Scraping** — BeautifulSoup full-text extraction
+4. **SLM Truth Guard** — claim-by-claim factual verification against retrieved sources
+5. **LLM-as-Judge Critic** — 5-dimension rubric scoring (Faithfulness, Relevance, Completeness, Evidence Quality, Clarity)
+6. **Self-Correcting Replan Loop** — routes failed drafts back to the Writer with critic feedback
+7. **Obsidian Vault Indexer** — bidirectional `[[wikilinks]]`, SQLite metadata, knowledge graph
 
 ---
 
-## 🏗️ Multi-Agent Architecture & Pipeline
+## Architecture
 
-Thoth implements a stateful cyclic graph with conditional feedback routing:
+```
+User Query
+    │
+    ▼
+┌──────────────────────────────────────┐
+│         FastAPI SSE Gateway          │
+│  (web_server.py · sse_starlette)     │
+└──────────┬───────────────────────────┘
+           │
+    ┌──────▼──────┐
+    │  Intent     │  fast_chat  ──► Llama-3.1-8B (direct, <500ms)
+    │  Router     │
+    │             │  deep_research ──► 8-Agent Swarm (below)
+    └─────────────┘
 
-```mermaid
-graph TD
-    START([START: User Research Query]) --> Decompose[Deep Research Orchestrator]
-    
-    subgraph Ingestion_Layer [Multi-Registry Ingestion Layer]
-        ArXiv[(arXiv Registry API)]
-        SemanticScholar[(Semantic Scholar API)]
-        PubMed[(PubMed / Europe PMC)]
-        Tavily[(Tavily AI Search API)]
-        WebDOM[(Live Web DOM / BeautifulSoup)]
-    end
-    
-    Decompose -->|Sub-Topic Queries| Search[Scholarly Search Agent]
-    
-    ArXiv --> Search
-    SemanticScholar --> Search
-    PubMed --> Search
-    Tavily --> Search
-    
-    Search -->|Target URLs & DOIs| Scrape[Reader & Extractor Agent]
-    WebDOM --> Scrape
-    
-    Scrape -->|Grounded Source Context| Writer[Synthesis Engine / Writer]
-    Writer -->|Draft Report| Verifier[SLM Truth Guard / Verifier]
-    
-    Tavily -.->|Live Fact Check Query| Verifier
-    
-    Verifier -->|Contradictions Flagged| Writer
-    Verifier -->|Claims Validated| Critic[Critic Node / LLM-as-a-Judge]
-    
-    Critic -->|Score < Threshold & Retries Left| Writer
-    Critic -->|Score >= Threshold or Max Retries| Vault[Knowledge Vault & Graph Indexer]
-    
-    Vault --> FollowUp[Follow-Up Explorer]
-    FollowUp --> END([END: Sanctum Research Studio Output])
-    
-    style START fill:#4F46E5,stroke:#312E81,stroke-width:2px,color:#fff
-    style END fill:#10B981,stroke:#065F46,stroke-width:2px,color:#fff
-    style Verifier fill:#7C3AED,stroke:#4C1D95,stroke-width:2px,color:#fff
-    style Critic fill:#D97706,stroke:#92400E,stroke-width:2px,color:#fff
-    style Ingestion_Layer fill:#0F172A,stroke:#334155,stroke-width:1px,color:#fff
+8-Agent Swarm (LangGraph StateGraph):
+┌─────────┐   ┌──────────┐   ┌────────┐   ┌────────┐
+│ SEARCH  │──►│ SNOWBALL │──►│ SCRAPE │──►│ WRITER │
+└─────────┘   └──────────┘   └────────┘   └───┬────┘
+                                               │
+                                    ┌──────────┴──────────┐
+                                    ▼                     ▼
+                               ┌─────────┐          ┌─────────┐
+                               │VERIFIER │          │ CRITIC  │
+                               └────┬────┘          └────┬────┘
+                                    └────────┬───────────┘
+                                             ▼
+                                    Score ≥ 7.0? ──Yes──► VAULT
+                                         │
+                                        No
+                                         │
+                                    Attempt < 2? ──Yes──► WRITER
+                                         │
+                                        No
+                                         ▼
+                                    VAULT (best draft)
 ```
 
-### Specialized Agents & Modules
+---
 
-- **Deep Research Orchestrator (`backend/orchestrator.py`)**: Decomposes complex inquiries into sub-topics, executes parallel multi-registry sweeps, reconciles cross-topic findings, and synchronizes state transitions.
-- **Scholarly Retrieval Engine (`backend/scholarly.py`)**: Interacts with arXiv, Semantic Scholar, PubMed / Europe PMC, and Tavily with automatic DOI resolution and BibTeX citation formatting.
-- **Reader Agent (`backend/tools.py`)**: Strips boilerplate scripts and navigates DOM structures to extract primary grounding context.
-- **Synthesis Engine (`backend/agents.py`)**: Drafts and refines comprehensive academic reports featuring *Executive Summary, Analytical Pillars, Methodological Bounds, Knowledge Gaps, and Traceable Citations*.
-- **SLM Truth Guard (`backend/agents.py`)**: Leverages `meta/llama-3.1-8b-instruct` on NVIDIA NIM with Pydantic structured schemas to validate claims in ~1–2 seconds.
-- **Critic LLM-as-a-Judge (`backend/agents.py`)**: Evaluates drafts using a strict 5-dimensional rubric, enforcing threshold scores (default: ≥ 6.5/10) before authorizing publication.
-- **Resilient LLM Dispatcher (`backend/dispatcher.py`)**: Manages model routing, rate limits, exponential backoff, and graceful failovers across NVIDIA NIM, OpenAI, and Groq.
-- **Knowledge Vault & Memory System (`backend/memory/`)**: Persistent SQLite storage (`store.db`), Obsidian-compatible markdown notes (`vault/`), and hybrid vector/keyword search index.
+## Agent Pipeline
+
+| Step | Agent | Model | Purpose |
+|------|-------|-------|---------|
+| 1 | **Search** | — | arXiv + Semantic Scholar + PubMed + EuropePMC |
+| 1.5 | **Snowball** | — | Citation graph expansion |
+| 2 | **Scrape** | — | Full-text DOM extraction (concurrent) |
+| 3 | **Writer** | Nemotron-30B | Synthesis report drafting |
+| 4 | **Verifier (Truth Guard)** | Llama-3.1-8B | Claim-by-claim source verification |
+| 5 | **Critic** | Nemotron-30B | 5-dimension rubric scoring |
+| 6 | **Replan** | LangGraph | Routes back to Writer if score < 7 |
+| 7 | **Vault** | — | Obsidian MD + SQLite persistence |
 
 ---
 
-## 🌟 Key Features & Capabilities
+## Chatbot Modes
 
-- **40 / 60 Split-Screen Workspace (Sanctum)**:
-  - **Left Copilot (40%)**: Multi-turn conversational research partner with persistent chat history, suggested investigation chips, and rolling context summarization (< 3,500 tokens).
-  - **Right Studio (60%)**: Multi-tabbed research suite with sticky tab navigation.
-- **Horizontal Agent Planner Rail**: Pinned progress stepper displaying live agent execution (`Search → Reader → Writer → Verifier → Critic → Follow-Up`) with animated pulses and per-node duration tags.
-- **Editorial Serif Typography (`Newsreader`)**: Long-form synthesis reports rendered in high-legibility serif prose with optimal line-height (`1.78`).
-- **Interactive Knowledge Codex (`vis.js`)**: Force-directed relational graph visualizing connections between Topics, Sub-Themes, Entities, Sources, and Follow-Up Probes.
-- **Literature Review Matrix (Atelier)**: Comparative cross-source matrix mapping *Source/Title*, *Key Contributions*, *Methodology*, and centered *Verification Badges*.
-- **Truth Guard Audit Drawer**: Detailed audit log of validated claims, flagged contradictions, and the LLM-as-a-Judge critique scorecard.
-- **Multi-Format Export**: One-click exports to `.md`, `.json`, and `.txt` with complete metadata and formatted references.
+| Mode | Trigger | Model | Latency |
+|------|---------|-------|---------|
+| **Chat** (default) | Type anything | Llama-3.1-8B | < 500ms |
+| **Deep Research** | Click 🔬 button | Full 8-agent swarm (Nemotron-30B) | 3–10 min |
+| **Web Probe** | Mode menu | Llama-3.1-8B + Tavily | ~5s |
+| **Vault QA** | Mode menu | Llama-3.1-8B + SQLite | ~2s |
+| **Expand Report** | Mode menu | Nemotron-30B | ~30s |
 
----
-
-## 🧠 100% Open-Weights AI Stack
-
-Thoth is built primarily on state-of-the-art open-weights models and open-source agent frameworks:
-
-| Component | Model / Technology | Provider / Framework | Purpose |
-|---|---|---|---|
-| **Primary Synthesis LLM** | `nvidia/nemotron-3.5-lightning-30b-a3b` | NVIDIA NIM | Deep multi-source reasoning, long-form synthesis, and LLM-as-a-Judge critique. |
-| **SLM Fact-Verifier (Truth Guard)** | `meta/llama-3.1-8b-instruct` | NVIDIA NIM / Meta | High-speed (~1–2s) structured Pydantic claim verification and contradiction testing. |
-| **Agent Orchestration** | `LangGraph` + `LangChain` | LangChain | Stateful cyclic graphs with conditional routing loops and runtime retry management. |
-| **Scholarly Registries** | `arXiv` · `Semantic Scholar` · `PubMed` · `Tavily` | Open APIs / Tavily | Real-time academic paper discovery, DOI resolution, and web grounding. |
-| **Knowledge Vault & Graph** | `SQLite` + `vis.js` + `SentenceTransformers` | Open Source | Bidirectional Markdown vault, vector search indexing, and graph visualization. |
+Chat is the **default**. Deep Research is **explicit opt-in** via the 🔬 toggle button.
 
 ---
 
-## 📁 Repository Structure
+## Tech Stack
 
-```text
+| Layer | Technology |
+|-------|-----------|
+| Orchestration | LangGraph (cyclic StateGraph) |
+| Primary LLM | NVIDIA NIM — `nvidia/llama-3.1-nemotron-70b` |
+| Fast SLM | NVIDIA NIM — `meta/llama-3.1-8b-instruct` |
+| Fallback LLM | Groq — `llama-3.3-70b-versatile` |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` (local) |
+| Web Server | FastAPI + sse_starlette (SSE streaming) |
+| Frontend | Vanilla JS + CSS (Alpine-free, no framework) |
+| Animations | Anime.js (3D parallax, accordions) |
+| Icons | Lucide |
+| Evaluation | deepeval (local offline mode) |
+| Vault | Obsidian-compatible Markdown + SQLite |
+| Search | arXiv API, Semantic Scholar, PubMed, EuropePMC, Tavily |
+
+---
+
+## Repository Structure
+
+```
 thoth/
-├── backend/                  # Multi-agent graph engine, memory, & scholarly tools
-│   ├── __init__.py           # Backend package exports
-│   ├── agents.py             # LLM agent definitions, prompts, & structured chains
-│   ├── dispatcher.py         # Multi-provider LLM routing & rate-limit failover
-│   ├── orchestrator.py       # DeepResearchOrchestrator multi-subtopic planner
-│   ├── pipeline.py           # LangGraph state machine & streaming orchestration
-│   ├── scholarly.py          # Academic engine (arXiv, Semantic Scholar, PubMed, BibTeX)
-│   ├── tools.py              # Web scraping & Tavily search tools
-│   └── memory/               # Persistent memory & Obsidian Knowledge Vault
-│       ├── __init__.py       # Memory package exports
-│       ├── db.py             # SQLite database layer (store.db)
-│       ├── graph.py          # Entity co-occurrence & knowledge graph builder
-│       ├── index.py          # Local vector & hybrid search index
-│       ├── session.py        # Multi-session memory management
-│       └── vault.py          # Obsidian-compatible Markdown vault with wikilinks
-├── frontend/                 # Streamlit Sanctum UI & styling system
-│   ├── __init__.py           # Frontend package exports
-│   ├── app.py                # Streamlit multi-view router & session state
-│   ├── theme.py              # Obsidian glassmorphism CSS & design tokens
-│   ├── ui_adapter.py         # Thread-safe pipeline execution bridge & event bus
-│   └── views.py              # Sanctum, Codex, Atelier, Chrono, and Settings views
-├── assets/                   # UI screenshots & visual assets
-├── scripts/                  # Verification & utility scripts
-│   └── e2e_verification.py   # Headless end-to-end integration test script
-├── tests/                    # Comprehensive unit and integration test suite
-│   ├── test_concurrent_orchestrator.py
-│   ├── test_critic.py
-│   ├── test_dispatcher.py
-│   ├── test_graph.py
-│   ├── test_memory_vault.py
-│   ├── test_orchestrator.py
-│   ├── test_resilience.py
-│   ├── test_scholarly.py
-│   ├── test_session_memory.py
-│   ├── test_token_budget.py
-│   └── test_verifier.py
-├── app.py                    # Root Streamlit launcher
-├── diagnostic_test.py        # 7-Layer Deep Agentic Diagnostic Suite
-├── requirements.txt          # Python project dependencies
-├── .env.example              # Template for API keys
-├── .gitignore                # Git ignore rules
-└── README.md                 # Project documentation
+├── backend/
+│   ├── agents.py          # LangGraph node implementations (Search, Snowball, Scrape, Writer, Verifier, Critic, Vault)
+│   ├── orchestrator.py    # LangGraph StateGraph definition & conditional edge routing
+│   ├── pipeline.py        # High-level pipeline runner & session memory
+│   ├── scholarly.py       # Multi-source scholarly search & scraping (arXiv, PubMed, EuropePMC, Tavily)
+│   ├── dispatcher.py      # Fast-path conversational router (chat vs research intent)
+│   ├── telemetry.py       # DeepEval local tracing (offline mode, no cloud key needed)
+│   └── eval/              # Evaluation harness (metrics, datasets, runner)
+│       ├── metrics.py
+│       ├── datasets.py
+│       └── runner.py
+├── web/
+│   ├── index.html         # Research Studio single-page app
+│   ├── css/styles.css     # Full design system (dark mode, glassmorphism, tokens)
+│   └── js/
+│       ├── app.js         # Chat engine, SSE stream parser, mode routing
+│       └── animations.js  # Anime.js 3D parallax & micro-animations
+├── vault/
+│   ├── topics/            # Generated research reports (Obsidian MD, .gitignored)
+│   └── sources/           # Scraped source documents (Obsidian MD, .gitignored)
+├── scripts/
+│   ├── run_evals.py
+│   └── run_multiturn_simulation.py
+├── tests/                 # DeepEval test suites
+├── web_server.py          # FastAPI app — SSE endpoints (/api/research/stream, /api/followup/stream)
+├── run_web.py             # One-click launcher (uvicorn + auto browser open)
+├── .env.example           # Environment variable template
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### 1. Prerequisites
+### Prerequisites
+- Python 3.10+
+- NVIDIA NIM API key (free tier available at [build.nvidia.com](https://build.nvidia.com))
+- Optionally: Groq API key (fallback LLM), Tavily API key (web search)
 
-- Python 3.10 or higher
-- Git
-
-### 2. Clone and Setup Environment
+### Installation
 
 ```bash
-# Clone the repository
-git clone <your-repository-url>
+git clone <your-repo-url>
 cd thoth
 
-# Create a virtual environment
-python3 -m venv venv
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Activate the virtual environment
-# On macOS / Linux:
-source venv/bin/activate
-# On Windows:
-# venv\Scripts\activate
-```
-
-### 3. Install Dependencies
-
-```bash
-pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
-
-Create a `.env` file from the `.env.example` template:
+### Environment Setup
 
 ```bash
 cp .env.example .env
+# Edit .env and add your API keys
 ```
 
-Open `.env` and add your API keys:
-- **`TAVILY_API_KEY`**: Obtain from [Tavily](https://tavily.com).
-- **`NVIDIA_API_KEY`**: Obtain from [NVIDIA Build](https://build.nvidia.com).
-- **`OPENAI_API_KEY`** *(Optional)*: Secondary fallback provider.
-- **`GROQ_API_KEY`** *(Optional)*: Low-latency inference fallback.
-
----
-
-## 💻 Running Thoth
-
-### A. Launch the Streamlit Research Sanctum (Recommended)
+### Run
 
 ```bash
-streamlit run app.py
+./venv/bin/python run_web.py
 ```
 
-Open **`http://localhost:8501`** in your browser to access the interactive research studio.
+Opens automatically at `http://127.0.0.1:8000`.
 
 ---
 
-### B. Run Headless CLI Pipeline
+## Environment Configuration
 
-Execute the autonomous multi-agent pipeline directly from the command line:
+See [`.env.example`](.env.example) for all variables. Key ones:
 
-```bash
-python -m backend.pipeline
-```
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `NVIDIA_API_KEY` | ✅ Yes | Primary LLM (Nemotron-30B, Llama-8B) |
+| `GROQ_API_KEY` | ⚠️ Recommended | Fallback LLM when NVIDIA times out |
+| `TAVILY_API_KEY` | Optional | Web search agent |
+| `SEMANTIC_SCHOLAR_API_KEY` | Optional | Higher rate limits on S2 |
 
----
-
-### C. Run End-to-End Headless Verification
-
-```bash
-python scripts/e2e_verification.py
-```
+> **Note:** Confident AI / DeepEval cloud tracing is **not required**. Thoth runs deepeval in local offline mode automatically.
 
 ---
 
-## 🧪 Diagnostics & Testing
+## Known Issues & Roadmap
 
-### 1. 7-Layer Deep Agentic Diagnostic Suite
-
-Thoth includes a built-in diagnostic test suite that validates credentials, web scraping, SLM verification, graph pipeline loops, multi-turn QA, source tracking matrix, and automated evaluation:
-
-```bash
-python diagnostic_test.py
-```
-
-### 2. Run Pytest Test Suite
-
-Execute the comprehensive test suite across all 11 test modules:
-
-```bash
-pytest tests/ -v
-```
-
----
-
-## ⚙️ Environment Configuration
-
-| Variable | Required | Description |
-|---|---|---|
-| `TAVILY_API_KEY` | **Yes** | Live web search & real-time fact-checking API key. |
-| `NVIDIA_API_KEY` | **Yes** | Access to NVIDIA NIM endpoints (`nemotron-30b`, `llama-3.1-8b`). |
-| `OPENAI_API_KEY` | *Optional* | Fallback LLM provider for `LLMDispatcher`. |
-| `GROQ_API_KEY` | *Optional* | High-speed open-weights inference fallback. |
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
+See [`TODO.md`](TODO.md) for the full tracked issue list and planned improvements.

@@ -1,9 +1,13 @@
 import collections
-from typing import List, Dict, Any, Optional, Union, Set
+from typing import List, Dict, Any, Optional, Union, Set, Tuple
 from backend.memory.db import init_db, DEFAULT_DB_PATH
 from backend.memory.vault import Note, extract_links
 
-ALLOWED_RELATIONS = {"cites", "supports", "contradicts", "part_of", "defines", "related"}
+ALLOWED_RELATIONS = {
+    "cites", "cited_by", "supports", "contradicts", "part_of",
+    "defines", "related", "recommends", "authored_by"
+}
+
 
 
 def add_edge(
@@ -169,3 +173,177 @@ def get_subgraph(
         "nodes": sorted(list(nodes)),
         "edges": edges_list
     }
+
+
+def find_contradictions_among_notes(
+    note_ids: List[str],
+    db_path: str = DEFAULT_DB_PATH
+) -> List[Dict[str, Any]]:
+    """
+    Checks if any pairs of note IDs in the provided list are connected by a 'contradicts' edge
+    in the knowledge graph in either direction.
+    Returns a list of contradiction dictionaries: [{'source': id_a, 'target': id_b, 'confidence': float}].
+    """
+    if not note_ids or len(note_ids) < 2:
+        return []
+
+    conn = init_db(db_path)
+    clean_ids = [str(nid).strip() for nid in note_ids if str(nid).strip()]
+    if len(clean_ids) < 2:
+        return []
+
+    placeholders = ",".join(["?"] * len(clean_ids))
+    query = f"""
+        SELECT source_note, relation, target_note, confidence
+        FROM edges
+        WHERE relation = 'contradicts'
+          AND source_note IN ({placeholders})
+          AND target_note IN ({placeholders});
+    """
+    params = clean_ids + clean_ids
+    cursor = conn.execute(query, params)
+    
+    seen_pairs: Set[Tuple[str, str]] = set()
+    contradictions = []
+
+    for row in cursor.fetchall():
+        s, t, conf = row["source_note"], row["target_note"], row["confidence"]
+        # Normalize pair order to prevent duplicate reporting of bidirectional contradictions
+        pair = (min(s, t), max(s, t))
+        if pair not in seen_pairs:
+            seen_pairs.add(pair)
+            contradictions.append({
+                "source": s,
+                "target": t,
+                "confidence": float(conf)
+            })
+
+    return contradictions
+
+
+def format_vault_context_with_contradictions(
+    notes: List[Dict[str, Any]],
+    db_path: str = DEFAULT_DB_PATH,
+    max_char_per_note: int = 800
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    Formats a list of retrieved vault notes into context text for LLM synthesis.
+    If any retrieved notes have 'contradicts' edges in the knowledge graph, injects
+    an explicit contradiction awareness alert to prevent contradiction leakage.
+    Returns (formatted_context_text, contradictions_found).
+    """
+    if not notes:
+        return "", []
+
+    note_ids = [n.get("note_id") for n in notes if n.get("note_id")]
+    contradictions = find_contradictions_among_notes(note_ids, db_path=db_path)
+
+    sections = []
+    if contradictions:
+        alert_lines = [
+            "[KNOWLEDGE GRAPH CONTRADICTION ALERT]",
+            "The following retrieved notes contain known direct contradictions in the research vault:"
+        ]
+        for c in contradictions:
+            alert_lines.append(f"- Note [{c['source']}] CONTRADICTS Note [{c['target']}] (confidence {c['confidence']:.2f})")
+        alert_lines.append(
+            "CRITICAL WRITING DIRECTIVE: You MUST explicitly acknowledge and discuss this conflict/discrepancy "
+            "in your synthesis rather than presenting both as uncontested supporting facts for the same claim."
+        )
+        sections.append("\n".join(alert_lines))
+
+    for n in notes:
+        nid = n.get("note_id", "unknown")
+        content = n.get("content", "")[:max_char_per_note]
+        sections.append(f"--- Vault Note [{nid}]:\n{content}")
+
+    formatted_text = "\n\n".join(sections)
+    return formatted_text, contradictions
+
+
+def export_citation_subgraph(
+    start_notes: Optional[List[str]] = None,
+    max_depth: int = 2,
+    db_path: str = DEFAULT_DB_PATH
+) -> Dict[str, Any]:
+    """
+    Exports nodes and edges from the SQLite knowledge graph formatted for
+    interactive 2D/3D D3 network visualization in the UI.
+    """
+    conn = init_db(db_path)
+    nodes_dict = {}
+    edges_list = []
+
+    # If start_notes provided, traverse around them; otherwise get recent graph
+    if start_notes:
+        collected_notes = set(start_notes)
+        for sn in start_notes:
+            connected = traverse(sn, max_depth=max_depth, db_path=db_path)
+            collected_notes.update(connected)
+
+        placeholders = ",".join(["?"] * len(collected_notes))
+        cursor = conn.execute(f"""
+            SELECT note_id, type, created
+            FROM notes
+            WHERE note_id IN ({placeholders})
+        """, list(collected_notes))
+        for row in cursor.fetchall():
+            nodes_dict[row["note_id"]] = {
+                "id": row["note_id"],
+                "label": row["note_id"],
+                "type": row["type"] or "concept",
+                "created_at": row["created"]
+            }
+
+        edge_cursor = conn.execute(f"""
+            SELECT source_note, relation, target_note, confidence
+            FROM edges
+            WHERE source_note IN ({placeholders}) OR target_note IN ({placeholders})
+        """, list(collected_notes) + list(collected_notes))
+    else:
+        # Fetch all or top 50 recent notes
+        cursor = conn.execute("""
+            SELECT note_id, type, created
+            FROM notes
+            ORDER BY created DESC
+            LIMIT 60
+        """)
+        for row in cursor.fetchall():
+            nodes_dict[row["note_id"]] = {
+                "id": row["note_id"],
+                "label": row["note_id"],
+                "type": row["type"] or "concept",
+                "created_at": row["created"]
+            }
+
+        edge_cursor = conn.execute("""
+            SELECT source_note, relation, target_note, confidence
+            FROM edges
+            LIMIT 120
+        """)
+
+
+    seen_edges = set()
+    for erow in edge_cursor.fetchall():
+        s, r, t, conf = erow["source_note"], erow["relation"], erow["target_note"], erow["confidence"]
+        edge_key = (s, r, t)
+        if edge_key not in seen_edges:
+            seen_edges.add(edge_key)
+            edges_list.append({
+                "from": s,
+                "to": t,
+                "relation": r,
+                "confidence": float(conf)
+            })
+            # Ensure endpoints exist in nodes_dict
+            if s not in nodes_dict:
+                nodes_dict[s] = {"id": s, "label": s, "type": "source" if s.startswith("src-") else "concept"}
+            if t not in nodes_dict:
+                nodes_dict[t] = {"id": t, "label": t, "type": "source" if t.startswith("src-") else "concept"}
+
+    return {
+        "nodes": list(nodes_dict.values()),
+        "edges": edges_list
+    }
+
+
