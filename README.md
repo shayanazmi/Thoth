@@ -335,17 +335,7 @@ thoth/
 
 ---
 
-## 🧪 Evaluation & Telemetry
 
-Thoth includes a native evaluation harness powered by `deepeval` operating in **100% local in-memory mode**:
-- **Zero Cloud Leakage**: No external telemetry keys (`CONFIDENT_AI_API_KEY`) required.
-- **Deterministic Metrics**: Evaluates factual recall, citation accuracy, and hallucination rates across multi-turn trajectories.
-- **Run Evals**:
-  ```bash
-  ./venv/bin/python scripts/run_evals.py
-  ```
-
----
 
 ## 📜 License
 
