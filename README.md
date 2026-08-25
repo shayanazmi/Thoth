@@ -1,7 +1,9 @@
-# Thoth · The Divine Scribe
-### Autonomous Multi-Agent Academic Research & Synthesis Engine
-
 <div align="center">
+
+<img src="assets/thoth_logo.png" alt="Thoth Logo" width="140" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(201, 154, 107, 0.35); margin-bottom: 12px;"/>
+
+# THOTH · THE DIVINE SCRIBE
+### Autonomous Multi-Agent Academic Research & Synthesis Engine
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-orange.svg?style=for-the-badge&logo=langchain&logoColor=white)](https://github.com/langchain-ai/langgraph)
