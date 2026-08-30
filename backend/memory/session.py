@@ -6,13 +6,22 @@ from backend.agents import conversation_summarizer_chain
 
 logger = logging.getLogger("ThothSessionMemory")
 
-# Default token budget allocation per architecture specification
+# Default token budget allocation for conversational Q&A turns
 DEFAULT_TOKEN_BUDGET: Dict[str, int] = {
-    "system": 500,
-    "retrieved_notes": 2500,
-    "summary": 1500,
-    "recent_turns": 2500,
-    "headroom": 1000,
+    "system": 1000,
+    "retrieved_notes": 16000,  # Expanded from 2500 to allow rich academic context
+    "summary": 2500,
+    "recent_turns": 4000,
+    "headroom": 2000,
+}
+
+# Dedicated Token Budget for Full Deep Research Report Writer (Nemotron-30B/70B 128k context)
+RESEARCH_WRITER_TOKEN_BUDGET: Dict[str, int] = {
+    "system": 1500,
+    "retrieved_notes": 32000,  # 32k tokens of full scraped papers & primary sources
+    "summary": 3000,
+    "recent_turns": 4000,
+    "headroom": 3000,
 }
 
 _tokenizer = None

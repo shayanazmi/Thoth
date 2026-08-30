@@ -335,9 +335,15 @@ thoth/
 └── README.md                 # Complete system documentation
 ```
 
+## 🌟 Recent Enhancements
+
+- **4K Official Emblem & 16:9 Social Preview**: Integrated official metallic *Scales of Ma'at* emblem (`assets/thoth_logo.png`) and widescreen social preview card (`assets/thoth-socialpreview.jpg`) into the web interface, favicon, and documentation.
+- **Academic Query Sanitization Engine**: Added query distillation (`_sanitize_academic_query`) in `backend/scholarly.py` to prevent query bloat when calling arXiv, Europe PMC, PubMed, Semantic Scholar, and OpenAlex.
+- **Expanded 32k Token Synthesis Context**: Implemented `RESEARCH_WRITER_TOKEN_BUDGET` in `backend/memory/session.py` and `backend/pipeline.py` to allow 32,000 tokens of full scraped academic papers to reach the Writer node, eliminating context starvation and increasing citation fidelity.
+- **Resilient Multi-Provider LLM Fallback**: Added automated Groq model fallback in `backend/agents.py` with environment override support (`GROQ_FALLBACK_MODEL`) to prevent downtime during upstream provider latency.
+- **Intent-Aware Hero Launcher**: Smart regex routing in `web/js/app.js` automatically routes casual conversation ("hi", "hello") to instant fast-chat while engaging the 8-agent swarm for academic research inquiries.
+
 ---
-
-
 
 ## 📜 License
 

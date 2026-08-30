@@ -98,9 +98,10 @@ groq_key = os.getenv("GROQ_API_KEY")
 openai_key = os.getenv("OPENAI_API_KEY")
 
 if groq_key and len(groq_key) > 10 and not groq_key.startswith("dummy"):
-    _fallback_llm = ChatOpenAI(model="llama-3.3-70b-versatile", api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.6, timeout=60)
+    groq_primary_model = os.getenv("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+    _fallback_llm = ChatOpenAI(model=groq_primary_model, api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.6, timeout=60)
     _fallback_verifier_llm = ChatOpenAI(model="llama-3.1-8b-instant", api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.1, timeout=30)
-    _fb_name = "Groq"
+    _fb_name = f"Groq ({groq_primary_model})"
 elif openai_key and len(openai_key) > 10 and not openai_key.startswith("sk-dummy") and not openai_key.startswith("dummy"):
     _fallback_llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0.6, timeout=60)
     _fallback_verifier_llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0.1, timeout=30)

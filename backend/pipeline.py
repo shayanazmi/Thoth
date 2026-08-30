@@ -413,8 +413,8 @@ def writer_node(state: ResearchState) -> dict:
     except Exception as e:
         logger.debug(f"[WRITER] Vault memory lookup skipped/empty: {e}")
 
-    # Build SessionMemory context if conversational turns exist
-    from backend.memory.session import SessionMemory, DEFAULT_TOKEN_BUDGET
+    # Build SessionMemory context with generous 32k token research budget for deep academic synthesis
+    from backend.memory.session import SessionMemory, RESEARCH_WRITER_TOKEN_BUDGET
     session_mem = SessionMemory(
         initial_summary=state.get("conversation_summary", ""),
         initial_turns=state.get("chat_turns", [])
@@ -427,7 +427,7 @@ def writer_node(state: ResearchState) -> dict:
         raw_research += f"\n\nPRIOR VAULT KNOWLEDGE:\n{vault_notes_text}"
 
     session_ctx = session_mem.get_context(
-        token_budget=DEFAULT_TOKEN_BUDGET,
+        token_budget=RESEARCH_WRITER_TOKEN_BUDGET,
         retrieved_notes_text=raw_research
     )
     

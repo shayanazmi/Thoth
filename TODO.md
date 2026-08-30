@@ -3,43 +3,19 @@
 
 ---
 
-## 🔴 Critical Bugs (Fix First)
+## 🟢 Resolved Critical Issues
 
-### 1. Search Query Bloat — Wrong Query Passed to Search Agent
-**File:** `backend/agents.py` / `backend/orchestrator.py` (search node)
-**Symptom:** After the Writer runs, the query string gets replaced with the full report text.
-The Snowball agent then sends the entire report as a search query, returning garbage results
-(e.g., a CERN physics paper for an alopecia query).
-**Root Cause:** `state["query"]` or `state["report"]` is mutated/overwritten before the
-second retrieval pass. The original topic is lost.
-**Fix:** Lock the original topic into `state["original_topic"]` at graph entry. Use that
-as the immutable search anchor throughout all retrieval nodes — never overwrite it.
+### 1. Search Query Bloat — Sanitization & Query Protection (Resolved)
+- **Fix:** Added `_sanitize_academic_query()` in `backend/scholarly.py` to strip multiline paragraphs, markdown noise, and distill queries to concise, high-signal academic keywords before querying arXiv, EuropePMC, PubMed, Semantic Scholar, and OpenAlex.
 
----
+### 2. Groq Fallback Model Name (Resolved)
+- **Fix:** Updated `backend/agents.py` fallback to use universally supported Groq models (`llama-3.1-8b-instant` default, with `GROQ_FALLBACK_MODEL` environment variable support).
 
-### 2. Groq Fallback Model Does Not Exist
-**File:** LLM config in `backend/agents.py` or `backend/pipeline.py`
-**Symptom:**
-  ERROR: Fallback provider (Groq): 'The model llama-3.3-70b-versatile does not exist'
-**Fix:** Update to a valid Groq model. Check https://console.groq.com/docs/models.
-Current valid options: `llama3-70b-8192`, `mixtral-8x7b-32768`, `gemma2-9b-it`.
+### 3. Token Budget Truncation (Resolved)
+- **Fix:** Expanded `DEFAULT_TOKEN_BUDGET["retrieved_notes"]` to 16,000 tokens and introduced dedicated `RESEARCH_WRITER_TOKEN_BUDGET["retrieved_notes"]` (32,000 tokens) in `backend/memory/session.py` and `backend/pipeline.py` so the Writer receives full scraped papers without starving context.
 
----
-
-### 3. Token Budget Truncation Too Aggressive
-**File:** `backend/memory/` (session memory)
-**Symptom:** WARNING: Truncating text slice from 73509 to 2500 tokens.
-**Impact:** Writer has almost no source text. Explains low Faithfulness scores (3.0/10).
-**Fix:** Raise limit to 16k–32k tokens. Use keyword-overlap extraction instead of blind
-head-truncation so the most relevant paragraphs are preserved.
-
----
-
-### 4. Hero Launch Bypasses Mode Routing
-**File:** `web/js/app.js` → handleHeroLaunch()
-**Symptom:** Landing page hero prompt always calls startResearch() — even for casual greetings.
-**Fix:** Add casual query check before launching the swarm. Or rename the hero box to
-"Research Topic" to set expectations.
+### 4. Hero Launch Casual Routing (Resolved)
+- **Fix:** Added regex greeting check in `handleHeroLaunch()` in `web/js/app.js` to route casual greetings ("hi", "hello") directly to fast chat instead of triggering the 8-agent swarm.
 
 ---
 

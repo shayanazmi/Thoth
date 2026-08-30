@@ -912,6 +912,32 @@ async def search_tavily(
         return []
 
 
+def _sanitize_academic_query(query: str, max_chars: int = 150) -> str:
+    """
+    Sanitizes raw user/agent queries for academic APIs (arXiv, S2, EuropePMC, PubMed, OpenAlex).
+    Removes multiline report dumps, parenthetical instructions, quotes, and cleans excess whitespace.
+    """
+    if not query:
+        return ""
+    # If multiline or paragraph, take first substantive line
+    lines = [line.strip() for line in query.splitlines() if line.strip()]
+    cleaned = lines[0] if lines else query
+    
+    # Remove outer quotes and markdown symbols
+    cleaned = re.sub(r'[\r\n\t]+', ' ', cleaned)
+    cleaned = re.sub(r'[#*`_~\[\](){}<>]', ' ', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    
+    # If still too long, extract primary key clause
+    if len(cleaned) > max_chars:
+        parts = re.split(r'[\.;\?!]', cleaned)
+        if parts and len(parts[0].strip()) >= 15:
+            cleaned = parts[0].strip()
+        else:
+            cleaned = cleaned[:max_chars].rsplit(' ', 1)[0]
+    return cleaned.strip()
+
+
 # ==============================================================================
 # 8. Unified Multi-Source Scholarly Search Aggregator
 # ==============================================================================
@@ -929,14 +955,17 @@ async def search_scholarly_sources(
     Tavily web search if fewer than `min_scholarly_results` academic candidates are found.
     """
     disp = dispatcher or scholarly_dispatcher
+    clean_query = _sanitize_academic_query(query)
+    if not clean_query:
+        clean_query = query[:100]
 
     # Concurrently query all federated academic endpoints
     academic_tasks = [
-        search_arxiv(query, max_results=max_results, dispatcher=disp),
-        search_semantic_scholar(query, max_results=max_results, dispatcher=s2_dispatcher),
-        search_openalex(query, max_results=max_results, dispatcher=disp),
-        search_europepmc(query, max_results=max_results, dispatcher=disp),
-        search_pubmed(query, max_results=max_results, dispatcher=disp),
+        search_arxiv(clean_query, max_results=max_results, dispatcher=disp),
+        search_semantic_scholar(clean_query, max_results=max_results, dispatcher=s2_dispatcher),
+        search_openalex(clean_query, max_results=max_results, dispatcher=disp),
+        search_europepmc(clean_query, max_results=max_results, dispatcher=disp),
+        search_pubmed(clean_query, max_results=max_results, dispatcher=disp),
     ]
 
     results_lists = await asyncio.gather(*academic_tasks, return_exceptions=True)

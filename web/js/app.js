@@ -289,7 +289,17 @@ class ThothApp {
     const topic = this.heroPromptInput.value.trim();
     if (!topic || this.isGenerating) return;
     this.switchView('studio');
-    this.startResearch(topic, true);
+
+    // Route casual greetings directly to fast conversational chat
+    const casualPatterns = /^(hi|hello|hey|greetings|hola|howdy|sup|test|yo)(\s+.*|\!|\?)*$/i;
+    if (casualPatterns.test(topic) || topic.length < 4) {
+      this.setMode('fast_chat');
+      this.appendUserMessage(topic);
+      this.sendFollowup(topic);
+    } else {
+      this.setMode('deep_research');
+      this.startResearch(topic, true);
+    }
   }
 
   handleChatSend() {
