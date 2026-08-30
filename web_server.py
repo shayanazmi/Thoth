@@ -79,8 +79,10 @@ async def api_stream_research(request: Request):
     tone = body.get("tone", "formal and analytical")
     scrape_top_n = int(body.get("scrape_top_n", 2))
     min_score = float(body.get("min_score", 6.5))
+    initial_turns = body.get("chat_turns", [])
+    initial_summary = body.get("conversation_summary", "")
 
-    logger.info(f"[SSE STREAM] Request for topic: '{topic}' (mode={mode})")
+    logger.info(f"[SSE STREAM] Request for topic: '{topic}' (mode={mode}, inherited_turns={len(initial_turns)})")
 
     async def event_generator():
         # Fast path for greetings and casual conversation (<500ms)
@@ -129,7 +131,9 @@ async def api_stream_research(request: Request):
                     role=role,
                     tone=tone,
                     scrape_top_n=scrape_top_n,
-                    min_score=min_score
+                    min_score=min_score,
+                    initial_turns=initial_turns,
+                    initial_summary=initial_summary
                 ):
                     # Clean state for JSON serialization
                     clean_state = {
@@ -140,7 +144,9 @@ async def api_stream_research(request: Request):
                         "verification_results": current_state.get("verification_results", []),
                         "mindmap": current_state.get("mindmap", {}),
                         "cumulative_sources": current_state.get("cumulative_sources", []),
-                        "follow_up_questions": current_state.get("follow_up_questions", [])
+                        "follow_up_questions": current_state.get("follow_up_questions", []),
+                        "chat_turns": current_state.get("chat_turns", []),
+                        "conversation_summary": current_state.get("conversation_summary", "")
                     }
                     event_data = {
                         "node": node_name,
@@ -270,6 +276,41 @@ async def api_stream_followup(request: Request):
             }
 
     return EventSourceResponse(event_generator())
+
+
+@app.get("/health")
+def api_health():
+    """Health check endpoint."""
+    return {"status": "ok", "app": "Thoth Research Intelligence"}
+
+
+@app.get("/api/status")
+def api_status():
+    """Returns telemetry and circuit breaker status."""
+    from backend.telemetry import get_telemetry_status
+    return get_telemetry_status()
+
+
+@app.get("/api/sessions")
+def api_list_sessions(limit: int = 20):
+    """Lists saved research sessions from SQLite database."""
+    from backend.memory.db import list_sessions
+    return list_sessions(limit=limit)
+
+
+@app.get("/api/reports")
+def api_list_reports(limit: int = 20):
+    """Lists saved synthesis reports from SQLite database."""
+    from backend.memory.db import list_reports
+    return list_reports(limit=limit)
+
+
+@app.get("/api/vault/graph")
+def api_vault_graph(root_node: Optional[str] = None, max_depth: int = 2):
+    """Returns nodes and edges from the Obsidian vault knowledge graph."""
+    from backend.memory.graph import export_citation_subgraph
+    start = [root_node] if root_node else None
+    return export_citation_subgraph(start_notes=start, max_depth=max_depth)
 
 
 @app.get("/api/vault/notes")

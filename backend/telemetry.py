@@ -45,3 +45,24 @@ def get_local_traces() -> List[Any]:
     if DEEPEVAL_AVAILABLE and trace_manager:
         return trace_manager.get_all_traces_dict()
     return []
+
+
+def get_telemetry_status() -> Dict[str, Any]:
+    """Returns telemetry, circuit breaker, and LLM configuration status."""
+    import os
+    from backend.dispatcher import default_dispatcher, scholarly_dispatcher, s2_dispatcher
+
+    primary_model = os.getenv("NVIDIA_PRIMARY_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
+    fallback_model = os.getenv("GROQ_FALLBACK_MODEL", "groq/llama-3.3-70b-versatile")
+    
+    return {
+        "status": "online",
+        "deepeval_tracing": DEEPEVAL_AVAILABLE,
+        "circuit_breaker_state": default_dispatcher._state,
+        "scholarly_breaker_state": scholarly_dispatcher._state,
+        "s2_breaker_state": s2_dispatcher._state,
+        "primary_provider": "NVIDIA AI Foundation NIM",
+        "primary_model": primary_model,
+        "fallback_provider": "Groq Cloud / OpenAI",
+        "fallback_model": fallback_model,
+    }

@@ -13,12 +13,14 @@ _embedding_model = None
 
 def get_embedding_model():
     """
-    Lazy-loads all-MiniLM-L6-v2 on CPU.
+    Lazy-loads all-MiniLM-L6-v2 on CPU with HF token support and local cache priority.
     """
     global _embedding_model
     if _embedding_model is None:
+        import os
         from sentence_transformers import SentenceTransformer
-        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+        token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_HUB_TOKEN")
+        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu", token=token)
     return _embedding_model
 
 

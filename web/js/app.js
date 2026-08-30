@@ -302,6 +302,28 @@ class ThothApp {
     }
   }
 
+  isResearchDirective(text) {
+    if (!text || typeof text !== 'string') return false;
+    const clean = text.trim().toLowerCase().replace(/[?!.,;:]+$/, '');
+
+    // Guard: Philosophical or definitional queries about research itself -> normal chat
+    if (/^(what|why|how|who|when|where|is|are|was|were)\s+(is\s+|are\s+)?(research|investigation)\b/.test(clean)) {
+      return false;
+    }
+
+    // Direct action patterns
+    const directivePatterns = [
+      /^(do\s+|conduct\s+|run\s+|start\s+)?deep\s+research(\s+on|\s+into|\s+about)?/i,
+      /^(can\s+you\s+|please\s+|go\s+)?(research|investigate|dig\s+into|look\s+into|examine|explore)(\s+this|\s+that|\s+it|\s+the\s+above|\s+further|\s+properly|\s+deeply)?(\s+on|\s+into|\s+about)?/i,
+      /^(go\s+deeper|explore\s+deeply|explore\s+in\s+depth|dig\s+deeper)(\s+on|\s+into|\s+about|\s+this|\s+that|\s+it)?/i,
+      /^(find|gather)\s+(evidence|literature|papers|sources|data)\s+(for|on|about|regarding)/i,
+      /^(what\s+does\s+the\s+(research|literature|evidence)\s+say(\s+about)?)/i,
+      /^research:/i
+    ];
+
+    return directivePatterns.some(pattern => pattern.test(clean));
+  }
+
   handleChatSend() {
     const text = this.chatInput.value.trim();
     if (!text || this.isGenerating) return;
@@ -317,15 +339,13 @@ class ThothApp {
     this.appendUserMessage(text);
 
     // ROUTING LOGIC:
-    // - fast_chat (default): ALWAYS go to direct conversational path — never trigger the swarm
-    // - deep_research: ALWAYS trigger the full 8-agent swarm
-    // - Other modes (web_probe, local_qa, expand_report): follow-up stream
-    if (this.activeMode === 'deep_research') {
-      this.startResearch(text, false);
+    // 1. Explicit deep_research mode OR contextual research directive -> 8-agent swarm with full context inheritance
+    if (this.activeMode === 'deep_research' || this.isResearchDirective(text)) {
+      this.startResearch(text, false, true);
       return;
     }
 
-    // All non-research modes go through the fast conversational path
+    // 2. All conversational dialogue -> fast contextual turn
     this.sendFollowup(text);
   }
 
@@ -359,7 +379,7 @@ class ThothApp {
   // ============================================================================
   // SSE RESEARCH STREAMING (Turn 0: Discovery)
   // ============================================================================
-  startResearch(topic, shouldAppendUser = true) {
+  startResearch(topic, shouldAppendUser = true, inheritContext = true) {
     this.activeTopic = topic;
     this.isGenerating = true;
     this.currentTopicDisplay.textContent = topic;
@@ -375,11 +395,13 @@ class ThothApp {
 
     const payload = {
       topic: topic,
-      mode: 'deep_research',   // startResearch is ONLY called in deep_research mode
+      mode: 'deep_research',
       role: "senior academic researcher",
       tone: "formal and analytical",
       scrape_top_n: 2,
-      min_score: 6.5
+      min_score: 6.5,
+      chat_turns: (inheritContext && this.currentState?.chat_turns) ? this.currentState.chat_turns : [],
+      conversation_summary: (inheritContext && this.currentState?.conversation_summary) ? this.currentState.conversation_summary : ''
     };
 
     fetch('/api/research/stream', {
@@ -425,6 +447,15 @@ class ThothApp {
         }).catch(err => {
           console.error('SSE Stream read error:', err);
           this.isGenerating = false;
+          const bubbleEl = document.getElementById(msgId);
+          if (bubbleEl) {
+            const prose = bubbleEl.querySelector('.message-prose');
+            if (prose && (!this.currentState || !this.currentState.report)) {
+              prose.innerHTML = `<span style="color:hsl(var(--destructive));font-size:0.9rem;"><i data-lucide="alert-triangle" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;"></i> Research connection interrupted.</span>`;
+              if (window.lucide) lucide.createIcons();
+            }
+          }
+          this.showToast('Research stream interrupted', 'alert-triangle');
         });
       };
 
@@ -432,6 +463,15 @@ class ThothApp {
     }).catch(err => {
       console.error('Fetch error:', err);
       this.isGenerating = false;
+      const bubbleEl = document.getElementById(msgId);
+      if (bubbleEl) {
+        const prose = bubbleEl.querySelector('.message-prose');
+        if (prose) {
+          prose.innerHTML = `<span style="color:hsl(var(--destructive));font-size:0.9rem;"><i data-lucide="alert-triangle" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;"></i> Unable to connect to research server.</span>`;
+          if (window.lucide) lucide.createIcons();
+        }
+      }
+      this.showToast('Failed to start research', 'alert-triangle');
     });
   }
 
@@ -449,7 +489,7 @@ class ThothApp {
     if (node === 'direct_chat') {
       const directAnswer = update.answer || state.direct_answer || '';
       if (contentBody) {
-        contentBody.innerHTML = marked.parse(directAnswer);
+        contentBody.innerHTML = this.parseMarkdownWithWikilinks(directAnswer);
       }
       const cotAccordion = msgContainer.querySelector('.cot-accordion');
       if (cotAccordion) cotAccordion.style.display = 'none';
@@ -489,7 +529,20 @@ class ThothApp {
     // Update Report & Artifacts in real-time
     if (state.report) {
       this.renderReport(state.report);
-      contentBody.innerHTML = marked.parse(state.report);
+      contentBody.innerHTML = this.parseMarkdownWithWikilinks(state.report);
+    } else if (contentBody) {
+      const stageMessages = {
+        'search': '🔍 Querying arXiv, Semantic Scholar & OpenAlex...',
+        'snowball': '🌐 Snowballing academic citation network...',
+        'scrape': '📖 Reading and extracting evidence from primary sources...',
+        'writer': '✍️ Scribing comprehensive research synthesis...',
+        'verifier': '⚖️ Scales of Ma\'at: Verifying factual claims against sources...',
+        'critic': '🧐 Evaluating rigor and rubrics...'
+      };
+      if (stageMessages[node]) {
+        contentBody.innerHTML = `<span style="color:hsl(var(--primary));font-size:0.9rem;"><i data-lucide="loader" class="animate-spin" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;"></i> ${stageMessages[node]}</span>`;
+        if (window.lucide) lucide.createIcons();
+      }
     }
 
     if (state.verification_results) {
@@ -577,6 +630,15 @@ class ThothApp {
         }).catch(err => {
           console.error('Followup read error:', err);
           this.isGenerating = false;
+          const bubbleEl = document.getElementById(msgId);
+          if (bubbleEl) {
+            const prose = bubbleEl.querySelector('.message-prose');
+            if (prose && prose.textContent.includes('Consulting')) {
+              prose.innerHTML = `<span style="color:hsl(var(--destructive));font-size:0.9rem;"><i data-lucide="alert-triangle" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;"></i> Response stream interrupted.</span>`;
+              if (window.lucide) lucide.createIcons();
+            }
+          }
+          this.showToast('Follow-up stream interrupted', 'alert-triangle');
         });
       };
 
@@ -584,6 +646,15 @@ class ThothApp {
     }).catch(err => {
       console.error('Followup fetch error:', err);
       this.isGenerating = false;
+      const bubbleEl = document.getElementById(msgId);
+      if (bubbleEl) {
+        const prose = bubbleEl.querySelector('.message-prose');
+        if (prose) {
+          prose.innerHTML = `<span style="color:hsl(var(--destructive));font-size:0.9rem;"><i data-lucide="alert-triangle" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;"></i> Unable to connect to assistant.</span>`;
+          if (window.lucide) lucide.createIcons();
+        }
+      }
+      this.showToast('Connection failed', 'alert-triangle');
     });
   }
 
@@ -609,7 +680,7 @@ class ThothApp {
         this.renderMindMap(payload.mindmap);
       }
     } else if (evType === 'answer') {
-      contentBody.innerHTML = marked.parse(payload.answer);
+      contentBody.innerHTML = this.parseMarkdownWithWikilinks(payload.answer);
       if (payload.citations && payload.citations.length > 0) {
         this.renderCitations(msgContainer, payload.citations);
       }
@@ -617,6 +688,9 @@ class ThothApp {
       if (payload.updated_report) {
         this.currentState.report = payload.updated_report;
         this.renderReport(payload.updated_report);
+      }
+      if (contentBody && (payload.new_section || payload.updated_report)) {
+        contentBody.innerHTML = this.parseMarkdownWithWikilinks(payload.new_section || payload.updated_report);
       }
     } else if (evType === 'followup_complete') {
       this.currentState.chat_turns = payload.chat_turns;
@@ -701,8 +775,12 @@ class ThothApp {
 
   triggerPill(questionText) {
     if (this.isGenerating) return;
-    this.chatInput.value = questionText;
-    this.handleChatSend();
+    if (this.isResearchDirective(questionText)) {
+      this.startResearch(questionText, true, true);
+    } else {
+      this.chatInput.value = questionText;
+      this.handleChatSend();
+    }
   }
 
   renderCitations(containerEl, citations) {
@@ -718,14 +796,151 @@ class ThothApp {
     if (window.lucide) lucide.createIcons();
   }
 
-  renderReport(reportMarkdown) {
-    if (this.artifactReportPane) {
-      this.artifactReportPane.innerHTML = `
-        <div class="prose">
-          ${marked.parse(reportMarkdown)}
-        </div>
-      `;
+  showToast(message, icon = 'check-circle') {
+    let container = document.getElementById('thothToastContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'thothToastContainer';
+      container.className = 'thoth-toast-container';
+      document.body.appendChild(container);
     }
+
+    const toast = document.createElement('div');
+    toast.className = 'thoth-toast';
+    toast.innerHTML = `<i data-lucide="${icon}" style="width:14px;height:14px;color:#c99a6b;"></i> <span>${message}</span>`;
+    container.appendChild(toast);
+    if (window.lucide) lucide.createIcons();
+
+    setTimeout(() => {
+      toast.classList.add('hiding');
+      setTimeout(() => toast.remove(), 300);
+    }, 2800);
+  }
+
+  copyReportMarkdown() {
+    const report = this.currentState?.report;
+    if (!report) {
+      this.showToast('No report content available to copy', 'alert-circle');
+      return;
+    }
+    navigator.clipboard.writeText(report).then(() => {
+      this.showToast('Report Markdown copied to clipboard!');
+    }).catch(() => {
+      this.showToast('Failed to copy to clipboard', 'alert-circle');
+    });
+  }
+
+  downloadReportMarkdown() {
+    const report = this.currentState?.report;
+    if (!report) {
+      this.showToast('No report content available to download', 'alert-circle');
+      return;
+    }
+    const topic = this.currentState?.topic || 'thoth_research';
+    const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 35);
+    const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `thoth_report_${slug}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.showToast(`Downloaded thoth_report_${slug}.md`);
+  }
+
+  printReport() {
+    const report = this.currentState?.report;
+    if (!report) {
+      this.showToast('No report content available to print', 'alert-circle');
+      return;
+    }
+    window.print();
+  }
+
+  copyBibtex(idx) {
+    const sources = this.currentState?.cumulative_sources || [];
+    const s = sources[idx];
+    if (!s) return;
+
+    const key = (s.authors?.[0]?.split(' ')?.[0] || 'Author') + (s.year || new Date().getFullYear()) + (s.title?.split(' ')?.[0] || 'Paper');
+    const cleanKey = key.replace(/[^a-zA-Z0-9]/g, '');
+    const bibtex = `@article{${cleanKey},
+  title={${s.title || 'Untitled'}},
+  author={${(s.authors && s.authors.length) ? s.authors.join(' and ') : 'Thoth Research'}},
+  url={${s.url || ''}},
+  doi={${s.doi || ''}},
+  year={${s.year || new Date().getFullYear()}},
+  journal={${s.source_api ? 'Discovered via ' + s.source_api : 'Academic Literature'}}
+}`;
+
+    navigator.clipboard.writeText(bibtex).then(() => {
+      this.showToast(`Copied BibTeX for: ${(s.title || '').substring(0, 30)}...`);
+    });
+  }
+
+  copyApaCitation(idx) {
+    const sources = this.currentState?.cumulative_sources || [];
+    const s = sources[idx];
+    if (!s) return;
+
+    const authorStr = (s.authors && s.authors.length) ? s.authors.join(', ') : 'Unknown Author';
+    const yearStr = s.year || new Date().getFullYear();
+    const apa = `${authorStr} (${yearStr}). ${s.title || 'Untitled'}. Retrieved from ${s.url || ''}`;
+
+    navigator.clipboard.writeText(apa).then(() => {
+      this.showToast('Copied APA citation to clipboard!');
+    });
+  }
+
+  parseMarkdownWithWikilinks(text) {
+    if (!text) return '';
+    // Replace [[note_or_source_id]] with interactive badge
+    const withBadges = text.replace(/\[\[([a-zA-Z0-9_\-]+)\]\]/g, (match, p1) => {
+      return `<a href="javascript:void(0)" class="wikilink-badge" onclick="window.app.handleWikilinkClick('${p1}')"><i data-lucide="file-text" style="width:10px;height:10px;"></i> [[${p1}]]</a>`;
+    });
+    return marked.parse(withBadges);
+  }
+
+  handleWikilinkClick(id) {
+    if (id.startsWith('src-')) {
+      this.switchArtifactTab('sources');
+      this.showToast(`Inspecting Source: ${id}`);
+    } else {
+      this.openNote(id);
+    }
+  }
+
+  renderReport(reportMarkdown) {
+    if (!this.artifactReportPane) return;
+
+    const words = reportMarkdown ? reportMarkdown.trim().split(/\s+/).length : 0;
+    const readingTimeMin = Math.max(1, Math.ceil(words / 200));
+
+    this.artifactReportPane.innerHTML = `
+      <div class="report-export-toolbar">
+        <div class="export-meta-badge">
+          <i data-lucide="book-open" style="width:13px;height:13px;color:#c99a6b;"></i>
+          <span>${words.toLocaleString()} words · ~${readingTimeMin} min read</span>
+        </div>
+        <div class="export-buttons-group">
+          <button class="export-btn" onclick="window.app.copyReportMarkdown()" title="Copy Markdown to Clipboard">
+            <i data-lucide="copy" style="width:12px;height:12px;"></i> Copy .md
+          </button>
+          <button class="export-btn" onclick="window.app.downloadReportMarkdown()" title="Download Markdown File">
+            <i data-lucide="download" style="width:12px;height:12px;"></i> Download
+          </button>
+          <button class="export-btn" onclick="window.app.printReport()" title="Print / Export PDF">
+            <i data-lucide="printer" style="width:12px;height:12px;"></i> Export PDF
+          </button>
+        </div>
+      </div>
+      <div class="prose">
+        ${this.parseMarkdownWithWikilinks(reportMarkdown)}
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
   }
 
   renderTruthGuard(verificationResults) {
@@ -770,13 +985,23 @@ class ThothApp {
     }
 
     const items = sources.map((s, idx) => `
-      <div style="background:hsl(var(--muted));border:1px solid hsl(var(--border));border-radius:var(--radius-md);padding:12px;display:flex;flex-direction:column;gap:6px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="source-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <span style="font-weight:700;font-size:0.85rem;color:#fff;">${s.title || 'Source ' + (idx + 1)}</span>
-          <span class="mono" style="font-size:0.7rem;color:hsl(var(--primary));">${s.source_api || 'web'}</span>
+          <span class="mono" style="font-size:0.7rem;color:hsl(var(--primary));background:hsl(var(--card));padding:2px 6px;border-radius:4px;white-space:nowrap;">${s.source_api || 'web'}</span>
         </div>
-        <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">${s.snippet || s.abstract || '(No abstract provided)'}</div>
-        <a href="${s.url}" target="_blank" style="font-size:0.75rem;color:hsl(var(--primary));text-decoration:none;word-break:break-all;"><i data-lucide="external-link" style="width:12px;height:12px;vertical-align:middle;"></i> ${s.url}</a>
+        <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));line-height:1.4;">${s.snippet || s.abstract || '(No abstract provided)'}</div>
+        <div class="source-actions-row">
+          <a href="${s.url}" target="_blank" class="citation-btn" style="text-decoration:none;">
+            <i data-lucide="external-link" style="width:11px;height:11px;"></i> Open URL
+          </a>
+          <button class="citation-btn" onclick="window.app.copyBibtex(${idx})">
+            <i data-lucide="file-code" style="width:11px;height:11px;"></i> BibTeX
+          </button>
+          <button class="citation-btn" onclick="window.app.copyApaCitation(${idx})">
+            <i data-lucide="quote" style="width:11px;height:11px;"></i> APA
+          </button>
+        </div>
       </div>
     `).join('');
 

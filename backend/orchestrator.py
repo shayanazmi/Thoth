@@ -60,8 +60,10 @@ def create_initial_state(
     scrape_top_n: int = 2,
     min_score: float = 6.5,
     max_retries: int = 2,
+    initial_turns: Optional[List[Dict[str, Any]]] = None,
+    initial_summary: str = "",
 ) -> Dict[str, Any]:
-    """Creates a fresh plain Python dictionary ResearchState."""
+    """Creates a fresh plain Python dictionary ResearchState, inheriting conversational context if present."""
     return {
         "topic": topic,
         "role": role,
@@ -80,8 +82,8 @@ def create_initial_state(
         "follow_up_questions": [],
         "mindmap": {"nodes": [], "edges": []},
         "cumulative_sources": [],
-        "conversation_summary": "",
-        "chat_turns": [],
+        "conversation_summary": str(initial_summary or ""),
+        "chat_turns": list(initial_turns or []),
         "rejected_claims": [],
         "circular_replan_warnings": []
     }
@@ -164,12 +166,15 @@ def stream_research_pipeline(
     scrape_top_n: int = 2,
     min_score: float = 6.5,
     max_retries: int = 2,
+    initial_turns: Optional[List[Dict[str, Any]]] = None,
+    initial_summary: str = "",
     cancel_event=None,
     dispatcher: Dispatcher = pipeline_dispatcher
 ) -> Generator[tuple[str, Dict[str, Any], Dict[str, Any]], None, None]:
     """
     Executes the multi-agent research workflow as an explicit Plan -> Act -> Observe -> Replan loop.
     Optimized with asyncio.gather concurrent scraping fan-out and parallel verifier/critic evaluation.
+    Inherits conversational history and established facts when transitioning from chat.
     Yields (node_name, update, current_state) events.
     """
     state = create_initial_state(
@@ -179,7 +184,9 @@ def stream_research_pipeline(
         language=language,
         scrape_top_n=scrape_top_n,
         min_score=min_score,
-        max_retries=max_retries
+        max_retries=max_retries,
+        initial_turns=initial_turns,
+        initial_summary=initial_summary
     )
 
     act_phase_start = time.time()

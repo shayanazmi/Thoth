@@ -89,6 +89,16 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             );
         """)
 
+        # 7. HTTP Cache Table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS http_cache (
+                cache_key TEXT PRIMARY KEY,
+                response_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ttl_seconds INTEGER DEFAULT 86400
+            );
+        """)
+
     return conn
 
 
@@ -261,3 +271,41 @@ def get_latest_report(session_id: Optional[str] = None, db_path: str = DEFAULT_D
     """Retrieves the most recent report."""
     reps = list_reports(session_id=session_id, db_path=db_path)
     return reps[0] if reps else None
+
+
+# ==============================================================================
+# 7. Persistent HTTP Query & Scraped Content Cache
+# ==============================================================================
+
+def get_cached_response(cache_key: str, db_path: str = DEFAULT_DB_PATH) -> Optional[str]:
+    """Retrieves cached response string if valid and not expired."""
+    try:
+        conn = get_connection(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT response_json, created_at, ttl_seconds FROM http_cache WHERE cache_key = ?;
+        """, (cache_key,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return row["response_json"]
+    except Exception:
+        return None
+
+
+def set_cached_response(cache_key: str, response_json: str, ttl_seconds: int = 86400, db_path: str = DEFAULT_DB_PATH):
+    """Saves API / Scraped response to SQLite cache with TTL."""
+    try:
+        init_db(db_path)
+        conn = get_connection(db_path)
+        with conn:
+            conn.execute("""
+                INSERT INTO http_cache (cache_key, response_json, ttl_seconds)
+                VALUES (?, ?, ?)
+                ON CONFLICT(cache_key) DO UPDATE SET
+                    response_json = excluded.response_json,
+                    created_at = CURRENT_TIMESTAMP,
+                    ttl_seconds = excluded.ttl_seconds;
+            """, (cache_key, response_json, ttl_seconds))
+    except Exception:
+        pass

@@ -26,6 +26,8 @@ from backend.memory.db import (
     get_report,
     list_reports,
     get_latest_report,
+    get_cached_response,
+    set_cached_response,
 )
 from backend.memory.index import (
     index_note,
@@ -68,6 +70,8 @@ __all__ = [
     "get_report",
     "list_reports",
     "get_latest_report",
+    "get_cached_response",
+    "set_cached_response",
     "index_note",
     "search_keyword",
     "search_semantic",
@@ -80,6 +84,7 @@ __all__ = [
     "format_vault_context_with_contradictions",
     "SessionMemory",
     "DEFAULT_TOKEN_BUDGET",
+    "RESEARCH_WRITER_TOKEN_BUDGET",
     "count_tokens",
     "truncate_text_to_tokens",
 ]

@@ -1,0 +1,89 @@
+{
+  "timestamp": "2026-08-30 20:03:26",
+  "mode": "OFFLINE_CALIBRATED",
+  "judge_model": "Thoth-Offline-Deterministic-Judge",
+  "sections": {
+    "fast_chat": {
+      "results": [
+        {
+          "query": "hi",
+          "type": "greeting",
+          "latency_ms": 3412.45,
+          "response_preview": "Greetings. I am Thoth, the Scribe of Truth and Master of the Balance. I stand ready to conduct autonomous, verified rese...",
+          "relevancy_score": 1,
+          "passed": true
+        },
+        {
+          "query": "who are you and what can you do?",
+          "type": "identity",
+          "latency_ms": 9850.43,
+          "response_preview": "I am Thoth, the Scribe of Truth and Lord of Divine Words. I am an autonomous research intelligence capable of deep, veri...",
+          "relevancy_score": 1,
+          "passed": false
+        },
+        {
+          "query": "Can you explain what CRISPR is in 2 sentences?",
+          "type": "quick_qa",
+          "latency_ms": 1856.7,
+          "response_preview": "CRISPR is a naturally occurring bacterial immune system that utilizes a guide RNA and the Cas9 protein to precisely loca...",
+          "relevancy_score": 1,
+          "passed": true
+        },
+        {
+          "query": "thanks for the explanation!",
+          "type": "closure",
+          "latency_ms": 3974.67,
+          "response_preview": "I am Thoth, ready to serve. What subject shall we explore today?...",
+          "relevancy_score": 1,
+          "passed": false
+        }
+      ],
+      "avg_latency_ms": 4773.6,
+      "avg_relevancy": 1.0
+    },
+    "query_sanitization": [
+      {
+        "raw_preview": "Integration of multimodal data (genetic, environmental, long...",
+        "sanitized": "Integration of multimodal data genetic, environmental, longitudinal imaging for truly personalized alopecia roadmaps.",
+        "length": 117,
+        "is_clean": true
+      },
+      {
+        "raw_preview": "What is the exact mechanism of JAK1/2 inhibition via Baricit...",
+        "sanitized": "What is the exact mechanism of JAK1/2 inhibition via Baricitinib in autoimmune hair follicle immune privilege restoration? Please cite 2023 papers",
+        "length": 146,
+        "is_clean": true
+      },
+      {
+        "raw_preview": "```markdown # Research Topic: Quantum Error Correction with ...",
+        "sanitized": "Research Topic: Quantum Error Correction with Surface Codes",
+        "length": 59,
+        "is_clean": true
+      }
+    ],
+    "truth_guard": {
+      "truthful_claim_score": 1.0,
+      "hallucinatory_claim_score": 1.0,
+      "discrimination_gap": 0.0,
+      "passed": false
+    },
+    "token_budget": {
+      "chat_retrieved_tokens": 15999,
+      "chat_budget_limit": 16000,
+      "writer_retrieved_tokens": 32000,
+      "writer_budget_limit": 32000,
+      "passed": true
+    },
+    "academic_rigor_geval": {
+      "score": 0.9,
+      "reason": "High factual consistency and topic retention.",
+      "passed": true
+    },
+    "snowballing_and_caching": {
+      "id_normalization": "passed",
+      "sqlite_cache_speed": "<1ms",
+      "status": "passed"
+    }
+  },
+  "summary_scores": {}
+}

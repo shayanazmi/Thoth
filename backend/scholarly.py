@@ -4,7 +4,7 @@ import asyncio
 import logging
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 import httpx
 from dotenv import load_dotenv
 
@@ -287,10 +287,20 @@ async def search_semantic_scholar(
 
 
 def _normalize_s2_id(pid: str) -> str:
-    """Normalizes raw IDs for S2 API endpoints (e.g. adding CorpusId: prefix to bare integers)."""
+    """Normalizes raw IDs for S2 API endpoints (e.g. adding CorpusId, DOI, or ARXIV prefixes)."""
     p = str(pid).strip()
+    if not p:
+        return ""
     if p.isdigit():
         return f"CorpusId:{p}"
+    if p.startswith("10."):
+        return f"DOI:{p}"
+    if re.match(r"^\d{4}\.\d{4,5}(v\d+)?$", p):
+        return f"ARXIV:{p}"
+    if p.lower().startswith("arxiv:"):
+        return f"ARXIV:{p[6:].strip()}"
+    if p.lower().startswith("doi:"):
+        return f"DOI:{p[4:].strip()}"
     return p
 
 
@@ -793,9 +803,27 @@ async def snowball_literature_graph(
     3. Backward References (foundational papers in seeds' bibliographies).
     """
     disp = dispatcher or s2_dispatcher
-    seed_paper_ids = [s.paper_id for s in seed_candidates if s.paper_id]
+    seed_paper_ids = []
+    for s in seed_candidates:
+        if s.paper_id:
+            seed_paper_ids.append(_normalize_s2_id(s.paper_id))
+        elif s.arxiv_id:
+            clean_ar = s.arxiv_id.strip()
+            if "/" in clean_ar:
+                clean_ar = clean_ar.split("/")[-1]
+            seed_paper_ids.append(f"ARXIV:{clean_ar}")
+        elif s.url and "arxiv.org/abs/" in s.url:
+            a_id = s.url.split("arxiv.org/abs/")[-1].split("/")[0].split("?")[0]
+            seed_paper_ids.append(f"ARXIV:{a_id}")
+        elif s.doi and "arxiv" not in s.doi.lower():
+            seed_paper_ids.append(f"DOI:{s.doi.strip()}")
+        elif s.doi:
+            seed_paper_ids.append(f"DOI:{s.doi.strip()}")
+    seed_paper_ids = [p for p in dict.fromkeys(seed_paper_ids) if p]
+
     if not seed_paper_ids:
-        return []
+        logger.info("[SNOWBALL] No valid seed paper IDs/DOIs found for S2 snowballing. Falling back to OpenAlex...")
+        return await _snowball_openalex_fallback(seed_candidates, limit=max_recommendations)
 
     logger.info(f"[SNOWBALL] Expanding literature graph for {len(seed_paper_ids)} seed paper IDs...")
     print(f"\n[INFO] [SNOWBALL] Expanding literature graph from {len(seed_paper_ids)} seed papers...")
@@ -859,7 +887,7 @@ async def _snowball_openalex_fallback(seeds: List[SourceCandidate], limit: int =
                                 parsed = parse_openalex_json({"results": [rw_res.json()]})
                                 for p in parsed:
                                     p.relation = "recommended"
-                                    candidates.extend(parsed)
+                                    candidates.append(p)
             except Exception as e:
                 logger.debug(f"[SNOWBALL FALLBACK] OpenAlex fallback failed for {query}: {e}")
     return candidates
@@ -915,24 +943,40 @@ async def search_tavily(
 def _sanitize_academic_query(query: str, max_chars: int = 150) -> str:
     """
     Sanitizes raw user/agent queries for academic APIs (arXiv, S2, EuropePMC, PubMed, OpenAlex).
-    Removes multiline report dumps, parenthetical instructions, quotes, and cleans excess whitespace.
+    Removes markdown code fences, multiline report dumps, parenthetical instructions, quotes, and cleans excess whitespace.
     """
     if not query:
         return ""
-    # If multiline or paragraph, take first substantive line
-    lines = [line.strip() for line in query.splitlines() if line.strip()]
-    cleaned = lines[0] if lines else query
+    # Strip markdown code blocks / fences (```...```)
+    clean_raw = re.sub(r'```[a-zA-Z0-9_-]*\n?', '', query).replace('```', '')
+    
+    # Filter out empty or markdown-only lines (e.g., 'markdown', '#', '---')
+    lines = [
+        line.strip() for line in clean_raw.splitlines() 
+        if line.strip() and line.strip().lower() not in {"markdown", "json", "python", "text", "xml", "---", "==="}
+    ]
+    cleaned = lines[0] if lines else clean_raw
     
     # Remove outer quotes and markdown symbols
     cleaned = re.sub(r'[\r\n\t]+', ' ', cleaned)
     cleaned = re.sub(r'[#*`_~\[\](){}<>]', ' ', cleaned)
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-    
-    # If still too long, extract primary key clause
+
+    # Strip conversational transition phrases and prefaces
+    conversational_prefaces = [
+        r'^(now\s+)?(let\'s\s+|lets\s+)?switch(ing)?\s+(topics?|gears?)\s+(completely|now)?[\.,;:]*\s*',
+        r'^(on\s+another\s+note|by\s+the\s+way|moving\s+on|in\s+addition|furthermore|additionally)[\.,;:]*\s*',
+        r'^(can\s+you\s+(please\s+)?(tell\s+me|explain|clarify|detail|research|investigate)|tell\s+me\s+about|explain\s+to\s+me|i\s+want\s+to\s+know(\s+about)?)[\.,;:]*\s*'
+    ]
+    for pref in conversational_prefaces:
+        cleaned = re.sub(pref, '', cleaned, flags=re.IGNORECASE).strip()
+
+    # If still too long, extract primary substantive clause
     if len(cleaned) > max_chars:
         parts = re.split(r'[\.;\?!]', cleaned)
-        if parts and len(parts[0].strip()) >= 15:
-            cleaned = parts[0].strip()
+        substantive = [p.strip() for p in parts if len(p.strip()) >= 15 and not any(re.match(pref, p.strip(), re.IGNORECASE) for pref in conversational_prefaces)]
+        if substantive:
+            cleaned = substantive[0]
         else:
             cleaned = cleaned[:max_chars].rsplit(' ', 1)[0]
     return cleaned.strip()
@@ -1007,3 +1051,57 @@ async def search_scholarly_sources(
                 deduped_candidates.append(cand)
 
     return deduped_candidates[:max_results]
+
+
+# ==============================================================================
+# 9. Semantic Relevance Pre-Filtering & Source Ranker
+# ==============================================================================
+
+def rank_sources_by_relevance(
+    topic: str,
+    sources: List[Union[Dict[str, Any], SourceCandidate]],
+    top_k: Optional[int] = None,
+    min_similarity: float = 0.15
+) -> List[Any]:
+    """
+    Ranks source dictionaries or SourceCandidate objects by semantic cosine similarity to the topic
+    using the CPU embedding model. Fast (<20ms for 20 candidates), preventing off-topic scraping.
+    """
+    if not sources or not topic:
+        return sources
+
+    try:
+        from backend.memory.index import get_embedding_model
+        import numpy as np
+
+        model = get_embedding_model()
+        topic_emb = model.encode(topic, normalize_embeddings=True)
+
+        scored_sources = []
+        for s in sources:
+            if isinstance(s, SourceCandidate):
+                text = f"{s.title}\n{s.abstract}".strip()
+            else:
+                text = f"{s.get('title', '')}\n{s.get('abstract', '')}\n{s.get('domain', '')}".strip()
+
+            if not text:
+                scored_sources.append((0.0, s))
+                continue
+
+            doc_emb = model.encode(text, normalize_embeddings=True)
+            sim = float(np.dot(topic_emb, doc_emb))
+            scored_sources.append((sim, s))
+
+        # Sort by similarity descending
+        scored_sources.sort(key=lambda x: x[0], reverse=True)
+
+        filtered = [s for sim, s in scored_sources if sim >= min_similarity]
+        if not filtered:
+            filtered = [s for _, s in scored_sources]
+
+        if top_k is not None and top_k > 0:
+            return filtered[:top_k]
+        return filtered
+    except Exception as e:
+        logger.debug(f"[RELEVANCE RANK] Ranking failed, falling back to original order: {e}")
+        return sources[:top_k] if top_k else sources

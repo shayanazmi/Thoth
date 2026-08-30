@@ -84,13 +84,16 @@ _primary_llm = ChatNVIDIA(
     }
 )
 
-# Ultra-Fast 8B SLM for Truth Guard Fact-Verification & Local Q&A
+# Ultra-Fast High-Precision SLM for Truth Guard Fact-Verification & Local Q&A
 _primary_verifier_llm = ChatNVIDIA(
-    model="meta/llama-3.1-8b-instruct",
+    model="nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key=os.getenv("NVIDIA_API_KEY"),
     temperature=0.1,  # Strict factual consistency
     max_completion_tokens=2048,
     timeout=60,
+    model_kwargs={
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
 )
 
 # Configure Fallback Provider (Groq / OpenAI / OpenAI-Compatible)
@@ -162,11 +165,11 @@ verifier_prompt = ChatPromptTemplate.from_messages([
 Your job is to analyze key factual claims in the drafted research report and verify them against the provided source material.
 Each source in the source material is labeled with an explicit identifier like `[src-identifier]` or `Source 1 (src-identifier): ...`.
 
-Rules:
-1. For each key claim in the report, determine if it is VERIFIED (is_valid: true) or CONFLATED/UNSUPPORTED (is_valid: false).
-2. If is_valid is true: You MUST specify the exact `supporting_source_id` (e.g. "src-arxiv_1311_2485" or "src-scaling_laws") matching the source label that directly supports this claim. If multiple sources support it, provide the primary supporting source ID.
-3. If is_valid is false: set `supporting_source_id` to "" and provide a clear explanation of the contradiction or lack of support in `reason_if_failed`.
-4. If any facts are contradicted or unsupported, flag them with is_valid: false.
+Rules for Verification:
+1. For each key claim in the report, determine if it is VERIFIED (is_valid: true) or CONTRADICTED/FABRICATED (is_valid: false).
+2. Directly Supported Facts & Empirical Numbers: Must directly match the source material. Specify the exact `supporting_source_id` (e.g. "src-arxiv_1311_2485" or "src-brave_aa1").
+3. Plausible Logical Inferences & Domain Synthesis: High-level logical deductions that naturally synthesize findings without inventing false data (e.g. "Translating multi-omics pipelines to clinical practice requires prospective cohort trials") should be marked `is_valid: true` attributed to the primary related source ID.
+4. Hard Contradictions & Fabricated Specifics: If a claim invents non-existent trial names, falsifies specific statistics/percentages, or directly contradicts source material, mark `is_valid: false`, set `supporting_source_id` to "", and provide a clear explanation in `reason_if_failed`.
 
 Output strictly valid JSON matching this schema:
 {{
@@ -247,10 +250,15 @@ critic_chain = critic_prompt | llm | StrOutputParser()
 
 # Follow-up Questions Generator Chain
 follow_up_prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are an inquisitive research editor. Given a research report on a topic and any recent conversation turns, generate 3 clear, concise, and highly relevant follow-up questions that a user might want to click next to explore deeper.
-Format your response as a JSON array of 3 strings. Do NOT include markdown blocks (```json) or conversational commentary.
-Example output format:
-["What are the primary computational bottlenecks of this architecture?", "How does this compare with the latest 2026 benchmarks?", "What are the practical deployment steps?"]"""),
+    ("system", """You are an inquisitive research editor and strategic thought partner.
+Given a topic, synthesis/answer, and recent dialogue, generate 3 high-impact, forward-thinking follow-up questions or actions that help the user explore the most important next steps.
+
+Rules:
+1. Make them specific, actionable, and forward-looking (e.g. comparing alternatives, investigating bottlenecks, analyzing empirical trade-offs, or exploring real-world deployment).
+2. Avoid generic questions like "Would you like to know more?" or "Can you provide more details?".
+3. Output ONLY a valid JSON array of 3 strings. Do NOT include markdown code fences (```json) or conversational commentary.
+Example:
+["Research empirical trade-offs against alternative architectures", "Compare scaling bottlenecks with recent hardware benchmarks", "What are the primary operational constraints for real-world deployment?"]"""),
     ("human", """Topic: {topic}
     
 Report:
@@ -333,18 +341,19 @@ router_chain = router_prompt | verifier_llm | StrOutputParser()
 
 # --- Mind Map Grounded Q&A Chain ---
 mindmap_qa_prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are Thoth's conversational research assistant.
-Answer the user's follow-up question accurately using the provided Research Mind Map context, synthesis report, and prior conversation history.
+    ("system", """You are Thoth, an autonomous scientific intelligence and research thought partner.
+Answer the user's follow-up question accurately using the provided Research context, synthesis report, and prior dialogue.
 
 Rules:
-1. Provide a direct, well-structured, and clear answer.
-2. Ground your claims in the provided knowledge base. If citing a source or URL from the context, include a clickable markdown link: `[Source Name](URL)`.
-3. If the knowledge base does not contain sufficient details to answer fully, answer what is known and state the remaining knowledge gap.
-4. Keep the tone academic, insightful, and concise.
-5. Output ONLY the clean answer without internal chain-of-thought, reasoning monologue, or conversational meta-commentary."""),
+1. Provide a direct, well-structured, and rigorous answer.
+2. Ground your claims in the provided knowledge base and cited sources.
+3. If the user challenges a conclusion or asks for counterarguments/limitations, critically inspect the assumptions, highlight alternative interpretations from the literature, and specify the weakest empirical links.
+4. If the knowledge base does not contain sufficient details to answer fully, state what is known and specify the exact research question required to resolve the gap.
+5. Keep the tone insightful, intellectually honest, and concise.
+6. Output ONLY the clean answer without internal chain-of-thought tags, reasoning monologues, or repetitive meta-commentary."""),
     ("human", """Topic: {topic}
 
-Context / Mind Map Sub-Tree:
+Context / Knowledge Base:
 {context}
 
 Conversation History / Summary:

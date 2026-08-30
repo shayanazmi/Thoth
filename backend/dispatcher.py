@@ -148,6 +148,17 @@ class Dispatcher:
 
             except Exception as e:
                 last_exception = e
+
+                # Determine if error is client error that should NOT be retried (404, 400, 401, 403)
+                is_non_retryable = False
+                if hasattr(e, "response") and hasattr(e.response, "status_code"):
+                    if e.response.status_code in {400, 401, 403, 404, 422}:
+                        is_non_retryable = True
+
+                if is_non_retryable:
+                    logger.debug(f"[DISPATCHER] Non-retryable HTTP {getattr(e.response, 'status_code', '')} client error for {getattr(fn, '__name__', str(fn))}. Failing fast without backoff.")
+                    raise last_exception
+
                 await self._record_failure()
 
                 # If circuit breaker tripped OPEN during this attempt, raise immediately

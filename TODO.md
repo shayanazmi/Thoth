@@ -19,30 +19,24 @@
 
 ---
 
-## 🟡 Degraded — Working But Needs Improvement
+### 5. Snowball Agent Multi-Corpus ID Resolution (Resolved)
+- **Fix:** Enhanced `_normalize_s2_id()` in `backend/scholarly.py` to recognize and format `ARXIV:`, `DOI:`, and `CorpusId:` prefixes. Prioritized ArXiv IDs over pseudo-DOIs and enabled automatic fallback to OpenAlex related works if Semantic Scholar is rate-limited.
 
-### 5. Snowball Agent Finds 0 New Papers
-**Symptom:** "Snowballing discovered 0 new connected papers." on every run.
-**Likely Cause:** Paper IDs from Step 1 aren't in the format Semantic Scholar's
-references API expects (CorpusId vs raw ID).
-**Fix:** Log exact API calls. Add fallback: try /citations endpoint if /references returns 0.
+### 6. NVIDIA NIM LLM Lifecycle & Timeout Handling (Resolved)
+- **Fix:** Migrated primary verifier LLM to `nvidia/nemotron-3.5-lightning-30b-a3b` with `enable_thinking: False` and temperature 0.1, with resilient Groq fallback and timeout protection.
 
-### 6. NVIDIA NIM Timeout on Writer Attempt 2+
-**Symptom:** Read timed out (120s) on second Writer pass.
-**Fix:** Increase Writer-specific timeout to 240s. Or implement streaming generation
-so partial output is captured even on timeout.
+### 7. Verifier Plausible Inference Tier (Resolved)
+- **Fix:** Refined `verifier_prompt` in `backend/agents.py` to distinguish hard factual contradictions (which are penalized) from valid high-level domain synthesis and logical extensions (which are preserved and validated).
 
-### 7. Verifier Over-Flags Logical Inferences
-**Symptom:** Claims like "FAIR principles can be applied to alopecia" marked invalid
-even when they are reasonable logical extensions, not hallucinations.
-**Fix:** Add a "plausible inference" tier in the verifier prompt. Only hard-flag:
-(a) claims that contradict source material, (b) fabricated specific numbers/statistics.
+### 8. HuggingFace Rate Limiting on Startup (Resolved)
+- **Fix:** Added `HF_TOKEN` support to `SentenceTransformer` lazy loader in `backend/memory/index.py` and documented it in `.env.example`.
 
-### 8. HuggingFace Rate Limiting on Startup
-**Symptom:** 20+ HTTP HEAD requests to HuggingFace on every server start (unauthenticated).
-**Fix:** Add HF_TOKEN to .env.example. Pass it when initializing sentence-transformers.
+### 9. Persistent SQLite Query & Scraped Content Cache (Resolved)
+- **Fix:** Added `http_cache` table and `get_cached_response` / `set_cached_response` utilities in `backend/memory/db.py` to cache repeated search queries and paper scrapes.
 
 ---
+
+## 🟡 Under Active Development & Planned Features
 
 ## 🔵 Planned Features & Architectural Milestones
 
@@ -89,26 +83,46 @@ the full batch.
 Index all vault notes into a persistent vector store (ChromaDB or FAISS) that survives
 server restarts. Currently Vault QA only queries the current session's notes.
 
-### 12. Source Relevance Pre-Filtering (Medium)
-Add cosine similarity check between paper abstract and original topic before adding
-to scrape queue. Filters out off-topic papers before they waste scrape budget.
+### 10. Source Relevance Pre-Filtering (Resolved)
+- **Fix:** Added `rank_sources_by_relevance()` using normalized SentenceTransformer embeddings in `backend/scholarly.py` and integrated into `scrape_node` in `backend/pipeline.py` to pre-filter off-topic sources before scraping.
 
-### 13. Expand Report — Append vs Replace (Low)
-"Expand Report" mode should append the new section to the existing report,
-not replace the whole report panel. UI needs a merge/append render path.
+### 11. Expand Report — Append vs Replace (Resolved)
+- **Fix:** Updated `web/js/app.js` and `backend/pipeline.py` to seamlessly append new synthesized sections to the right-hand report pane and chat bubble simultaneously.
 
-### 14. Remove/Replace Streamlit stub app.py (Low)
-The root-level app.py is a 518-byte Streamlit stub that no longer reflects the
-architecture. Delete it or update it to forward users to the FastAPI server.
+### 12. Application Launcher Modernization (Resolved)
+- **Fix:** Replaced legacy Streamlit forwarding stub in root `app.py` with direct Uvicorn launcher booting `web_server:app` on port 8000.
+
+### 13. One-Click Report Export Toolbar, BibTeX/APA Citation Generators & Wikilinks (Resolved)
+- **Fix:** Added export toolbar (Copy Markdown, Download `.md`, Export PDF, Word count & read time), automated BibTeX / APA citation copiers, and interactive Obsidian `[[wikilink]]` badge navigators in `web/js/app.js` and `web/css/styles.css`.
+
+---
+
+## 🟡 Under Active Development & Planned Features
+
+## 🔵 Planned Features & Architectural Milestones
+
+### 9. The "Pantheon of Rigor": Adversarial Peer-Review Board (On Hold - Research Pending)
+**Vision & Philosophy:** Modern academic publishing and arXiv are flooded with low-quality,
+jargon-heavy, regurgitated papers with zero genuine novelty ("complicated technical bullshit").
+To ensure Thoth-generated intelligence reports and identified knowledge gaps reach publication-grade
+standards for top-tier **Q1 Scopus, Nature, ACM, and IEEE journals**, we are implementing an
+adversarial peer-review tribunal composed of specialized personality agents representing history's
+greatest scientific and philosophical minds:
+- Richard Feynman (Anti-Jargon Razor)
+- Socrates (Assumption Destroyer)
+- Alan Turing (Algorithmic Provability)
+- Albert Einstein (Paradigmatic Shift & Gedankenexperiments)
+- Plato & Aristotle (Ontological Coherence)
+*(Note: Explicitly held ON HOLD until research and formulation are completed)*
 
 ---
 
 ## ✅ Resolved (August 2026 Session)
 
-- SSE stream not rendering → Fixed: sse_starlette sends CRLF (\r\n\r\n), not LF (\n\n).
-  Added buffer.replace(/\r\n/g, '\n') before split in app.js.
-- "hi" triggering 8-agent swarm → Fixed: Default mode = fast_chat. Research requires
-  explicit button toggle.
-- Browser caching stale app.js → Fixed: Version bumped to ?v=3.4 in index.html.
+- SSE stream not rendering → Fixed: sse_starlette sends CRLF (\r\n\r\n), not LF (\n\n). Added buffer.replace(/\r\n/g, '\n') before split in app.js.
+- "hi" triggering 8-agent swarm → Fixed: Default mode = fast_chat. Research requires explicit button toggle.
+- Browser caching stale app.js → Fixed: Version bumped to ?v=3.5 in index.html.
 - Confident AI warning spam → Fixed: logging.getLogger("confident").setLevel(CRITICAL).
 - Casual queries mis-routed to research → Fixed: handleChatSend() simplified routing.
+- Report export toolbar & BibTeX/APA copy → Added one-click Markdown/PDF export and citation generators.
+- Interactive Obsidian wikilinks → Added clickable badges in report and chat feeds.

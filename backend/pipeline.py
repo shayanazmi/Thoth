@@ -6,7 +6,12 @@ import urllib.parse
 import asyncio
 from typing import TypedDict, List, Dict, Any, Optional
 from backend.tools import web_search, scrape_url
-from backend.scholarly import search_scholarly_sources, snowball_literature_graph, SourceCandidate
+from backend.scholarly import (
+    search_scholarly_sources,
+    snowball_literature_graph,
+    SourceCandidate,
+    rank_sources_by_relevance
+)
 
 
 from backend.agents import (
@@ -196,14 +201,96 @@ def _extract_urls_from_text(text: str) -> List[str]:
             cleaned.append(u_clean)
     return cleaned
 
-# 2. Node Implementations for Initial Research Graph
+def resolve_anaphoric_topic(raw_topic: str, chat_turns: Optional[List[Dict[str, Any]]] = None, conv_summary: str = "") -> str:
+    """
+    Resolves deictic / anaphoric phrases (e.g. 'research this', 'look into that', 'go deeper on the second point')
+    into concrete, searchable queries using the conversational history and established facts.
+    """
+    if not raw_topic:
+        return "General Academic Research"
+        
+    clean_lower = re.sub(r'[?!.,;:]+$', '', raw_topic.strip().lower())
+    
+    anaphoric_triggers = [
+        "research this", "research that", "research it", "research the above", "research further",
+        "deep research on this", "deep research on that", "deep research", "research",
+        "explore this", "explore that", "explore it", "explore the above", "explore deeply",
+        "go deeper", "go deeper on this", "go deeper on that", "go deeper on it", "dig deeper",
+        "investigate this", "investigate that", "investigate it", "investigate the above",
+        "look into this", "look into that", "look into it", "look into the above",
+        "find evidence for this", "find evidence for that", "find evidence",
+        "verify this", "verify that", "what does the research say", "what does the literature say",
+        "the previous point", "this idea", "this claim", "that comparison", "the above topic"
+    ]
+    
+    is_anaphoric = (
+        any(trig in clean_lower for trig in anaphoric_triggers)
+        or clean_lower in {"this", "that", "it", "more"}
+        or bool(re.search(r'\b(this|that|it|the previous thing|the water thing|the first one|the second one)\b', clean_lower))
+        or any(clean_lower.startswith(p) for p in ["can you research", "please research", "could you research", "research:"])
+    )
+    
+    if not is_anaphoric:
+        return raw_topic
+        
+    # Helper to get role content from various turn representations
+    def get_turn_content(t: Dict[str, Any], role: str) -> str:
+        if "role" in t:
+            return t.get("content", "") if t.get("role") == role else ""
+        if role == "user":
+            return t.get("user_query", "") or t.get("user", "")
+        return t.get("assistant_response", "") or t.get("assistant", "")
+
+    # Extract focus clause if present (e.g., "especially the optical tweezer crosstalk limits")
+    focus_match = re.search(r'\b(especially|specifically|focusing on|regarding|specifically on)\s+(.+)$', clean_lower)
+    focus_clause = focus_match.group(2).strip() if focus_match else ""
+
+    # Check for ordinal reference like "the second point", "the first option"
+    if chat_turns:
+        last_turn = chat_turns[-1]
+        last_assistant_resp = get_turn_content(last_turn, "assistant")
+        if "second" in clean_lower or "2nd" in clean_lower:
+            lines = [l.strip() for l in last_assistant_resp.split("\n") if re.match(r'^(2\.|\d+[\.\)]|\-|\*)\s+', l.strip())]
+            if len(lines) >= 2:
+                base = re.sub(r'^(2\.|\d+[\.\)]|\-|\*)\s+', '', lines[1])[:100]
+                return f"{base}: {focus_clause}" if focus_clause else base
+                
+        # By default, extract most relevant substantive user query
+        for t in reversed(chat_turns):
+            uq = get_turn_content(t, "user").strip()
+            if uq and not any(uq.lower().startswith(p) for p in ["hi", "hello", "hey", "thanks", "thank you", "research this", "look into this"]):
+                if focus_clause and focus_clause.lower() not in uq.lower():
+                    return f"{uq} (Focus: {focus_clause})"
+                return uq
+                
+        if last_assistant_resp:
+            first_sent = re.split(r'[\.\n]', last_assistant_resp)[0].strip()
+            if len(first_sent) > 10:
+                base = first_sent[:100]
+                return f"{base}: {focus_clause}" if focus_clause else base
+
+    if conv_summary:
+        first_line = conv_summary.strip().split("\n")[0].strip()
+        if len(first_line) > 10:
+            base = first_line[:100]
+            return f"{base}: {focus_clause}" if focus_clause else base
+            
+    return raw_topic
+
+
 @observe(type="llm")
 def search_node(state: ResearchState) -> dict:
     print("\n" + "= " * 50)
     print("Step 1 - Search Agent is querying scholarly databases & web...")
     print("=" * 50)
     
-    topic = state.get("topic", "")
+    raw_topic = state.get("topic", "")
+    chat_turns = state.get("chat_turns", [])
+    conv_summary = state.get("conversation_summary", "")
+
+    # Contextual query resolution for conversation -> research transitions
+    topic = resolve_anaphoric_topic(raw_topic, chat_turns=chat_turns, conv_summary=conv_summary)
+
     target_count = max(int(state.get("scrape_top_n", 5) or 5), 5)
     candidates: List[SourceCandidate] = []
     
@@ -362,12 +449,18 @@ def scrape_node(state: ResearchState) -> dict:
     print(f"Step 2 - Reader Agent is scraping top {state['scrape_top_n']} resources...")
     print("=" * 50)
     
-    # Gather candidate URLs
+    # Gather candidate URLs ranked by semantic relevance to the research topic
     existing_sources = state.get("cumulative_sources", [])
-    urls = [s.get("url") for s in existing_sources if s.get("url")][:state["scrape_top_n"]]
+    ranked_sources = rank_sources_by_relevance(
+        topic=state.get("topic", ""),
+        sources=existing_sources,
+        top_k=state.get("scrape_top_n", 2)
+    )
+    urls = [s.get("url") for s in ranked_sources if s.get("url")]
     
     if not urls:
-        urls = _extract_urls_from_text(state.get("search_results", ""))[:state["scrape_top_n"]]
+        raw_urls = _extract_urls_from_text(state.get("search_results", ""))
+        urls = raw_urls[:state.get("scrape_top_n", 2)]
         
     scraped_content = ""
     cumulative_sources = list(existing_sources)
@@ -941,6 +1034,8 @@ def stream_followup_turn(
         section_draft = strip_chain_of_thought(raw_draft)
         
         updated_report = report.strip() + "\n\n" + section_draft.strip()
+        report = updated_report
+        current_state["report"] = updated_report
         yield "report_expansion", {
             "new_section": section_draft,
             "updated_report": updated_report

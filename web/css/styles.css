@@ -1327,6 +1327,186 @@ html, body {
   flex: 1;
 }
 
+/* Report Export Toolbar */
+.report-export-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.export-meta-badge {
+  font-size: 0.72rem;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-btn {
+  padding: 5px 10px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  color: hsl(var(--foreground));
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+  background: hsl(var(--primary));
+  color: #000;
+  border-color: hsl(var(--primary));
+}
+
+/* Source Citation Buttons */
+.source-card {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s ease;
+}
+
+.source-card:hover {
+  border-color: hsl(var(--primary) / 0.5);
+}
+
+.source-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.citation-btn {
+  padding: 4px 8px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.citation-btn:hover {
+  color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+/* Floating Toast Notifications */
+.thoth-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.thoth-toast {
+  background: hsl(var(--card) / 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--primary) / 0.5);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 15px hsl(var(--primary) / 0.2);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  animation: toast-slide-in 0.3s cubic-bezier(0.2, 0, 0.2, 1);
+  transition: all 0.3s ease;
+}
+
+.thoth-toast.hiding {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+@keyframes toast-slide-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Interactive Wikilink Badges */
+.wikilink-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: hsl(var(--primary) / 0.12);
+  border: 1px solid hsl(var(--primary) / 0.35);
+  color: hsl(var(--primary));
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  cursor: pointer;
+  vertical-align: baseline;
+  transition: all 0.2s ease;
+}
+
+.wikilink-badge:hover {
+  background: hsl(var(--primary));
+  color: #000;
+  border-color: hsl(var(--primary));
+  transform: translateY(-1px);
+}
+
+/* Print Styles for PDF Export */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #artifactReportPane, #artifactReportPane * {
+    visibility: visible;
+  }
+  #artifactReportPane {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20px;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .report-export-toolbar {
+    display: none !important;
+  }
+}
+
 /* Responsive Breakpoints */
 @media (max-width: 1024px) {
   .hero-grid { grid-template-columns: 1fr; }
