@@ -77,12 +77,22 @@ async def api_stream_research(request: Request):
     mode = body.get("mode", "auto")
     role = body.get("role", "senior academic researcher")
     tone = body.get("tone", "formal and analytical")
-    scrape_top_n = int(body.get("scrape_top_n", 2))
+    scrape_top_n = int(body.get("scrape_top_n", 15))
+    
+    # Natural language paper count detection (e.g. 'research X with 20 papers' or 'top 10 papers')
+    match_papers = re.search(r'\b(?:top|scrape|fetch|analyze|with)\s+(\d{1,2})\s+papers?\b', topic, re.IGNORECASE)
+    if match_papers:
+        try:
+            scrape_top_n = max(3, min(int(match_papers.group(1)), 50))
+            logger.info(f"[SSE STREAM] Extracted natural language paper count: {scrape_top_n} papers")
+        except Exception:
+            pass
+
     min_score = float(body.get("min_score", 6.5))
     initial_turns = body.get("chat_turns", [])
     initial_summary = body.get("conversation_summary", "")
 
-    logger.info(f"[SSE STREAM] Request for topic: '{topic}' (mode={mode}, inherited_turns={len(initial_turns)})")
+    logger.info(f"[SSE STREAM] Request for topic: '{topic}' (mode={mode}, papers={scrape_top_n}, inherited_turns={len(initial_turns)})")
 
     async def event_generator():
         # Fast path for greetings and casual conversation (<500ms)

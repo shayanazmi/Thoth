@@ -103,10 +103,9 @@ class TestRealUserPersonas(unittest.TestCase):
             sample_state,
             "What is the weakest assumption in this 99.5% claim, and what counterarguments exist?"
         ))
-        self.assertGreaterEqual(len(events), 1)
-        final_node, final_update, final_state = events[-1]
-        self.assertIn("answer", final_update)
-        answer = final_update["answer"].lower()
+        answer_events = [data for event_type, data in events if event_type == "answer"]
+        self.assertGreaterEqual(len(answer_events), 1)
+        answer = answer_events[0]["answer"].lower()
         # Answer must discuss assumptions, limits, or experimental conditions
         self.assertTrue(any(k in answer for k in ["assumption", "limit", "vacuum", "fidelity", "crosstalk", "error", "laser", "gate", "qubit"]))
         print("  ✓ Persona D/E: Skeptical researcher critical Q&A verified.")

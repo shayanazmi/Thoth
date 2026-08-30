@@ -15,13 +15,13 @@ DEFAULT_TOKEN_BUDGET: Dict[str, int] = {
     "headroom": 2000,
 }
 
-# Dedicated Token Budget for Full Deep Research Report Writer (Nemotron-30B/70B 128k context)
+# Dedicated Token Budget for Full Deep Research Report Writer
 RESEARCH_WRITER_TOKEN_BUDGET: Dict[str, int] = {
     "system": 1500,
-    "retrieved_notes": 32000,  # 32k tokens of full scraped papers & primary sources
-    "summary": 3000,
-    "recent_turns": 4000,
-    "headroom": 3000,
+    "retrieved_notes": 12000,  # 12k tokens (~48,000 chars) of curated scraped papers & primary sources
+    "summary": 2000,
+    "recent_turns": 2500,
+    "headroom": 2000,
 }
 
 _tokenizer = None

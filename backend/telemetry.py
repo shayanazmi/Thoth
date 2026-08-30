@@ -53,7 +53,7 @@ def get_telemetry_status() -> Dict[str, Any]:
     from backend.dispatcher import default_dispatcher, scholarly_dispatcher, s2_dispatcher
 
     primary_model = os.getenv("NVIDIA_PRIMARY_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
-    fallback_model = os.getenv("GROQ_FALLBACK_MODEL", "groq/llama-3.3-70b-versatile")
+    fallback_model = os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-120b")
     
     return {
         "status": "online",

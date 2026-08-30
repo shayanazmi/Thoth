@@ -89,7 +89,7 @@ def _reconstruct_openalex_abstract(inverted_index: Optional[Dict[str, List[int]]
 # 1. arXiv API Client
 # ==============================================================================
 
-async def _fetch_arxiv_raw(query: str, max_results: int = 5) -> str:
+async def _fetch_arxiv_raw(query: str, max_results: int = 15) -> str:
     """Performs raw GET request to arXiv Atom XML API."""
     url = "https://export.arxiv.org/api/query"
     params = {
@@ -182,7 +182,7 @@ def parse_arxiv_xml(xml_text: str) -> List[SourceCandidate]:
 @observe(type="tool", description="Searches arXiv repository for academic preprints and papers")
 async def search_arxiv(
     query: str,
-    max_results: int = 5,
+    max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
     """
@@ -210,7 +210,7 @@ def _get_s2_headers() -> Dict[str, str]:
     return headers
 
 
-async def _fetch_semantic_scholar_raw(query: str, max_results: int = 5) -> Dict[str, Any]:
+async def _fetch_semantic_scholar_raw(query: str, max_results: int = 15) -> Dict[str, Any]:
     """Performs GET request to Semantic Scholar Paper Search Graph API."""
     url = "https://api.semanticscholar.org/graph/v1/paper/search"
     params = {
@@ -270,7 +270,7 @@ def parse_semantic_scholar_json(data: Dict[str, Any]) -> List[SourceCandidate]:
 @observe(type="tool", description="Queries Semantic Scholar Academic Graph API for peer-reviewed papers")
 async def search_semantic_scholar(
     query: str,
-    max_results: int = 5,
+    max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
     """
@@ -312,8 +312,8 @@ async def _fetch_s2_recommendations_raw(positive_ids: List[str], negative_ids: L
         "limit": limit,
     }
     body = {
-        "positivePaperIds": [_normalize_s2_id(p) for p in positive_ids],
-        "negativePaperIds": [_normalize_s2_id(p) for p in negative_ids],
+        "positivePaperIds": positive_ids,
+        "negativePaperIds": negative_ids,
     }
     headers = _get_s2_headers()
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -332,12 +332,14 @@ async def get_paper_recommendations(
     """
     Recommends papers given a list of positive and optional negative seed paper IDs.
     """
-    if not positive_paper_ids:
+    # S2 recommendations v1 accepts 40-char SHA paperId or CorpusId:123
+    clean_pos_ids = [p for p in positive_paper_ids if p and (len(p) == 40 or p.startswith("CorpusId:") or p.isdigit())]
+    if not clean_pos_ids:
         return []
-    neg_ids = negative_paper_ids or []
+    clean_neg_ids = [p for p in (negative_paper_ids or []) if p and (len(p) == 40 or p.startswith("CorpusId:") or p.isdigit())]
     disp = dispatcher or s2_dispatcher
     try:
-        json_data = await disp.call(_fetch_s2_recommendations_raw, positive_paper_ids, neg_ids, limit)
+        json_data = await disp.call(_fetch_s2_recommendations_raw, clean_pos_ids, clean_neg_ids, limit)
         recommended = json_data.get("recommendedPapers", [])
         candidates = []
         for paper in recommended:
@@ -539,7 +541,7 @@ async def search_paper_snippets(
 # 3. OpenAlex API Client
 # ==============================================================================
 
-async def _fetch_openalex_raw(query: str, max_results: int = 5) -> Dict[str, Any]:
+async def _fetch_openalex_raw(query: str, max_results: int = 15) -> Dict[str, Any]:
     """Performs GET request to OpenAlex Works API."""
     url = "https://api.openalex.org/works"
     params = {
@@ -603,7 +605,7 @@ def parse_openalex_json(data: Dict[str, Any]) -> List[SourceCandidate]:
 @observe(type="tool", description="Queries OpenAlex global scholarly corpus for research publications")
 async def search_openalex(
     query: str,
-    max_results: int = 5,
+    max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
     """Searches OpenAlex by query and returns SourceCandidate objects."""
@@ -620,7 +622,7 @@ async def search_openalex(
 # 4. Europe PMC API Client
 # ==============================================================================
 
-async def _fetch_europepmc_raw(query: str, max_results: int = 5) -> Dict[str, Any]:
+async def _fetch_europepmc_raw(query: str, max_results: int = 15) -> Dict[str, Any]:
     """Performs GET request to Europe PMC REST API (Open Access filter enabled)."""
     url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
     clean_query = f"{query} AND OPEN_ACCESS:y"
@@ -680,7 +682,7 @@ def parse_europepmc_json(data: Dict[str, Any]) -> List[SourceCandidate]:
 @observe(type="tool", description="Queries Europe PMC database for open-access scientific publications")
 async def search_europepmc(
     query: str,
-    max_results: int = 5,
+    max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
     """Searches Europe PMC for open-access papers."""
@@ -697,7 +699,7 @@ async def search_europepmc(
 # 5. PubMed NCBI API Client
 # ==============================================================================
 
-async def _fetch_pubmed_raw(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+async def _fetch_pubmed_raw(query: str, max_results: int = 15) -> List[Dict[str, Any]]:
     """Performs ESearch followed by ESummary on NCBI Entrez API."""
     search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
     search_params = {
@@ -771,7 +773,7 @@ def parse_pubmed_json(results: List[Dict[str, Any]]) -> List[SourceCandidate]:
 @observe(type="tool", description="Queries PubMed database for biomedical and clinical literature")
 async def search_pubmed(
     query: str,
-    max_results: int = 5,
+    max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
     """Searches PubMed via NCBI Entrez."""
@@ -869,7 +871,7 @@ async def snowball_literature_graph(
 async def _snowball_openalex_fallback(seeds: List[SourceCandidate], limit: int = 3) -> List[SourceCandidate]:
     """Fallback snowballing using OpenAlex related works when S2 is rate-limited."""
     candidates: List[SourceCandidate] = []
-    headers = {"User-Agent": "Thoth-Academic-Snowballer/1.0"}
+    headers = {"User-Agent": "Thoth-Academic-Snowballer/1.0 (mailto:academic-research@thoth.ai)"}
     async with httpx.AsyncClient(timeout=12.0) as client:
         for seed in seeds[:2]:
             query = seed.doi or seed.title
@@ -882,7 +884,11 @@ async def _snowball_openalex_fallback(seeds: List[SourceCandidate], limit: int =
                     if results:
                         related_urls = results[0].get("related_works", [])[:limit]
                         for r_url in related_urls:
-                            rw_res = await client.get(r_url, headers=headers)
+                            api_url = r_url
+                            if "api.openalex.org" not in api_url:
+                                work_id = api_url.rstrip("/").split("/")[-1]
+                                api_url = f"https://api.openalex.org/works/{work_id}"
+                            rw_res = await client.get(api_url, headers=headers)
                             if rw_res.status_code == 200:
                                 parsed = parse_openalex_json({"results": [rw_res.json()]})
                                 for p in parsed:
@@ -898,7 +904,7 @@ async def _snowball_openalex_fallback(seeds: List[SourceCandidate], limit: int =
 # 7. Tavily Web Search Client (Fallback Adapter)
 # ==============================================================================
 
-def _fetch_tavily_sync(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+def _fetch_tavily_sync(query: str, max_results: int = 15) -> List[Dict[str, Any]]:
     """Performs synchronous search against Tavily API."""
     from tavily import TavilyClient
     api_key = os.getenv("TAVILY_API_KEY")
@@ -912,7 +918,7 @@ def _fetch_tavily_sync(query: str, max_results: int = 5) -> List[Dict[str, Any]]
 @observe(type="tool", description="Queries Tavily search engine for recent web intelligence and fallback discovery")
 async def search_tavily(
     query: str,
-    max_results: int = 5,
+    max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
     """Searches Tavily and returns results formatted as SourceCandidate objects."""
@@ -988,8 +994,8 @@ def _sanitize_academic_query(query: str, max_chars: int = 150) -> str:
 
 async def search_scholarly_sources(
     query: str,
-    max_results: int = 5,
-    min_scholarly_results: int = 3,
+    max_results: int = 15,
+    min_scholarly_results: int = 5,
     dispatcher: Optional[Dispatcher] = None,
     enable_snowball: bool = False
 ) -> List[SourceCandidate]:
@@ -997,19 +1003,22 @@ async def search_scholarly_sources(
     Federates search across academic sources (arXiv, Semantic Scholar, OpenAlex, Europe PMC, PubMed)
     concurrently, deduplicates candidates, optionally snowballs citation graph, and falls back to
     Tavily web search if fewer than `min_scholarly_results` academic candidates are found.
+    Ranks top candidates by semantic relevance, recency, and citation impact.
     """
     disp = dispatcher or scholarly_dispatcher
     clean_query = _sanitize_academic_query(query)
     if not clean_query:
         clean_query = query[:100]
 
+    api_limit = max(max_results, 15)
+
     # Concurrently query all federated academic endpoints
     academic_tasks = [
-        search_arxiv(clean_query, max_results=max_results, dispatcher=disp),
-        search_semantic_scholar(clean_query, max_results=max_results, dispatcher=s2_dispatcher),
-        search_openalex(clean_query, max_results=max_results, dispatcher=disp),
-        search_europepmc(clean_query, max_results=max_results, dispatcher=disp),
-        search_pubmed(clean_query, max_results=max_results, dispatcher=disp),
+        search_arxiv(clean_query, max_results=api_limit, dispatcher=disp),
+        search_semantic_scholar(clean_query, max_results=api_limit, dispatcher=s2_dispatcher),
+        search_openalex(clean_query, max_results=api_limit, dispatcher=disp),
+        search_europepmc(clean_query, max_results=api_limit, dispatcher=disp),
+        search_pubmed(clean_query, max_results=api_limit, dispatcher=disp),
     ]
 
     results_lists = await asyncio.gather(*academic_tasks, return_exceptions=True)
@@ -1042,7 +1051,7 @@ async def search_scholarly_sources(
     # If insufficient academic results, fall back/supplement with Tavily web search
     if len(deduped_candidates) < min_scholarly_results:
         logger.info(f"[SCHOLARLY] Only {len(deduped_candidates)} academic results found. Supplementing with Tavily web search...")
-        tavily_candidates = await search_tavily(query, max_results=max_results, dispatcher=disp)
+        tavily_candidates = await search_tavily(query, max_results=api_limit, dispatcher=disp)
         for cand in tavily_candidates:
             norm_title = re.sub(r"[^a-zA-Z0-9]", "", cand.title.lower())
             key = cand.url or norm_title
@@ -1050,7 +1059,9 @@ async def search_scholarly_sources(
                 seen_keys.add(norm_title)
                 deduped_candidates.append(cand)
 
-    return deduped_candidates[:max_results]
+    # Rank candidates by semantic relevance, recency (2026/2025/2024), and citation impact
+    ranked_candidates = rank_sources_by_relevance(clean_query or query, deduped_candidates, top_k=max_results)
+    return ranked_candidates[:max_results]
 
 
 # ==============================================================================
@@ -1061,11 +1072,14 @@ def rank_sources_by_relevance(
     topic: str,
     sources: List[Union[Dict[str, Any], SourceCandidate]],
     top_k: Optional[int] = None,
-    min_similarity: float = 0.15
+    min_similarity: float = 0.10
 ) -> List[Any]:
     """
-    Ranks source dictionaries or SourceCandidate objects by semantic cosine similarity to the topic
-    using the CPU embedding model. Fast (<20ms for 20 candidates), preventing off-topic scraping.
+    Ranks source dictionaries or SourceCandidate objects by composite score:
+    - Semantic cosine similarity to the topic using the CPU embedding model
+    - Recency bonus for recent preprints/papers (2026: +0.15, 2025: +0.10, 2024: +0.05)
+    - Citation count impact bonus (log-scaled)
+    Fast (<25ms for 30 candidates), ensuring the best, latest, and most relevant papers surface first.
     """
     if not sources or not topic:
         return sources
@@ -1081,8 +1095,12 @@ def rank_sources_by_relevance(
         for s in sources:
             if isinstance(s, SourceCandidate):
                 text = f"{s.title}\n{s.abstract}".strip()
+                pub_date = str(s.published_date or "")
+                citations = s.citation_count or 0
             else:
                 text = f"{s.get('title', '')}\n{s.get('abstract', '')}\n{s.get('domain', '')}".strip()
+                pub_date = str(s.get("published_date") or s.get("year") or "")
+                citations = s.get("citation_count") or 0
 
             if not text:
                 scored_sources.append((0.0, s))
@@ -1090,12 +1108,28 @@ def rank_sources_by_relevance(
 
             doc_emb = model.encode(text, normalize_embeddings=True)
             sim = float(np.dot(topic_emb, doc_emb))
-            scored_sources.append((sim, s))
 
-        # Sort by similarity descending
+            # Recency bonus for latest scientific literature
+            recency_bonus = 0.0
+            if "2026" in pub_date or "2026" in text[:300]:
+                recency_bonus = 0.15
+            elif "2025" in pub_date or "2025" in text[:300]:
+                recency_bonus = 0.10
+            elif "2024" in pub_date or "2024" in text[:300]:
+                recency_bonus = 0.05
+
+            # Citation count impact bonus
+            citation_bonus = 0.0
+            if isinstance(citations, (int, float)) and citations > 0:
+                citation_bonus = min(float(np.log1p(citations)) * 0.01, 0.06)
+
+            composite_score = sim + recency_bonus + citation_bonus
+            scored_sources.append((composite_score, s))
+
+        # Sort by composite score descending
         scored_sources.sort(key=lambda x: x[0], reverse=True)
 
-        filtered = [s for sim, s in scored_sources if sim >= min_similarity]
+        filtered = [s for score, s in scored_sources if score >= min_similarity]
         if not filtered:
             filtered = [s for _, s in scored_sources]
 

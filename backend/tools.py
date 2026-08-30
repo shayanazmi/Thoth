@@ -1,30 +1,22 @@
-# pyrefly: ignore[missing-import]
 from langchain.tools import tool
 import requests
-# pyrefly: ignore[missing-import]
 from bs4 import BeautifulSoup
 from tavily import TavilyClient
 import os 
 from dotenv import load_dotenv
-from rich import print
 
 load_dotenv()
 
 tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
 @tool 
-def web_search(query :str) -> str:
+def web_search(query: str) -> str:
     """Perform web search using Tavily and return the results."""
     results = tavily.search(query=query, search_depth="advanced", max_results=5)
-    
-    out = []
-    for r in results['results']:
-        out.append(
-            f"Title: {r['title']}\n"
-            f"URL: {r['url']}\n"
-            f"Snippet: {r['content'][:300]}...\n"
-        )
-    return "\n------\n".join(out)
+    return "\n------\n".join(
+        f"Title: {r.get('title', '')}\nURL: {r.get('url', '')}\nSnippet: {r.get('content', '')[:300]}..."
+        for r in results.get("results", [])
+    )
 
 from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
 
@@ -51,6 +43,3 @@ def scrape_url(url: str) -> str:
         return _scrape_url_with_retry(url)
     except Exception as e:
         return f"Could not scrape URL: {str(e)}"
-
-if __name__ == "__main__":
-    print(scrape_url.invoke("https://www.nature.com/subjects/computational-science"))

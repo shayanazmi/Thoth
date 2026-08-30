@@ -247,7 +247,7 @@ class TestOrchestratorPureFunctions(unittest.TestCase):
         self.assertEqual(state["role"], "senior academic researcher")
         self.assertEqual(state["tone"], "formal and analytical")
         self.assertEqual(state["language"], "English")
-        self.assertEqual(state["scrape_top_n"], 2)
+        self.assertEqual(state["scrape_top_n"], 15)
         self.assertEqual(state["min_score"], 6.5)
         self.assertEqual(state["max_retries"], 2)
 

@@ -38,9 +38,17 @@ class ThothApp {
     // Default mode is fast_chat — research is opt-in
     this.activeMode = 'fast_chat';
 
+    // Literature volume: default is Top 15 Most Relevant & Latest Papers
+    this.scrapeTopN = parseInt(localStorage.getItem('thoth_scrape_top_n')) || 15;
+
+    // UX State Tracking
+    this.isUserScrolledUp = false;
+    this.activeAbortController = null;
+
     this.initElements();
     this.bindEvents();
     this.setMode('fast_chat'); // Initialize UI to default chat mode
+    this.setPaperVolume(this.scrapeTopN); // Initialize paper count UI
     this.loadVaultNotes();
   }
 
@@ -64,8 +72,15 @@ class ThothApp {
     this.activeModeLabel = document.getElementById('activeModeLabel');
     this.deepResearchToggle = document.getElementById('deepResearchToggle');
 
+    // Paper Volume Badges & Controls
+    this.paperVolumeBadge = document.getElementById('paperVolumeBadge');
+    this.paperVolumeLabel = document.getElementById('paperVolumeLabel');
+    this.heroVolumeGroup = document.getElementById('heroVolumeGroup');
+    this.paperVolumeOptionsGrid = document.getElementById('paperVolumeOptionsGrid');
+
     // Feeds & Containers
     this.chatFeed = document.getElementById('chatFeed');
+    this.jumpToLatestBtn = document.getElementById('jumpToLatestBtn');
     this.stepperBar = document.getElementById('pipelineStepperBar');
     this.currentTopicDisplay = document.getElementById('currentTopicDisplay');
     this.vaultNotesList = document.getElementById('vaultNotesList');
@@ -111,13 +126,37 @@ class ThothApp {
       });
     });
 
-    // Chat REPL Input
+    // Volume chips on Landing page
+    document.querySelectorAll('.volume-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        const vol = parseInt(e.currentTarget.getAttribute('data-volume'));
+        if (vol) this.setPaperVolume(vol);
+      });
+    });
+
+    // Chat REPL Input & Dynamic Auto-Resize
+    this.chatInput?.addEventListener('input', () => this.autoResizeTextarea());
     this.chatSendBtn?.addEventListener('click', () => this.handleChatSend());
     this.chatInput?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         this.handleChatSend();
       }
+    });
+
+    // Scroll Detection & Jump-to-Latest Control
+    this.chatFeed?.addEventListener('scroll', () => {
+      const threshold = 100;
+      const distFromBottom = this.chatFeed.scrollHeight - this.chatFeed.scrollTop - this.chatFeed.clientHeight;
+      this.isUserScrolledUp = distFromBottom > threshold;
+      if (!this.isUserScrolledUp && this.jumpToLatestBtn) {
+        this.jumpToLatestBtn.classList.add('hidden');
+      }
+    });
+
+    this.jumpToLatestBtn?.addEventListener('click', () => {
+      this.isUserScrolledUp = false;
+      this.scrollToBottom(true);
     });
 
     // Tool Menu Toggle
@@ -129,10 +168,14 @@ class ThothApp {
       e.stopPropagation();
       this.toggleToolMenu();
     });
+    this.paperVolumeBadge?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleToolMenu();
+    });
 
     // Close tool menu when clicking outside
     document.addEventListener('click', (e) => {
-      if (this.floatingToolMenu && !this.floatingToolMenu.contains(e.target) && e.target !== this.toolAttachBtn && e.target !== this.activeModeBadge) {
+      if (this.floatingToolMenu && !this.floatingToolMenu.contains(e.target) && e.target !== this.toolAttachBtn && e.target !== this.activeModeBadge && e.target !== this.paperVolumeBadge) {
         this.floatingToolMenu.classList.add('hidden');
       }
     });
@@ -145,6 +188,17 @@ class ThothApp {
         if (mode) {
           this.setMode(mode);
           this.floatingToolMenu.classList.add('hidden');
+        }
+      });
+    });
+
+    // Volume Option Buttons inside Tool Menu
+    document.querySelectorAll('.volume-option-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const vol = parseInt(e.currentTarget.getAttribute('data-volume'));
+        if (vol) {
+          this.setPaperVolume(vol);
+          this.floatingToolMenu?.classList.add('hidden');
         }
       });
     });
@@ -285,6 +339,66 @@ class ThothApp {
     }
   }
 
+  setGenerating(isGen) {
+    this.isGenerating = isGen;
+    const isResearch = this.activeMode === 'deep_research';
+
+    if (this.chatSendBtn) {
+      if (isGen) {
+        this.chatSendBtn.classList.add('btn-stop-generating');
+        this.chatSendBtn.innerHTML = `<i data-lucide="square" style="width:11px;height:11px;fill:currentColor;"></i> <span>Stop</span>`;
+        this.chatSendBtn.title = 'Stop Generation';
+      } else {
+        this.chatSendBtn.classList.remove('btn-stop-generating');
+        this.chatSendBtn.innerHTML = `<i data-lucide="${isResearch ? 'zap' : 'arrow-up'}" style="width:15px;height:15px;"></i>`;
+        this.chatSendBtn.title = isResearch ? 'Launch Research Swarm' : 'Send Message';
+        this.chatSendBtn.style.background = isResearch
+          ? 'linear-gradient(135deg, hsl(32, 65%, 48%), hsl(42, 80%, 55%))'
+          : '';
+        this.activeAbortController = null;
+      }
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  abortGeneration() {
+    if (this.activeAbortController) {
+      this.activeAbortController.abort();
+      this.activeAbortController = null;
+    }
+    this.setGenerating(false);
+    this.showToast('Generation cancelled', 'alert-circle');
+  }
+
+  autoResizeTextarea() {
+    if (!this.chatInput) return;
+    this.chatInput.style.height = 'auto';
+    const newHeight = Math.min(Math.max(this.chatInput.scrollHeight, 38), 160);
+    this.chatInput.style.height = `${newHeight}px`;
+  }
+
+  setPaperVolume(n) {
+    const validCount = Math.max(3, Math.min(parseInt(n) || 15, 50));
+    this.scrapeTopN = validCount;
+    localStorage.setItem('thoth_scrape_top_n', validCount);
+
+    if (this.paperVolumeLabel) {
+      this.paperVolumeLabel.textContent = validCount === 15 ? 'Top 15 Papers' : `${validCount} Papers`;
+    }
+
+    // Update active highlight on landing page chips
+    document.querySelectorAll('.volume-chip').forEach(chip => {
+      chip.classList.toggle('active', parseInt(chip.getAttribute('data-volume')) === validCount);
+    });
+
+    // Update active highlight in tool menu options
+    document.querySelectorAll('.volume-option-btn').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.getAttribute('data-volume')) === validCount);
+    });
+
+    if (window.lucide) lucide.createIcons();
+  }
+
   handleHeroLaunch() {
     const topic = this.heroPromptInput.value.trim();
     if (!topic || this.isGenerating) return;
@@ -325,10 +439,16 @@ class ThothApp {
   }
 
   handleChatSend() {
+    if (this.isGenerating) {
+      this.abortGeneration();
+      return;
+    }
+
     const text = this.chatInput.value.trim();
-    if (!text || this.isGenerating) return;
+    if (!text) return;
 
     this.chatInput.value = '';
+    this.autoResizeTextarea();
 
     // Handle Slash Commands
     if (text.startsWith('/')) {
@@ -381,12 +501,22 @@ class ThothApp {
   // ============================================================================
   startResearch(topic, shouldAppendUser = true, inheritContext = true) {
     this.activeTopic = topic;
-    this.isGenerating = true;
+    this.setGenerating(true);
+    this.activeAbortController = new AbortController();
     this.currentTopicDisplay.textContent = topic;
     if (this.stepperBar) this.stepperBar.innerHTML = '';
 
     if (shouldAppendUser) {
       this.appendUserMessage(topic);
+    }
+
+    // Extract natural language paper count if present (e.g. 'research with 20 papers')
+    const paperMatch = topic.match(/\b(?:top|scrape|fetch|analyze|with)\s+(\d{1,2})\s+papers?\b/i);
+    if (paperMatch) {
+      const extractedCount = parseInt(paperMatch[1]);
+      if (extractedCount >= 3 && extractedCount <= 50) {
+        this.setPaperVolume(extractedCount);
+      }
     }
 
     // Create placeholder assistant message with active stepper and CoT accordion
@@ -398,7 +528,7 @@ class ThothApp {
       mode: 'deep_research',
       role: "senior academic researcher",
       tone: "formal and analytical",
-      scrape_top_n: 2,
+      scrape_top_n: this.scrapeTopN || 15,
       min_score: 6.5,
       chat_turns: (inheritContext && this.currentState?.chat_turns) ? this.currentState.chat_turns : [],
       conversation_summary: (inheritContext && this.currentState?.conversation_summary) ? this.currentState.conversation_summary : ''
@@ -407,7 +537,8 @@ class ThothApp {
     fetch('/api/research/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: this.activeAbortController.signal
     }).then(response => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -416,7 +547,7 @@ class ThothApp {
       const processStream = () => {
         reader.read().then(({ done, value }) => {
           if (done) {
-            this.isGenerating = false;
+            this.setGenerating(false);
             this.loadVaultNotes();
             return;
           }
@@ -445,8 +576,12 @@ class ThothApp {
 
           processStream();
         }).catch(err => {
+          if (err.name === 'AbortError') {
+            console.log('Research stream cancelled by user.');
+            return;
+          }
           console.error('SSE Stream read error:', err);
-          this.isGenerating = false;
+          this.setGenerating(false);
           const bubbleEl = document.getElementById(msgId);
           if (bubbleEl) {
             const prose = bubbleEl.querySelector('.message-prose');
@@ -461,8 +596,9 @@ class ThothApp {
 
       processStream();
     }).catch(err => {
+      if (err.name === 'AbortError') return;
       console.error('Fetch error:', err);
-      this.isGenerating = false;
+      this.setGenerating(false);
       const bubbleEl = document.getElementById(msgId);
       if (bubbleEl) {
         const prose = bubbleEl.querySelector('.message-prose');
@@ -496,6 +632,8 @@ class ThothApp {
       if (state.follow_up_questions) {
         this.renderProactivePills(msgContainer, state.follow_up_questions);
       }
+      this.renderMessageActions(msgContainer, this.activeTopic);
+      this.scrollToBottom();
       return;
     }
 
@@ -510,11 +648,11 @@ class ThothApp {
     // Update Chain of Thought logs
     if (cotBody) {
       if (node === 'search') {
-        cotBody.textContent += `[SEARCH] Retrieved primary literature from Semantic Scholar & Web.\n`;
+        cotBody.textContent += `[SEARCH] Querying academic indices for top ${this.scrapeTopN || 15} peer-reviewed papers.\n`;
       } else if (node === 'snowball') {
         cotBody.textContent += `[SNOWBALL] Expanded citation graph and forward reference seeds.\n`;
       } else if (node === 'scrape') {
-        cotBody.textContent += `[READER] Scraped readable text from candidate sources.\n`;
+        cotBody.textContent += `[READER] Fanning out concurrent scrape across top ${this.scrapeTopN || 15} candidate sources.\n`;
       } else if (node === 'writer') {
         cotBody.textContent += `[SCRIBE] Drafted synthesis report (Attempt ${state.attempt || 1}).\n`;
       } else if (node === 'verifier') {
@@ -531,10 +669,11 @@ class ThothApp {
       this.renderReport(state.report);
       contentBody.innerHTML = this.parseMarkdownWithWikilinks(state.report);
     } else if (contentBody) {
+      const count = this.scrapeTopN || 15;
       const stageMessages = {
-        'search': '🔍 Querying arXiv, Semantic Scholar & OpenAlex...',
-        'snowball': '🌐 Snowballing academic citation network...',
-        'scrape': '📖 Reading and extracting evidence from primary sources...',
+        'search': `🔍 Discovering top ${count} peer-reviewed papers across arXiv, Semantic Scholar & OpenAlex...`,
+        'snowball': '🌐 Snowballing academic citation network & recommendations...',
+        'scrape': `📖 Fanning out concurrent scrape across top ${count} primary sources...`,
         'writer': '✍️ Scribing comprehensive research synthesis...',
         'verifier': '⚖️ Scales of Ma\'at: Verifying factual claims against sources...',
         'critic': '🧐 Evaluating rigor and rubrics...'
@@ -563,7 +702,9 @@ class ThothApp {
       if (state.follow_up_questions) {
         this.renderProactivePills(msgContainer, state.follow_up_questions);
       }
+      this.renderMessageActions(msgContainer, state.topic || this.activeTopic);
     }
+    this.scrollToBottom();
   }
 
   // ============================================================================
@@ -575,7 +716,8 @@ class ThothApp {
       return;
     }
 
-    this.isGenerating = true;
+    this.setGenerating(true);
+    this.activeAbortController = new AbortController();
     const mode = this.activeMode || 'auto';
 
     const msgId = `msg_${Date.now()}`;
@@ -590,7 +732,8 @@ class ThothApp {
     fetch('/api/followup/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: this.activeAbortController.signal
     }).then(response => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -599,7 +742,7 @@ class ThothApp {
       const processStream = () => {
         reader.read().then(({ done, value }) => {
           if (done) {
-            this.isGenerating = false;
+            this.setGenerating(false);
             this.loadVaultNotes();
             return;
           }
@@ -628,8 +771,12 @@ class ThothApp {
 
           processStream();
         }).catch(err => {
+          if (err.name === 'AbortError') {
+            console.log('Follow-up stream cancelled by user.');
+            return;
+          }
           console.error('Followup read error:', err);
-          this.isGenerating = false;
+          this.setGenerating(false);
           const bubbleEl = document.getElementById(msgId);
           if (bubbleEl) {
             const prose = bubbleEl.querySelector('.message-prose');
@@ -644,8 +791,9 @@ class ThothApp {
 
       processStream();
     }).catch(err => {
+      if (err.name === 'AbortError') return;
       console.error('Followup fetch error:', err);
-      this.isGenerating = false;
+      this.setGenerating(false);
       const bubbleEl = document.getElementById(msgId);
       if (bubbleEl) {
         const prose = bubbleEl.querySelector('.message-prose');
@@ -684,6 +832,8 @@ class ThothApp {
       if (payload.citations && payload.citations.length > 0) {
         this.renderCitations(msgContainer, payload.citations);
       }
+      this.renderMessageActions(msgContainer, this.activeTopic || this.currentState?.topic);
+      this.scrollToBottom();
     } else if (evType === 'report_expansion') {
       if (payload.updated_report) {
         this.currentState.report = payload.updated_report;
@@ -692,18 +842,90 @@ class ThothApp {
       if (contentBody && (payload.new_section || payload.updated_report)) {
         contentBody.innerHTML = this.parseMarkdownWithWikilinks(payload.new_section || payload.updated_report);
       }
+      this.renderMessageActions(msgContainer, this.activeTopic || this.currentState?.topic);
+      this.scrollToBottom();
     } else if (evType === 'followup_complete') {
       this.currentState.chat_turns = payload.chat_turns;
       this.currentState.conversation_summary = payload.conversation_summary;
       if (payload.follow_up_questions) {
         this.renderProactivePills(msgContainer, payload.follow_up_questions);
       }
+      this.renderMessageActions(msgContainer, this.activeTopic || this.currentState?.topic);
+      this.scrollToBottom();
     }
   }
 
   // ============================================================================
   // UI RENDERING HELPERS
   // ============================================================================
+  scrollToBottom(force = false) {
+    if (!this.chatFeed) return;
+    if (force || !this.isUserScrolledUp) {
+      this.chatFeed.scrollTop = this.chatFeed.scrollHeight;
+      if (this.jumpToLatestBtn) this.jumpToLatestBtn.classList.add('hidden');
+    } else if (this.isUserScrolledUp && this.jumpToLatestBtn) {
+      this.jumpToLatestBtn.classList.remove('hidden');
+    }
+  }
+
+  renderMessageActions(containerEl, topic) {
+    if (!containerEl) return;
+    const bubble = containerEl.querySelector('.chat-bubble');
+    if (!bubble) return;
+
+    let actionsBar = bubble.querySelector('.message-actions-bar');
+    if (!actionsBar) {
+      actionsBar = document.createElement('div');
+      actionsBar.className = 'message-actions-bar';
+      bubble.appendChild(actionsBar);
+    }
+    const cleanTopic = (topic || this.activeTopic || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    actionsBar.innerHTML = `
+      <button class="msg-action-btn primary" onclick="window.app.triggerDirectResearch('${cleanTopic}')" title="Conduct comprehensive 8-agent literature synthesis on this topic">
+        <i data-lucide="microscope" style="width:12px;height:12px;"></i>
+        <span>Deep Research</span>
+      </button>
+      <button class="msg-action-btn" onclick="window.app.copyMessageText(this)" title="Copy message text">
+        <i data-lucide="copy" style="width:12px;height:12px;"></i>
+        <span>Copy</span>
+      </button>
+      <button class="msg-action-btn" onclick="window.app.switchArtifactTab('report')" title="View report in side pane">
+        <i data-lucide="file-text" style="width:12px;height:12px;"></i>
+        <span>Report</span>
+      </button>
+      <button class="msg-action-btn" onclick="window.app.switchArtifactTab('truth')" title="View fact verification audit">
+        <i data-lucide="scale" style="width:12px;height:12px;"></i>
+        <span>Scales of Ma'at</span>
+      </button>
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  copyMessageText(btnEl) {
+    const bubble = btnEl.closest('.chat-bubble');
+    const prose = bubble?.querySelector('.message-prose') || bubble?.querySelector('.prose');
+    if (!prose) return;
+    const text = prose.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      this.showToast('Copied message to clipboard!');
+      const span = btnEl.querySelector('span');
+      if (span) {
+        const orig = span.textContent;
+        span.textContent = 'Copied!';
+        setTimeout(() => { span.textContent = orig; }, 2000);
+      }
+    }).catch(() => {
+      this.showToast('Failed to copy', 'alert-circle');
+    });
+  }
+
+  triggerDirectResearch(topic) {
+    if (this.isGenerating) return;
+    this.setMode('deep_research');
+    const query = topic || this.activeTopic || (this.currentState && this.currentState.topic) || 'Current research objective';
+    this.startResearch(query, true, true);
+  }
+
   appendUserMessage(text) {
     const row = document.createElement('div');
     row.className = 'chat-message-row user';
@@ -718,7 +940,7 @@ class ThothApp {
     this.chatFeed.appendChild(row);
     if (window.lucide) lucide.createIcons();
     if (window.ThothAnimations) window.ThothAnimations.animateNewMessage(row);
-    this.scrollToBottom();
+    this.scrollToBottom(true);
   }
 
   createAssistantPlaceholder(msgId) {

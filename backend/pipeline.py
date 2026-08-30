@@ -211,27 +211,26 @@ def resolve_anaphoric_topic(raw_topic: str, chat_turns: Optional[List[Dict[str, 
         
     clean_lower = re.sub(r'[?!.,;:]+$', '', raw_topic.strip().lower())
     
-    anaphoric_triggers = [
-        "research this", "research that", "research it", "research the above", "research further",
-        "deep research on this", "deep research on that", "deep research", "research",
-        "explore this", "explore that", "explore it", "explore the above", "explore deeply",
-        "go deeper", "go deeper on this", "go deeper on that", "go deeper on it", "dig deeper",
-        "investigate this", "investigate that", "investigate it", "investigate the above",
-        "look into this", "look into that", "look into it", "look into the above",
-        "find evidence for this", "find evidence for that", "find evidence",
-        "verify this", "verify that", "what does the research say", "what does the literature say",
-        "the previous point", "this idea", "this claim", "that comparison", "the above topic"
+    # Pure deictic commands that refer entirely to prior context
+    short_deictic_patterns = [
+        r'^(can\s+you\s+|please\s+|could\s+you\s+)?(research|explore|investigate|dig\s+into|look\s+into)\s+(this|that|it|the\s+above)(\s+deeply|\s+further|\s+properly)?$',
+        r'^(go\s+deeper|dig\s+deeper|explore\s+deeply)(\s+on\s+(this|that|it))?$',
+        r'^(find|gather)\s+(evidence|literature|papers)\s+(for\s+(this|that)|on\s+(this|that))$',
+        r'^(what\s+does\s+the\s+(research|literature)\s+say(\s+about\s+(this|that))?)$',
+        r'^(this|that|it|more)$',
+        r'^(the\s+first\s+(one|point|option)|the\s+second\s+(one|point|option)|the\s+third\s+(one|point|option))$'
     ]
     
-    is_anaphoric = (
-        any(trig in clean_lower for trig in anaphoric_triggers)
-        or clean_lower in {"this", "that", "it", "more"}
-        or bool(re.search(r'\b(this|that|it|the previous thing|the water thing|the first one|the second one)\b', clean_lower))
-        or any(clean_lower.startswith(p) for p in ["can you research", "please research", "could you research", "research:"])
-    )
+    is_pure_deictic = any(re.match(p, clean_lower) for p in short_deictic_patterns)
     
-    if not is_anaphoric:
-        return raw_topic
+    # Directive with focus clause like "research this deeply, especially X"
+    focus_match = re.search(r'^(?:can\s+you\s+|please\s+|could\s+you\s+)?(?:research|explore|investigate|dig\s+into)\s+(?:this|that|it|the\s+above)(?:\s+deeply|\s+further)?(?:,\s*|\s+)(?:especially|specifically|focusing\s+on|regarding)\s+(.+)$', clean_lower)
+    focus_clause = focus_match.group(1).strip() if focus_match else ""
+
+    # If it's not a pure deictic command or focus directive, keep raw_topic
+    if not is_pure_deictic and not focus_match:
+        if not any(ord_word in clean_lower for ord_word in ["second", "2nd", "first", "1st", "third", "3rd"]):
+            return raw_topic
         
     # Helper to get role content from various turn representations
     def get_turn_content(t: Dict[str, Any], role: str) -> str:
@@ -240,10 +239,6 @@ def resolve_anaphoric_topic(raw_topic: str, chat_turns: Optional[List[Dict[str, 
         if role == "user":
             return t.get("user_query", "") or t.get("user", "")
         return t.get("assistant_response", "") or t.get("assistant", "")
-
-    # Extract focus clause if present (e.g., "especially the optical tweezer crosstalk limits")
-    focus_match = re.search(r'\b(especially|specifically|focusing on|regarding|specifically on)\s+(.+)$', clean_lower)
-    focus_clause = focus_match.group(2).strip() if focus_match else ""
 
     # Check for ordinal reference like "the second point", "the first option"
     if chat_turns:
@@ -291,7 +286,7 @@ def search_node(state: ResearchState) -> dict:
     # Contextual query resolution for conversation -> research transitions
     topic = resolve_anaphoric_topic(raw_topic, chat_turns=chat_turns, conv_summary=conv_summary)
 
-    target_count = max(int(state.get("scrape_top_n", 5) or 5), 5)
+    target_count = max(int(state.get("scrape_top_n", 15) or 15), 3)
     candidates: List[SourceCandidate] = []
     
     try:
@@ -303,9 +298,9 @@ def search_node(state: ResearchState) -> dict:
             if loop and loop.is_running():
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                    return executor.submit(asyncio.run, search_scholarly_sources(topic, max_results=target_count, min_scholarly_results=min(target_count, 4))).result()
+                    return executor.submit(asyncio.run, search_scholarly_sources(topic, max_results=target_count, min_scholarly_results=min(target_count, 5))).result()
             else:
-                return asyncio.run(search_scholarly_sources(topic, max_results=target_count, min_scholarly_results=min(target_count, 4)))
+                return asyncio.run(search_scholarly_sources(topic, max_results=target_count, min_scholarly_results=min(target_count, 5)))
 
         candidates = _run_async_search()
     except Exception as e:
@@ -454,13 +449,13 @@ def scrape_node(state: ResearchState) -> dict:
     ranked_sources = rank_sources_by_relevance(
         topic=state.get("topic", ""),
         sources=existing_sources,
-        top_k=state.get("scrape_top_n", 2)
+        top_k=state.get("scrape_top_n", 15)
     )
     urls = [s.get("url") for s in ranked_sources if s.get("url")]
     
     if not urls:
         raw_urls = _extract_urls_from_text(state.get("search_results", ""))
-        urls = raw_urls[:state.get("scrape_top_n", 2)]
+        urls = raw_urls[:state.get("scrape_top_n", 15)]
         
     scraped_content = ""
     cumulative_sources = list(existing_sources)

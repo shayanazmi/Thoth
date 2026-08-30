@@ -84,7 +84,11 @@ def _construct_default_schema_instance(schema: Type[BaseModel]) -> BaseModel:
     except Exception as e:
         logger.warning(f"[JUDGE MODEL] Default instance construction error for {schema.__name__}: {e}")
         # Return bare unvalidated instance as absolute last resort
-        return schema.construct(**data) if hasattr(schema, "construct") else schema()
+        if hasattr(schema, "model_construct"):
+            return schema.model_construct(**data)
+        if hasattr(schema, "construct"):
+            return schema.construct(**data)
+        return schema()
 
 
 def _repair_dict_for_schema(schema: Type[BaseModel], raw_dict: Dict[str, Any]) -> BaseModel:

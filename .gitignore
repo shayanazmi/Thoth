@@ -112,6 +112,8 @@ thoth_chat_summary_with_thinking.md
 thoth_full_chat_history_with_thinking.md
 thoth_modification_plan.md
 diagnostic_test.py
+todo-shayanwentonawalk
+eval_sandbox/production_eval_results.json
 
 # Research Vault contents — keep directory skeleton, ignore generated notes
 vault/topics/*.md

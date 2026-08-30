@@ -36,6 +36,43 @@ class FallbackLLMWrapper(Runnable):
         self.primary_name = primary_name
         self.fallback_name = fallback_name
 
+    def _adapt_input_for_fallback(self, input_val: Any, max_chars: int = 24000) -> Any:
+        """Compresses oversized prompt inputs so fallback tier rate limits (e.g. Groq TPM) are never exceeded."""
+        if isinstance(input_val, str):
+            if len(input_val) > max_chars:
+                return input_val[:max_chars] + "\n\n[Context truncated for fallback provider capacity]"
+            return input_val
+        elif isinstance(input_val, list):
+            new_msgs = []
+            for msg in input_val:
+                if hasattr(msg, "content") and isinstance(msg.content, str) and len(msg.content) > max_chars:
+                    truncated_content = msg.content[:max_chars] + "\n\n[Context truncated for fallback capacity]"
+                    msg_copy = type(msg)(content=truncated_content)
+                    new_msgs.append(msg_copy)
+                elif isinstance(msg, dict) and "content" in msg and isinstance(msg["content"], str) and len(msg["content"]) > max_chars:
+                    m_copy = dict(msg)
+                    m_copy["content"] = m_copy["content"][:max_chars] + "\n\n[Context truncated for fallback capacity]"
+                    new_msgs.append(m_copy)
+                else:
+                    new_msgs.append(msg)
+            return new_msgs
+        elif hasattr(input_val, "messages") and isinstance(input_val.messages, list):
+            new_msgs = []
+            for msg in input_val.messages:
+                if hasattr(msg, "content") and isinstance(msg.content, str) and len(msg.content) > max_chars:
+                    truncated_content = msg.content[:max_chars] + "\n\n[Context truncated for fallback capacity]"
+                    msg_copy = type(msg)(content=truncated_content)
+                    new_msgs.append(msg_copy)
+                else:
+                    new_msgs.append(msg)
+            # Create shallow copy of prompt with adapted messages
+            try:
+                adapted_prompt = type(input_val)(messages=new_msgs)
+                return adapted_prompt
+            except Exception:
+                return new_msgs
+        return input_val
+
     def invoke(self, input: Any, config: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
         try:
             res = self.primary_llm.invoke(input, config=config, **kwargs)
@@ -47,7 +84,8 @@ class FallbackLLMWrapper(Runnable):
                 logger.warning(msg_warn)
                 print(f"\n[WARNING] {msg_warn}")
                 try:
-                    res = self.fallback_llm.invoke(input, config=config, **kwargs)
+                    adapted_input = self._adapt_input_for_fallback(input)
+                    res = self.fallback_llm.invoke(adapted_input, config=config, **kwargs)
                     msg_fb = f"[LLM Call] Served by fallback provider: {self.fallback_name}"
                     logger.info(msg_fb)
                     print(f"[INFO] {msg_fb}")
@@ -77,7 +115,7 @@ _primary_llm = ChatNVIDIA(
     api_key=os.getenv("NVIDIA_API_KEY"),
     temperature=0.6,
     max_completion_tokens=8192,
-    timeout=120,
+    timeout=60,
     model_kwargs={
         "chat_template_kwargs": {"enable_thinking": True},
         "reasoning_budget": 512  # Streamlined reasoning for fast generation
@@ -90,7 +128,7 @@ _primary_verifier_llm = ChatNVIDIA(
     api_key=os.getenv("NVIDIA_API_KEY"),
     temperature=0.1,  # Strict factual consistency
     max_completion_tokens=2048,
-    timeout=60,
+    timeout=30,
     model_kwargs={
         "chat_template_kwargs": {"enable_thinking": False},
     }
@@ -101,9 +139,10 @@ groq_key = os.getenv("GROQ_API_KEY")
 openai_key = os.getenv("OPENAI_API_KEY")
 
 if groq_key and len(groq_key) > 10 and not groq_key.startswith("dummy"):
-    groq_primary_model = os.getenv("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+    groq_primary_model = os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-120b")
+    groq_verifier_model = os.getenv("GROQ_VERIFIER_MODEL", "openai/gpt-oss-20b")
     _fallback_llm = ChatOpenAI(model=groq_primary_model, api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.6, timeout=60)
-    _fallback_verifier_llm = ChatOpenAI(model="llama-3.1-8b-instant", api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.1, timeout=30)
+    _fallback_verifier_llm = ChatOpenAI(model=groq_verifier_model, api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.1, timeout=30)
     _fb_name = f"Groq ({groq_primary_model})"
 elif openai_key and len(openai_key) > 10 and not openai_key.startswith("sk-dummy") and not openai_key.startswith("dummy"):
     _fallback_llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0.6, timeout=60)
@@ -115,7 +154,7 @@ else:
     _fb_name = "None"
 
 llm = FallbackLLMWrapper(primary_llm=_primary_llm, fallback_llm=_fallback_llm, primary_name="NVIDIA-Nemotron-30B", fallback_name=_fb_name)
-verifier_llm = FallbackLLMWrapper(primary_llm=_primary_verifier_llm, fallback_llm=_fallback_verifier_llm, primary_name="NVIDIA-Llama-8B", fallback_name=_fb_name)
+verifier_llm = FallbackLLMWrapper(primary_llm=_primary_verifier_llm, fallback_llm=_fallback_verifier_llm, primary_name="NVIDIA-Nemotron-30B", fallback_name=_fb_name)
 
 def get_llm():
     """Returns the configured primary/fallback LLM client."""

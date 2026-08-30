@@ -95,13 +95,26 @@ server restarts. Currently Vault QA only queries the current session's notes.
 ### 13. One-Click Report Export Toolbar, BibTeX/APA Citation Generators & Wikilinks (Resolved)
 - **Fix:** Added export toolbar (Copy Markdown, Download `.md`, Export PDF, Word count & read time), automated BibTeX / APA citation copiers, and interactive Obsidian `[[wikilink]]` badge navigators in `web/js/app.js` and `web/css/styles.css`.
 
----
+### 14. Dynamic Literature Volume Scraper Controls (Resolved)
+- **Fix:** Added dynamic volume scraper options (5, 10, Top 15 Default, 20, 30 papers) on landing hero chips, studio badges, and tool menus with `localStorage` persistence and natural language query extraction (e.g., "research with 20 papers").
 
-## 🟡 Under Active Development & Planned Features
+### 15. Event-Loop Safe Dispatcher Concurrency (Resolved)
+- **Fix:** Replaced static `asyncio.Semaphore` and `asyncio.Lock` instances in `backend/dispatcher.py` with lazy, dynamic properties bound to `asyncio.get_running_loop()` to prevent `RuntimeError: bound to a different event loop` across threaded ASGI workers.
+
+### 16. Multi-Provider Fallback Resilience & Input Adaptation (Resolved)
+- **Fix:** Integrated `FallbackLLMWrapper` in `backend/agents.py` with automatic input compression (`_adapt_input_for_fallback`) to protect fallback provider rate limits (e.g. Groq TPM). Upgraded default Groq fallback models to high-capacity `openai/gpt-oss-120b` (synthesis) and `openai/gpt-oss-20b` (verifier).
+
+### 17. Scholarly API Hardening (Resolved)
+- **Fix:** Converted OpenAlex work URIs to `https://api.openalex.org/works/W...` with polite-pool headers in `backend/scholarly.py`. Filtered Semantic Scholar recommendations seed IDs strictly to valid S2 paper IDs or Corpus IDs to eliminate HTTP 400 Bad Request errors.
+
+### 18. UX-First Refinements: Intelligent Scroll, Auto-Resize Composer & Abort Controls (Resolved)
+- **Fix:** Added user-aware scroll threshold detection and floating `↓ New messages` jump pill (`#jumpToLatestBtn`). Textarea dynamically auto-expands from 1 to 5 lines with content. Send button transforms into `■ Stop` generation button wired to standard client-side `AbortController`. Added contextual assistant action chips (`Deep Research`, `Copy`, `Report`, `Scales of Ma'at`) beneath messages for zero-friction follow-ups.
+
+---
 
 ## 🔵 Planned Features & Architectural Milestones
 
-### 9. The "Pantheon of Rigor": Adversarial Peer-Review Board (On Hold - Research Pending)
+### The "Pantheon of Rigor": Adversarial Peer-Review Board (On Hold - Research Pending)
 **Vision & Philosophy:** Modern academic publishing and arXiv are flooded with low-quality,
 jargon-heavy, regurgitated papers with zero genuine novelty ("complicated technical bullshit").
 To ensure Thoth-generated intelligence reports and identified knowledge gaps reach publication-grade
@@ -117,12 +130,12 @@ greatest scientific and philosophical minds:
 
 ---
 
-## ✅ Resolved (August 2026 Session)
+## ✅ Resolved Summary (August 2026 Refinements)
 
-- SSE stream not rendering → Fixed: sse_starlette sends CRLF (\r\n\r\n), not LF (\n\n). Added buffer.replace(/\r\n/g, '\n') before split in app.js.
-- "hi" triggering 8-agent swarm → Fixed: Default mode = fast_chat. Research requires explicit button toggle.
-- Browser caching stale app.js → Fixed: Version bumped to ?v=3.5 in index.html.
-- Confident AI warning spam → Fixed: logging.getLogger("confident").setLevel(CRITICAL).
-- Casual queries mis-routed to research → Fixed: handleChatSend() simplified routing.
-- Report export toolbar & BibTeX/APA copy → Added one-click Markdown/PDF export and citation generators.
-- Interactive Obsidian wikilinks → Added clickable badges in report and chat feeds.
+- **SSE Stream CRLF Normalization**: Resolved sse_starlette line break parsing issues in `app.js`.
+- **Default Mode Alignment**: Default mode set to `fast_chat` with opt-in Deep Research swarm.
+- **Event-Loop Isolation**: Thread-safe per-loop lock management in `backend/dispatcher.py`.
+- **OpenAlex & S2 API Compliance**: Hardened API URLs and ID validation in `backend/scholarly.py`.
+- **Multi-Provider Fallback**: High-capacity `openai/gpt-oss-120b` fallback with automatic prompt compression.
+- **UX Controls**: Intelligent non-hijacking scroll, stop generation abort controller, auto-resizing composer, and contextual message action chips.
+- **Full Test Pass**: 191 / 191 regression tests passing + 100% persona simulation and Phase 7 E2E evaluations.

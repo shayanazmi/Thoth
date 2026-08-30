@@ -36,14 +36,44 @@ class Dispatcher:
         self.cooloff_seconds = cooloff_seconds
         self.min_interval_seconds = min_interval_seconds
 
-        self._semaphore = asyncio.Semaphore(max_concurrent)
         self._state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
         self._consecutive_failures = 0
         self._last_failure_time = 0.0
         self._last_call_time = 0.0
         self._half_open_in_flight = False
-        self._lock = asyncio.Lock()
-        self._rate_lock = asyncio.Lock()
+        self._semaphores = {}
+        self._locks = {}
+        self._rate_locks = {}
+
+    @property
+    def _semaphore(self) -> asyncio.Semaphore:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.Semaphore(self.max_concurrent)
+        if loop not in self._semaphores:
+            self._semaphores[loop] = asyncio.Semaphore(self.max_concurrent)
+        return self._semaphores[loop]
+
+    @property
+    def _lock(self) -> asyncio.Lock:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.Lock()
+        if loop not in self._locks:
+            self._locks[loop] = asyncio.Lock()
+        return self._locks[loop]
+
+    @property
+    def _rate_lock(self) -> asyncio.Lock:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.Lock()
+        if loop not in self._rate_locks:
+            self._rate_locks[loop] = asyncio.Lock()
+        return self._rate_locks[loop]
 
 
     @property

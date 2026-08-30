@@ -109,6 +109,18 @@
               <button class="preset-chip" data-query="LLM Mechanistic Interpretability sparse autoencoders">Mechanistic Interpretability</button>
               <button class="preset-chip" data-query="Post-Keynesian Stock-Flow Consistent macro models">Macroeconomic SFC Models</button>
             </div>
+            <div class="prompt-volume-row">
+              <span style="font-size:0.75rem;color:hsl(var(--muted-foreground));display:inline-flex;align-items:center;gap:4px;">
+                <i data-lucide="book-open" style="width:12px;height:12px;color:hsl(var(--primary));"></i> Papers to analyze:
+              </span>
+              <div class="volume-chip-group" id="heroVolumeGroup">
+                <button class="volume-chip" data-volume="5">5 Papers</button>
+                <button class="volume-chip" data-volume="10">10 Papers</button>
+                <button class="volume-chip active" data-volume="15">Top 15 Papers (Default)</button>
+                <button class="volume-chip" data-volume="20">20 Papers</button>
+                <button class="volume-chip" data-volume="30">30 Papers</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -245,6 +257,12 @@
           </div>
         </div>
 
+        <!-- Jump to Latest Floating Button -->
+        <button class="jump-to-latest-btn hidden" id="jumpToLatestBtn" title="Jump to latest message">
+          <i data-lucide="arrow-down" style="width:13px;height:13px;"></i>
+          <span>New messages</span>
+        </button>
+
         <!-- Modern ChatGPT / Gemini Style Chat Input Bar -->
         <div class="chat-input-bar">
           
@@ -292,6 +310,19 @@
                 <div class="tool-item-desc">Direct instant responses without web search</div>
               </div>
             </div>
+
+            <div class="tool-menu-divider"></div>
+            <div class="tool-menu-section-header">
+              <i data-lucide="book-open" style="width:12px;height:12px;color:hsl(var(--primary));"></i>
+              <span>Papers to Scrape & Analyze</span>
+            </div>
+            <div class="paper-volume-options-grid" id="paperVolumeOptionsGrid">
+              <button class="volume-option-btn" data-volume="5">5 Papers (Fast)</button>
+              <button class="volume-option-btn" data-volume="10">10 Papers (Balanced)</button>
+              <button class="volume-option-btn active" data-volume="15">Top 15 Papers (Default)</button>
+              <button class="volume-option-btn" data-volume="20">20 Papers (Broad)</button>
+              <button class="volume-option-btn" data-volume="30">30 Papers (Exhaustive)</button>
+            </div>
           </div>
 
           <!-- Input Container -->
@@ -307,6 +338,11 @@
                 <div class="active-mode-badge" id="activeModeBadge" title="Click to change mode">
                   <i data-lucide="sparkles" style="width:12px;height:12px;"></i>
                   <span id="activeModeLabel">Auto Router</span>
+                  <i data-lucide="chevron-down" style="width:10px;height:10px;opacity:0.6;"></i>
+                </div>
+                <div class="paper-volume-badge" id="paperVolumeBadge" title="Click to change number of papers">
+                  <i data-lucide="book-open" style="width:12px;height:12px;"></i>
+                  <span id="paperVolumeLabel">15 Papers</span>
                   <i data-lucide="chevron-down" style="width:10px;height:10px;opacity:0.6;"></i>
                 </div>
               </div>
