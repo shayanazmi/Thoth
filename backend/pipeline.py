@@ -37,11 +37,22 @@ import logging
 from backend.memory.vault import write_note, read_note, DEFAULT_VAULT_DIR
 from backend.memory.db import DEFAULT_DB_PATH
 from backend.memory.index import index_note, hybrid_search
-from backend.memory.session import SessionMemory, DEFAULT_TOKEN_BUDGET
+from backend.memory.session import (
+    SessionMemory,
+    DEFAULT_TOKEN_BUDGET,
+    count_tokens,
+    truncate_text_to_tokens,
+)
+from backend.reports import patch_report_section
+from backend.conversation import (
+    detect_escalation_intent,
+    EscalationState,
+)
 from backend.telemetry import observe
 
 logger = logging.getLogger("ThothPipeline")
 DEFAULT_MAX_CONTEXT_TOKENS = 6000
+
 
 def _slugify(text: str, max_len: int = 40) -> str:
     """Creates a clean filename/identifier slug."""
@@ -49,47 +60,6 @@ def _slugify(text: str, max_len: int = 40) -> str:
     cleaned = re.sub(r"_+", "_", cleaned).strip("_")
     return cleaned[:max_len] if cleaned else "note"
 
-def count_tokens(text: str, model_encoding: str = "cl100k_base") -> int:
-    """Counts token count of a given string using tiktoken."""
-    if not text:
-        return 0
-    try:
-        encoding = tiktoken.get_encoding(model_encoding)
-        return len(encoding.encode(text))
-    except Exception:
-        return len(text) // 4
-
-def truncate_text_to_tokens(text: str, max_tokens: int, model_encoding: str = "cl100k_base") -> str:
-    """Truncates text so its token count does not exceed max_tokens, preserving structural boundaries where practical."""
-    if not text or max_tokens <= 0:
-        return ""
-    try:
-        encoding = tiktoken.get_encoding(model_encoding)
-        tokens = encoding.encode(text)
-        if len(tokens) <= max_tokens:
-            return text
-        logger.warning(f"[TOKEN BUDGET] Truncating context text from {len(tokens)} tokens to {max_tokens} token ceiling.")
-        print(f"\n[WARNING] [TOKEN BUDGET] Truncating context text from {len(tokens)} tokens to {max_tokens} token ceiling.")
-        raw_truncated = encoding.decode(tokens[:max_tokens])
-        min_len = int(len(raw_truncated) * 0.75)
-        for delim in ["\n\n--- Source:", "\n\n", ".\n", "\n"]:
-            last_idx = raw_truncated.rfind(delim)
-            if last_idx >= min_len:
-                return raw_truncated[:last_idx].strip()
-        return raw_truncated
-    except Exception:
-        char_limit = max_tokens * 4
-        if len(text) > char_limit:
-            logger.warning(f"[TOKEN BUDGET] Truncating text from {len(text)} chars to {char_limit} chars.")
-            print(f"\n[WARNING] [TOKEN BUDGET] Truncating text from {len(text)} chars to {char_limit} chars.")
-            raw_truncated = text[:char_limit]
-            min_len = int(len(raw_truncated) * 0.75)
-            for delim in ["\n\n--- Source:", "\n\n", ".\n", "\n"]:
-                last_idx = raw_truncated.rfind(delim)
-                if last_idx >= min_len:
-                    return raw_truncated[:last_idx].strip()
-            return raw_truncated
-        return text
 
 def fit_context_to_token_budget(
     topic: str,
@@ -760,9 +730,19 @@ def route_followup_intent(
     user_query: str
 ) -> Dict[str, str]:
     """
-    Evaluates follow-up query against research state to route into LOCAL_QA, WEB_SEARCH, or REPORT_EXPANSION.
+    Evaluates follow-up query against research state to route into
+    LOCAL_QA, WEB_SEARCH, REPORT_EXPANSION, or DEEP_RESEARCH_BRANCH.
     Applies strict schema confinement against small-model structured output drift.
     """
+    # 1. Fast path for explicit escalation intent
+    esc = detect_escalation_intent(user_query)
+    if esc["state"] == EscalationState.RESEARCH_READY:
+        return {
+            "route": "DEEP_RESEARCH_BRANCH",
+            "reasoning": f"Explicit research intent detected: {esc['reason']}",
+            "search_query": user_query,
+        }
+
     raw_route = router_chain.invoke({
         "topic": topic,
         "mindmap_summary": mindmap_summary,
@@ -775,12 +755,12 @@ def route_followup_intent(
         route_data = {}
 
     route = str(route_data.get("route", "LOCAL_QA")).upper().strip()
-    if route not in ("LOCAL_QA", "WEB_SEARCH", "REPORT_EXPANSION"):
+    if route not in ("LOCAL_QA", "WEB_SEARCH", "REPORT_EXPANSION", "DEEP_RESEARCH_BRANCH"):
         route = "LOCAL_QA"
 
     reasoning = str(route_data.get("reasoning", "Autonomous routing decision."))
     search_query = str(route_data.get("search_query", "")).strip()
-    if route == "WEB_SEARCH" and not search_query:
+    if route in ("WEB_SEARCH", "DEEP_RESEARCH_BRANCH") and not search_query:
         search_query = f"{topic} {user_query}"
 
     return {
@@ -788,6 +768,7 @@ def route_followup_intent(
         "reasoning": reasoning,
         "search_query": search_query
     }
+
 
 
 def stream_followup_turn(
@@ -1018,8 +999,10 @@ def stream_followup_turn(
         }
 
     elif route == "REPORT_EXPANSION":
-        # Draft a new section to expand the synthesis report with token budgeting
-        trimmed_report = truncate_text_to_tokens(report, int(max_context_tokens * 0.4))
+        # Draft a new or revised section for the synthesis report
+        trimmed_report = truncate_text_to_tokens(
+            report, int(max_context_tokens * 0.4)
+        )
         raw_draft = report_expander_chain.invoke({
             "topic": topic,
             "user_query": user_query,
@@ -1027,14 +1010,26 @@ def stream_followup_turn(
             "report_overview": trimmed_report[:1000]
         })
         section_draft = strip_chain_of_thought(raw_draft)
-        
-        updated_report = report.strip() + "\n\n" + section_draft.strip()
+
+        # Detect heading in section draft or fallback to user query
+        heading_match = re.search(r"^(#{1,6})\s+(.+)$", section_draft, re.MULTILINE)
+        section_title = heading_match.group(2).strip() if heading_match else user_query
+
+        # Apply safe in-place section patch
+        updated_report, was_replaced = patch_report_section(
+            original_markdown=report,
+            section_title=section_title,
+            new_content=section_draft,
+        )
         report = updated_report
         current_state["report"] = updated_report
         yield "report_expansion", {
             "new_section": section_draft,
-            "updated_report": updated_report
+            "updated_report": updated_report,
+            "was_in_place_replacement": was_replaced,
+            "section_title": section_title,
         }
+
         
         # Update mindmap node for the new section
         new_node_id = f"section_{turn_index}"

@@ -443,7 +443,129 @@ Format your response cleanly in structured Markdown."""
     if not judge_executed:
         print(f"  {_YELLOW}[INFO] Live GLM 5.2 Judge skipped or in offline mode. Telemetry summary verified.{_RESET}")
 
-    print(format_header("ALL 7 DIAGNOSTIC LAYERS COMPLETED"))
+    # =========================================================================
+    # LAYER 8: CONVERSATION ESCALATION & INTENT DIAGNOSTICS
+    # =========================================================================
+    print(format_header("LAYER 8: CONVERSATION ESCALATION & INTENT DIAGNOSTICS"))
+    from backend.conversation import (
+        EscalationState,
+        detect_escalation_intent,
+        synthesize_research_mandate,
+        evaluate_clarification_need,
+    )
+    from backend.reports import (
+        find_markdown_sections,
+        patch_report_section,
+        validate_report_structure,
+    )
+
+    t0 = time.time()
+    # 8.1 Explicit Research Trigger
+    esc_exp = detect_escalation_intent("Research this deeply with recent papers")
+    status_8_1 = "PASS" if esc_exp["state"] == EscalationState.RESEARCH_READY else "FAIL"
+    print(format_sublayer("Sub-layer 8.1: Explicit Research Trigger Detection", status_8_1, f"State: {esc_exp['state']} | Confidence: {esc_exp['confidence']}"))
+    telemetry_data["layers"]["8.1_explicit_escalation"] = status_8_1
+
+    # 8.2 Implicit Hypothesis Candidate Trigger
+    diag_turns = [
+        {"user": "Solid state batteries suffer from dendrite growth.", "assistant": "Yes, interfacial resistance is high."},
+        {"user": "What if ALD alumina coating protects the LLZO interface?", "assistant": "ALD alumina can suppress dendrites."}
+    ]
+    esc_cand = detect_escalation_intent("Is there any empirical proof or benchmark in recent papers?", chat_turns=diag_turns)
+    status_8_2 = "PASS" if esc_cand["state"] == EscalationState.RESEARCH_CANDIDATE and esc_cand["prompt_user"] else "FAIL"
+    print(format_sublayer("Sub-layer 8.2: Implicit Hypothesis Signal Detection", status_8_2, f"State: {esc_cand['state']} | Prompt User: {esc_cand['prompt_user']}"))
+    telemetry_data["layers"]["8.2_implicit_escalation"] = status_8_2
+
+    # 8.3 Casual Inquiry Isolation
+    esc_chat = detect_escalation_intent("Why are transformers called transformers?")
+    status_8_3 = "PASS" if esc_chat["state"] == EscalationState.CHAT and not esc_chat["prompt_user"] else "FAIL"
+    print(format_sublayer("Sub-layer 8.3: Casual Inquiry Isolation", status_8_3, f"State: {esc_chat['state']}"))
+    telemetry_data["layers"]["8.3_casual_isolation"] = status_8_3
+
+    # =========================================================================
+    # LAYER 9: RESEARCH MANDATE SYNTHESIS & CONTEXT INHERITANCE DIAGNOSTICS
+    # =========================================================================
+    print(format_header("LAYER 9: RESEARCH MANDATE & CONTEXT INHERITANCE DIAGNOSTICS"))
+    mandate_sample = synthesize_research_mandate(
+        user_query="Can you research this?",
+        chat_turns=diag_turns,
+        conversation_summary="ALD alumina prevents reduction of LLZO."
+    )
+    status_9_1 = "PASS" if len(mandate_sample.hypotheses) >= 1 or len(mandate_sample.known_facts) >= 1 else "FAIL"
+    print(format_sublayer("Sub-layer 9.1: Context & Hypothesis Extraction", status_9_1, f"Hypotheses: {len(mandate_sample.hypotheses)} | Known Facts: {len(mandate_sample.known_facts)}"))
+    telemetry_data["layers"]["9.1_mandate_extraction"] = status_9_1
+
+    status_9_2 = "PASS" if mandate_sample.topic != "Can you research this?" else "FAIL"
+    print(format_sublayer("Sub-layer 9.2: Substantive Pronoun Reference Resolution", status_9_2, f"Resolved Topic: '{mandate_sample.topic[:40]}...'"))
+    telemetry_data["layers"]["9.2_pronoun_resolution"] = status_9_2
+
+    # =========================================================================
+    # LAYER 10: PRE-FLIGHT CLARIFICATION GATE DIAGNOSTICS
+    # =========================================================================
+    print(format_header("LAYER 10: PRE-FLIGHT CLARIFICATION GATE DIAGNOSTICS"))
+    # Broad query
+    broad_mandate = synthesize_research_mandate("Batteries")
+    clar_broad = evaluate_clarification_need(broad_mandate)
+    status_10_1 = "PASS" if clar_broad.needs_clarification and len(clar_broad.options) >= 2 else "FAIL"
+    print(format_sublayer("Sub-layer 10.1: Broad Topic Ambiguity Detection", status_10_1, f"Options Generated: {len(clar_broad.options)}"))
+    telemetry_data["layers"]["10.1_broad_clarification"] = status_10_1
+
+    # Specific query bypass
+    spec_mandate = synthesize_research_mandate("2026 CRISPR Prime Editing Off-Target Fidelity in Human T-Cells")
+    clar_spec = evaluate_clarification_need(spec_mandate)
+    status_10_2 = "PASS" if not clar_spec.needs_clarification else "FAIL"
+    print(format_sublayer("Sub-layer 10.2: Specific Query Immediate Bypass", status_10_2, f"Needs Clarification: {clar_spec.needs_clarification}"))
+    telemetry_data["layers"]["10.2_specific_bypass"] = status_10_2
+
+    # Inherited chat constraints bypass
+    clar_inherited = evaluate_clarification_need(mandate_sample)
+    status_10_3 = "PASS" if not clar_inherited.needs_clarification else "FAIL"
+    print(format_sublayer("Sub-layer 10.3: Inherited Chat Constraints Bypass", status_10_3, f"Needs Clarification: {clar_inherited.needs_clarification}"))
+    telemetry_data["layers"]["10.3_inherited_bypass"] = status_10_3
+
+    # =========================================================================
+    # LAYER 11: LIVING REPORT SECTION PATCHING & INTEGRITY DIAGNOSTICS
+    # =========================================================================
+    print(format_header("LAYER 11: LIVING REPORT SECTION PATCHING DIAGNOSTICS"))
+    test_md = """# Research Synthesis
+## Section 1: Intro
+Introduction body text.
+## Section 2: Findings
+Old findings body text.
+## Section 3: Open Questions
+Open questions body text."""
+
+    new_sec_2 = """## Section 2: Findings
+Updated 2026 findings with verified claims [[src-paper_1]]."""
+
+    patched_md, was_replaced = patch_report_section(test_md, "Section 2: Findings", new_sec_2)
+    status_11_1 = "PASS" if was_replaced and "Updated 2026 findings" in patched_md and "## Section 1: Intro" in patched_md else "FAIL"
+    print(format_sublayer("Sub-layer 11.1: In-Place Section Replacement & Citation Retention", status_11_1, f"Replaced: {was_replaced}"))
+    telemetry_data["layers"]["11.1_section_patching"] = status_11_1
+
+    valid_md = validate_report_structure(patched_md)
+    broken_md = validate_report_structure("---\ntype: broken\n# Missing Frontmatter Close")
+    status_11_2 = "PASS" if valid_md and not broken_md else "FAIL"
+    print(format_sublayer("Sub-layer 11.2: Markdown Structural Integrity Validation", status_11_2, f"Valid: {valid_md} | Broken Rejected: {not broken_md}"))
+    telemetry_data["layers"]["11.2_structure_validation"] = status_11_2
+
+    # =========================================================================
+    # LAYER 12: PROTECTED MATERIAL & CONTINUOUS RESEARCH ORCHESTRATION
+    # =========================================================================
+    print(format_header("LAYER 12: PROTECTED MATERIAL & END-TO-END WORKFLOW DIAGNOSTICS"))
+    feynman_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "handling api limit like feynman")
+    feynman_intact = os.path.exists(feynman_dir) and len(os.listdir(feynman_dir)) >= 5
+    status_12_1 = "PASS" if feynman_intact else "FAIL"
+    print(format_sublayer("Sub-layer 12.1: Protected Research Directory (Feynman) Integrity", status_12_1, f"Path: {feynman_dir} | Files: {len(os.listdir(feynman_dir)) if os.path.exists(feynman_dir) else 0}"))
+    telemetry_data["layers"]["12.1_protected_feynman_dir"] = status_12_1
+
+    # End-to-end Chat -> Mandate -> Research readiness
+    status_12_2 = "PASS" if status_8_1 == "PASS" and status_9_1 == "PASS" and status_10_3 == "PASS" and status_11_1 == "PASS" else "FAIL"
+    print(format_sublayer("Sub-layer 12.2: Continuous Chat -> Mandate -> Research Transition", status_12_2, f"Workflow Status: {'OPERATIONAL' if status_12_2 == 'PASS' else 'DEGRADED'}"))
+    telemetry_data["layers"]["12.2_continuous_workflow"] = status_12_2
+
+    print(format_header("ALL 12 DIAGNOSTIC LAYERS COMPLETED"))
+
 
 
 if __name__ == "__main__":

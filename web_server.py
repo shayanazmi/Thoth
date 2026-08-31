@@ -27,9 +27,16 @@ from backend.orchestrator import stream_research_pipeline
 from backend.pipeline import stream_followup_turn
 from backend.agents import direct_chat_chain, strip_chain_of_thought
 from backend.memory.vault import list_notes, read_note, DEFAULT_VAULT_DIR
+from backend.conversation import (
+    synthesize_research_mandate,
+    evaluate_clarification_need,
+    detect_escalation_intent,
+    EscalationState,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ThothWebServer")
+
 
 app = FastAPI(title="Thoth Research Gateway", version="3.0.0")
 
@@ -129,9 +136,40 @@ async def api_stream_research(request: Request):
             }
             return
 
+        # Pre-flight Clarification Check
+        mandate = synthesize_research_mandate(
+            user_query=topic,
+            chat_turns=initial_turns,
+            conversation_summary=initial_summary,
+        )
+        clarification = evaluate_clarification_need(mandate)
+        if clarification.needs_clarification and not body.get("skip_clarification", False):
+            yield {
+                "event": "message",
+                "data": json.dumps({
+                    "node": "clarification_gate",
+                    "update": {
+                        "clarification_prompt": clarification.clarification_prompt,
+                        "options": clarification.options,
+                        "reason": clarification.reason,
+                    },
+                    "state": {
+                        "topic": topic,
+                        "mandate": mandate.to_dict(),
+                    }
+                })
+            }
+            if body.get("clarification_only", False):
+                yield {
+                    "event": "message",
+                    "data": json.dumps({"node": "complete", "state": {}})
+                }
+                return
+
         # Execute full multi-agent stream_research_pipeline in threadpool
         loop = asyncio.get_running_loop()
         queue = asyncio.Queue()
+
 
 
         def _worker():
@@ -352,8 +390,52 @@ def api_get_vault_note(note_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/research/clarify")
+async def api_check_clarification(request: Request):
+    """
+    Evaluates whether a proposed research topic requires scoping clarification.
+    """
+    body = await request.json()
+    topic = body.get("topic", "")
+    chat_turns = body.get("chat_turns", [])
+    summary = body.get("conversation_summary", "")
+
+    mandate = synthesize_research_mandate(
+        user_query=topic,
+        chat_turns=chat_turns,
+        conversation_summary=summary,
+    )
+    result = evaluate_clarification_need(mandate)
+    return JSONResponse(
+        content={
+            "mandate": mandate.to_dict(),
+            "clarification": result.to_dict(),
+        }
+    )
+
+
+@app.post("/api/conversation/escalate")
+async def api_detect_escalation(request: Request):
+    """
+    Evaluates conversational intent to detect whether dialogue has reached
+    a point where Deep Research should be suggested or triggered.
+    """
+    body = await request.json()
+    query = body.get("query", "")
+    chat_turns = body.get("chat_turns", [])
+    summary = body.get("conversation_summary", "")
+
+    escalation = detect_escalation_intent(
+        user_query=query,
+        chat_turns=chat_turns,
+        conversation_summary=summary,
+    )
+    return JSONResponse(content=escalation)
+
+
 # Mount Static Assets
 _WEB_DIR = os.path.join(_PROJECT_ROOT, "web")
+
 app.mount("/css", StaticFiles(directory=os.path.join(_WEB_DIR, "css")), name="css")
 app.mount("/js", StaticFiles(directory=os.path.join(_WEB_DIR, "js")), name="js")
 app.mount("/assets", StaticFiles(directory=os.path.join(_WEB_DIR, "assets")), name="assets")

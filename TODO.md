@@ -107,8 +107,20 @@ server restarts. Currently Vault QA only queries the current session's notes.
 ### 17. Scholarly API Hardening (Resolved)
 - **Fix:** Converted OpenAlex work URIs to `https://api.openalex.org/works/W...` with polite-pool headers in `backend/scholarly.py`. Filtered Semantic Scholar recommendations seed IDs strictly to valid S2 paper IDs or Corpus IDs to eliminate HTTP 400 Bad Request errors.
 
-### 18. UX-First Refinements: Intelligent Scroll, Auto-Resize Composer & Abort Controls (Resolved)
-- **Fix:** Added user-aware scroll threshold detection and floating `↓ New messages` jump pill (`#jumpToLatestBtn`). Textarea dynamically auto-expands from 1 to 5 lines with content. Send button transforms into `■ Stop` generation button wired to standard client-side `AbortController`. Added contextual assistant action chips (`Deep Research`, `Copy`, `Report`, `Scales of Ma'at`) beneath messages for zero-friction follow-ups.
+### 19. Conversational Brainstorming to Deep Research Escalation (Resolved)
+- **Fix:** Implemented 3-state escalation model (`CHAT`, `RESEARCH_CANDIDATE`, `RESEARCH_READY`) in `backend/conversation/escalation.py` with multi-turn implicit evidence signals and bilingual triggers (*"ispar research karo"*, *"check the literature"*).
+
+### 20. Semantic Research Mandate Synthesizer & Referential Resolution (Resolved)
+- **Fix:** Implemented `backend/conversation/mandate.py` to derive substantive research subjects from conversation context, resolving referential pronouns (*"this"*, *"that"*, *"the issue"*) and preserving user constraints/hypotheses without leaking chat noise to workers.
+
+### 21. Pre-Flight Clarification Gate (Resolved)
+- **Fix:** Implemented `backend/conversation/clarification.py` providing 2–3 scoping vectors for ambiguous broad topics (e.g. *"Batteries"*) while automatically bypassing clarification for specific or dialogue-constrained queries.
+
+### 22. Living Report In-Place Diffing & Patching (Resolved)
+- **Fix:** Implemented `backend/reports/` with code-fence-aware boundary parsing (`sections.py`), in-place section updates (`patch.py`), and Markdown structure validation (`validation.py`).
+
+### 23. 12-Layer System Diagnostics & Expanded Regression Suite (Resolved)
+- **Fix:** Expanded `diagnostic_test.py` to 12 continuous diagnostic layers and expanded test coverage to **224 unit & integration tests (100% pass rate)**.
 
 ---
 
@@ -132,10 +144,15 @@ greatest scientific and philosophical minds:
 
 ## ✅ Resolved Summary (August 2026 Refinements)
 
+- **Conversational Research Escalation**: Seamless 3-state escalation from chat to deep research.
+- **Semantic Mandate Synthesis**: Topic derivation with referential pronoun resolution and constraint inheritance.
+- **Pre-Flight Clarification Gating**: 2–3 scoping vectors on broad topics with automatic dialogue bypass.
+- **Living Report In-Place Updates**: Code-fence-aware section boundary parser and non-destructive diffing.
 - **SSE Stream CRLF Normalization**: Resolved sse_starlette line break parsing issues in `app.js`.
 - **Default Mode Alignment**: Default mode set to `fast_chat` with opt-in Deep Research swarm.
 - **Event-Loop Isolation**: Thread-safe per-loop lock management in `backend/dispatcher.py`.
 - **OpenAlex & S2 API Compliance**: Hardened API URLs and ID validation in `backend/scholarly.py`.
 - **Multi-Provider Fallback**: High-capacity `openai/gpt-oss-120b` fallback with automatic prompt compression.
 - **UX Controls**: Intelligent non-hijacking scroll, stop generation abort controller, auto-resizing composer, and contextual message action chips.
-- **Full Test Pass**: 191 / 191 regression tests passing + 100% persona simulation and Phase 7 E2E evaluations.
+- **Full Test & Diagnostic Pass**: **224 / 224 regression tests passing (100%)** + all 12 diagnostic layers green.
+
