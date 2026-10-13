@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 
+from backend.repositories.base import supabase_provider
 from backend.memory.vault import list_notes, read_note, DEFAULT_VAULT_DIR
 from backend.memory.graph import export_citation_subgraph
 from backend.memory.db import list_sessions, list_reports
@@ -63,11 +64,27 @@ def api_vault_graph(root_node: Optional[str] = None, max_depth: int = 2):
     return export_citation_subgraph(start_notes=start, max_depth=max_depth)
 
 @router.get("/sessions")
-def api_list_sessions(limit: int = 20):
+def api_list_sessions(limit: int = 50):
+    client = supabase_provider.get_client()
+    if client:
+        try:
+            res = client.table("sessions").select("*").order("updated_at", desc=True).limit(limit).execute()
+            if res.data is not None:
+                return res.data
+        except Exception as e:
+            logger.warning(f"Failed to query Supabase sessions: {e}")
     return list_sessions(limit=limit)
 
 @router.get("/reports")
-def api_list_reports(limit: int = 20):
+def api_list_reports(limit: int = 50):
+    client = supabase_provider.get_client()
+    if client:
+        try:
+            res = client.table("reports").select("*").order("created_at", desc=True).limit(limit).execute()
+            if res.data is not None:
+                return res.data
+        except Exception as e:
+            logger.warning(f"Failed to query Supabase reports: {e}")
     return list_reports(limit=limit)
 
 @router.post("/conversation/escalate")
