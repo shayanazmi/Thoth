@@ -48,6 +48,28 @@ class ThothApp {
     this.loadVaultNotes();
   }
 
+  _resolveUrl(endpoint) {
+    if (window.ThothAPI && typeof window.ThothAPI.resolveUrl === 'function') {
+      return window.ThothAPI.resolveUrl(endpoint);
+    }
+    const base = window.THOTH_CONFIG?.API_BASE_URL || '';
+    return `${base}${endpoint}`;
+  }
+
+  async _getHeaders(contentType = 'application/json') {
+    const headers = {};
+    if (contentType) headers['Content-Type'] = contentType;
+    if (window.ThothAuth && typeof window.ThothAuth.getAccessToken === 'function') {
+      try {
+        const token = await window.ThothAuth.getAccessToken();
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      } catch (e) {
+        console.warn('Failed to retrieve auth token:', e);
+      }
+    }
+    return headers;
+  }
+
   initElements() {
 
     this.landingView = document.getElementById('landingView');
@@ -433,9 +455,9 @@ class ThothApp {
     if (window.lucide) lucide.createIcons();
 
     try {
-      const resp = await fetch('/api/brainstorm/chat', {
+      const resp = await fetch(this._resolveUrl('/api/brainstorm/chat'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await this._getHeaders(),
         body: JSON.stringify({
           thinker_id: thinkerId,
           message: text,
@@ -633,12 +655,13 @@ class ThothApp {
       conversation_summary: (inheritContext && this.currentState?.conversation_summary) ? this.currentState.conversation_summary : ''
     };
 
-    fetch('/api/research/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: this.activeAbortController.signal
-    }).then(response => {
+    this._getHeaders().then(headers => {
+      fetch(this._resolveUrl('/api/research/stream'), {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload),
+        signal: this.activeAbortController.signal
+      }).then(response => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -707,6 +730,7 @@ class ThothApp {
         }
       }
       this.showToast('Failed to start research', 'alert-triangle');
+    });
     });
   }
 
@@ -822,12 +846,13 @@ class ThothApp {
       mode_override: mode
     };
 
-    fetch('/api/followup/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: this.activeAbortController.signal
-    }).then(response => {
+    this._getHeaders().then(headers => {
+      fetch(this._resolveUrl('/api/followup/stream'), {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload),
+        signal: this.activeAbortController.signal
+      }).then(response => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -896,6 +921,7 @@ class ThothApp {
         }
       }
       this.showToast('Connection failed', 'alert-triangle');
+    });
     });
   }
 
@@ -1403,15 +1429,17 @@ class ThothApp {
   // VAULT NOTES EXPLORER
   // ============================================================================
   loadVaultNotes() {
-    fetch('/api/vault/notes')
-      .then(res => res.json())
-      .then(data => {
-        this.vaultNotes = data.notes || [];
-        this.renderVaultNotesList(this.vaultNotes);
-        const countEl = document.getElementById('vaultCountBadge');
-        if (countEl) countEl.textContent = `${this.vaultNotes.length} notes`;
-      })
-      .catch(e => console.error('Failed to load vault notes:', e));
+    this._getHeaders().then(headers => {
+      fetch(this._resolveUrl('/api/vault/notes'), { headers })
+        .then(res => res.json())
+        .then(data => {
+          this.vaultNotes = data.notes || [];
+          this.renderVaultNotesList(this.vaultNotes);
+          const countEl = document.getElementById('vaultCountBadge');
+          if (countEl) countEl.textContent = `${this.vaultNotes.length} notes`;
+        })
+        .catch(e => console.error('Failed to load vault notes:', e));
+    });
   }
 
   renderVaultNotesList(notes) {
@@ -1440,14 +1468,16 @@ class ThothApp {
   }
 
   openNote(noteId) {
-    fetch(`/api/vault/note/${noteId}`)
-      .then(res => res.json())
-      .then(note => {
-        if (this.modalTitle) this.modalTitle.textContent = note.id;
-        if (this.modalBody) this.modalBody.innerHTML = marked.parse(note.content || '(Empty Note)');
-        if (this.noteModal) this.noteModal.classList.remove('hidden');
-      })
-      .catch(e => console.error('Failed to fetch note:', e));
+    this._getHeaders().then(headers => {
+      fetch(this._resolveUrl(`/api/vault/note/${noteId}`), { headers })
+        .then(res => res.json())
+        .then(note => {
+          if (this.modalTitle) this.modalTitle.textContent = note.id;
+          if (this.modalBody) this.modalBody.innerHTML = marked.parse(note.content || '(Empty Note)');
+          if (this.noteModal) this.noteModal.classList.remove('hidden');
+        })
+        .catch(e => console.error('Failed to fetch note:', e));
+    });
   }
 
   // ============================================================================

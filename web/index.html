@@ -7,8 +7,11 @@
 
   <link rel="icon" type="image/png" href="/assets/thoth_logo.png">
 
+  <link rel="stylesheet" href="/styles/styles.css">
+  <link rel="stylesheet" href="/styles/components.css">
   <link rel="stylesheet" href="/css/styles.css">
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -32,6 +35,10 @@
       <div class="telemetry-pill">
         <i data-lucide="database" style="width:12px;height:12px;color:#c99a6b;"></i>
         <span id="vaultCountBadge">0 notes</span>
+      </div>
+      <div class="telemetry-pill" id="authStatusPill" style="cursor:pointer;" title="Researcher Authentication & Endpoints">
+        <i data-lucide="shield" style="width:12px;height:12px;color:#e7c77b;"></i>
+        <span id="userAuthBadge">Guest Scribe</span>
       </div>
     </div>
 
@@ -413,11 +420,28 @@
     </div>
   </div>
 
+  <script src="/lib/config.js"></script>
+  <script src="/lib/supabase.js"></script>
+  <script src="/lib/api.js"></script>
+  <script src="/components/auth_modal.js"></script>
   <script src="/js/animations.js?v=3.5"></script>
   <script src="/js/app.js?v=3.5"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       if (window.lucide) lucide.createIcons();
+
+      const authPill = document.getElementById('authStatusPill');
+      if (authPill && window.ThothAuthModal) {
+        authPill.onclick = () => window.ThothAuthModal.show();
+      }
+
+      window.addEventListener('thoth:auth:state', (e) => {
+        const badge = document.getElementById('userAuthBadge');
+        if (badge) {
+          const user = window.ThothAuth?.currentUser;
+          badge.textContent = user?.email ? user.email.split('@')[0] : 'Guest Scribe';
+        }
+      });
     });
   </script>
 </body>

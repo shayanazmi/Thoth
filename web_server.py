@@ -513,6 +513,15 @@ async def api_brainstorm_spar(request: Request):
 
 _WEB_DIR = os.path.join(_PROJECT_ROOT, "web")
 
+if os.path.exists(os.path.join(_WEB_DIR, "styles")):
+    app.mount("/styles", StaticFiles(directory=os.path.join(_WEB_DIR, "styles")), name="styles")
+if os.path.exists(os.path.join(_WEB_DIR, "lib")):
+    app.mount("/lib", StaticFiles(directory=os.path.join(_WEB_DIR, "lib")), name="lib")
+if os.path.exists(os.path.join(_WEB_DIR, "components")):
+    app.mount("/components", StaticFiles(directory=os.path.join(_WEB_DIR, "components")), name="components")
+if os.path.exists(os.path.join(_WEB_DIR, "pages")):
+    app.mount("/pages", StaticFiles(directory=os.path.join(_WEB_DIR, "pages")), name="pages")
+
 app.mount("/css", StaticFiles(directory=os.path.join(_WEB_DIR, "css")), name="css")
 app.mount("/js", StaticFiles(directory=os.path.join(_WEB_DIR, "js")), name="js")
 app.mount("/assets", StaticFiles(directory=os.path.join(_WEB_DIR, "assets")), name="assets")
