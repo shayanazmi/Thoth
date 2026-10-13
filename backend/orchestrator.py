@@ -78,7 +78,10 @@ def create_initial_state(
         "conversation_summary": str(initial_summary or ""),
         "chat_turns": list(initial_turns or []),
         "rejected_claims": [],
-        "circular_replan_warnings": []
+        "circular_replan_warnings": [],
+        "integrity_status": "PENDING",
+        "integrity_result": {},
+        "is_verified": False
     }
 
 @observe(type="tool", description="Concurrently scrapes and extracts readable text from candidate URLs")
@@ -92,12 +95,34 @@ async def concurrent_scrape_urls(urls: List[str], dispatcher: Dispatcher = pipel
             "url": url,
             "domain": domain,
             "title": f"Source from {domain}",
-            "added_in_turn": 0
+            "added_in_turn": 0,
+            "extracted_text": "",
+            "scrape_status": "pending",
+            "scrape_error": None
         }
         try:
             res = await dispatcher.call(scrape_url.invoke, {"url": url})
-            return source_info, f"\n\n--- Source: {url} ---\n{res[:3000]}"
+            if isinstance(res, str) and (res.startswith("Could not scrape URL:") or res.startswith("(Failed to scrape:")):
+                source_info["extracted_text"] = ""
+                source_info["scrape_status"] = "failed"
+                source_info["scrape_error"] = str(res)
+                text_content = f"\n\n--- Source: {url} ---\n(Failed to scrape: {res})"
+            elif not res or not str(res).strip():
+                source_info["extracted_text"] = ""
+                source_info["scrape_status"] = "empty"
+                source_info["scrape_error"] = "Empty content extracted"
+                text_content = f"\n\n--- Source: {url} ---\n(Empty content)"
+            else:
+                extracted = str(res)[:3000]
+                source_info["extracted_text"] = extracted
+                source_info["scrape_status"] = "success"
+                source_info["scrape_error"] = None
+                text_content = f"\n\n--- Source: {url} ---\n{extracted}"
+            return source_info, text_content
         except Exception as e:
+            source_info["extracted_text"] = ""
+            source_info["scrape_status"] = "failed"
+            source_info["scrape_error"] = str(e)
             return source_info, f"\n\n--- Source: {url} ---\n(Failed to scrape: {e})"
 
     logger.info(f"[ORCHESTRATOR CONCURRENCY] Fanning out concurrent scrape requests for {len(urls)} URLs...")
@@ -125,7 +150,18 @@ async def concurrent_verifier_and_critic(state: Dict[str, Any], dispatcher: Disp
 
     if isinstance(verifier_res, Exception):
         logger.error(f"[ORCHESTRATOR CONCURRENCY] Verifier execution error / circuit trip: {verifier_res}")
-        verifier_update = {"verifier_feedback": "", "verification_results": [], "verification_status": f"UNAVAILABLE ({verifier_res})"}
+        verifier_update = {
+            "verifier_feedback": f"Verifier unavailable: {verifier_res}",
+            "verification_results": [],
+            "verification_status": f"UNAVAILABLE ({verifier_res})",
+            "integrity_status": "INCOMPLETE",
+            "is_verified": False,
+            "integrity_result": {
+                "status": "INCOMPLETE",
+                "failure_explanations": [f"Verifier execution error: {verifier_res}"],
+                "is_verified": False
+            }
+        }
     else:
         verifier_update = verifier_res
 
@@ -194,10 +230,24 @@ def stream_research_pipeline(
 
     if candidate_urls:
         scraped_content, new_sources = asyncio.run(concurrent_scrape_urls(candidate_urls, dispatcher))
-        cumulative_sources = list(existing_sources)
+        new_sources_by_url = {s.get("url"): s for s in new_sources if s.get("url")}
+
+        cumulative_sources = []
+        for s in existing_sources:
+            s_copy = dict(s)
+            u = s_copy.get("url")
+            if u in new_sources_by_url:
+                scraped_meta = new_sources_by_url[u]
+                s_copy["extracted_text"] = scraped_meta.get("extracted_text", "")
+                s_copy["scrape_status"] = scraped_meta.get("scrape_status", "success")
+                s_copy["scrape_error"] = scraped_meta.get("scrape_error")
+            cumulative_sources.append(s_copy)
+
+        existing_urls = {s.get("url") for s in cumulative_sources if s.get("url")}
         for s_info in new_sources:
-            if not any(s.get("url") == s_info["url"] for s in cumulative_sources):
+            if s_info.get("url") and s_info["url"] not in existing_urls:
                 cumulative_sources.append(s_info)
+                existing_urls.add(s_info["url"])
 
         scrape_update = {
             "scraped_content": scraped_content,
@@ -255,8 +305,11 @@ def stream_research_pipeline(
         logger.info(f"[ACT PHASE TIMING] Act phase (concurrent fan-out scrape + parallel verifier/critic) completed in {act_duration}s.")
         print(f"\n[TIMING] [ACT PHASE] Completed in {act_duration}s (Concurrent fan-out active).")
 
+        integrity_status = state.get("integrity_status") or ("FAILED" if state.get("verifier_feedback") else "PASSED")
         verifier_feedback = state.get("verifier_feedback", "")
-        if verifier_feedback:
+
+        # 1. Fail-closed Research Integrity Gate
+        if integrity_status != "PASSED" or verifier_feedback:
             for line in verifier_feedback.split("\n"):
                 clean_line = line.strip().lstrip("-*• ")
                 if clean_line and len(clean_line) > 10 and not clean_line.startswith("Verification"):
@@ -264,11 +317,23 @@ def stream_research_pipeline(
                         state.setdefault("rejected_claims", []).append(clean_line)
 
             if state["attempt"] <= state["max_retries"]:
-                logger.warning(f"[ORCHESTRATOR - REPLAN] Truth Guard flagged factual contradictions. Looping back to Writer (attempt {state['attempt']}/{state['max_retries']}).")
-                print(f"\n[REPLAN] Truth Guard flagged contradictions. Routing back to Writer to revise...")
+                logger.warning(f"[ORCHESTRATOR - REPLAN] Research Integrity Gate: {integrity_status}. Routing back to Writer to revise (attempt {state['attempt']}/{state['max_retries']}).")
+                print(f"\n[REPLAN] Research Integrity Gate ({integrity_status}). Routing back to Writer to revise...")
                 continue
             else:
-                logger.warning(f"[ORCHESTRATOR - REPLAN] Truth Guard flagged contradictions but max retries ({state['max_retries']}) hit. Proceeding to finalization.")
+                # Max retries exhausted: FAIL CLOSED!
+                state["integrity_status"] = f"INTEGRITY_{integrity_status}" if not str(integrity_status).startswith("INTEGRITY_") else integrity_status
+                state["is_verified"] = False
+                logger.warning(
+                    f"[ORCHESTRATOR - INTEGRITY GATE] Max retries reached with unresolved integrity failures ({integrity_status}). "
+                    f"Report finalized as UNVERIFIED ({state['integrity_status']}). Critic score has NO authority to override."
+                )
+                print(f"\n[GATE CLOSED] Finalizing report as {state['integrity_status']} (unverified).")
+                break
+
+        # 2. Quality check evaluated only if integrity passed
+        state["integrity_status"] = "PASSED"
+        state["is_verified"] = True
 
         score = state.get("score", 0.0)
         min_score = state.get("min_score", 6.5)
@@ -280,8 +345,21 @@ def stream_research_pipeline(
             print(f"\n[REPLAN] Score {score:.1f} < threshold {min_score}. Routing back to Writer for revision...")
             continue
         else:
-            logger.info(f"[ORCHESTRATOR - OBSERVE] Quality check passed with score {score:.1f}/10. Finalizing report.")
+            logger.info(f"[ORCHESTRATOR - OBSERVE] Quality check passed with score {score:.1f}/10. Integrity: PASSED. Finalizing report.")
             break
+
+    # Compile deterministic bibliography from verified sources
+    from backend.intellectual_rigour.integrity_gate import generate_deterministic_bibliography
+    final_report, deduped_sources, unresolved_citations = generate_deterministic_bibliography(
+        report_text=state.get("report", ""),
+        cumulative_sources=state.get("cumulative_sources", [])
+    )
+    state["report"] = final_report
+    if unresolved_citations:
+        state.setdefault("unresolved_citations", []).extend(unresolved_citations)
+        if state.get("is_verified", False):
+            state["is_verified"] = False
+            state["integrity_status"] = "INTEGRITY_FAILED"
 
     if cancel_event and cancel_event.is_set():
         logger.info("[ORCHESTRATOR] Cancel event detected before vault persistence.")
@@ -385,7 +463,9 @@ def persist_turn_to_vault(
     topic = state.get("topic", "Research Topic")
     draft = state.get("report") or state.get("draft", "")
     sources = state.get("cumulative_sources", [])
-    confidence = float(state.get("score", 8.0)) / 10.0
+    is_verified = bool(state.get("is_verified", False) and state.get("integrity_status") == "PASSED")
+    integrity_status = state.get("integrity_status", "UNKNOWN")
+    confidence = (float(state.get("score", 8.0)) / 10.0) if is_verified else 0.0
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     source_ids = []
@@ -398,17 +478,25 @@ def persist_turn_to_vault(
             src_id = f"{src_id}_{idx}"
         source_ids.append(src_id)
 
+        authors_str = ', '.join(s.get('authors', [])) if s.get('authors') else 'N/A'
+        pub_date = s.get('published_date') or 'N/A'
+        pmid_val = s.get('pmid') or 'N/A'
+        content_val = s.get('abstract', '') or s.get('snippet', '') or (s.get('extracted_text', '')[:1000] if s.get('extracted_text') else '(No abstract provided)')
+
         source_body = f"""# Source: {s.get('title', 'Retrieved Source')}
 
 - **URL**: {s.get('url', 'N/A')}
 - **Domain**: {s.get('domain', 'N/A')}
+- **Authors**: {authors_str}
+- **Published Date**: {pub_date}
 - **Source API**: {s.get('source_api', 'web')}
 - **DOI**: {s.get('doi', 'N/A')}
 - **ArXiv ID**: {s.get('arxiv_id', 'N/A')}
+- **PMID**: {pmid_val}
 - **Citation Count**: {s.get('citation_count', 0)}
 
 ## Content / Abstract
-{s.get('snippet', '') or s.get('abstract', '(No abstract provided)')}
+{content_val}
 """
         src_fm = {
             "type": "sources",
@@ -429,10 +517,14 @@ def persist_turn_to_vault(
     verification_results = state.get("verification_results", [])
     claims_list = extract_atomic_claims(draft, source_ids, verification_results=verification_results)
 
+    integrity_banner = ""
+    if not is_verified:
+        integrity_banner = f"> [!WARNING] Research Integrity Gate: {integrity_status}\n> This report is a draft and did not pass empirical claim-to-evidence verification.\n\n"
+
     if claims_list:
         claims_text = "\n".join(claims_list)
         topic_body = f"""# Topic: {topic}
-
+{integrity_banner}
 ## Claims
 {claims_text}
 
@@ -441,7 +533,7 @@ def persist_turn_to_vault(
 """
     else:
         topic_body = f"""# Topic: {topic}
-
+{integrity_banner}
 ## Synthesis Report
 {draft}
 """
@@ -449,6 +541,8 @@ def persist_turn_to_vault(
         "type": "topics",
         "created": now_iso,
         "confidence": round(confidence, 2),
+        "verified": is_verified,
+        "integrity_status": integrity_status,
         "sources": source_ids
     }
 

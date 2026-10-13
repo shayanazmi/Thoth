@@ -27,6 +27,7 @@ class SourceCandidate:
     arxiv_id: Optional[str] = None
     paper_id: Optional[str] = None
     relation: Optional[str] = None
+    pmid: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -41,6 +42,7 @@ class SourceCandidate:
             "arxiv_id": self.arxiv_id,
             "paper_id": self.paper_id,
             "relation": self.relation,
+            "pmid": self.pmid,
         }
 
     def to_formatted_snippet(self) -> str:
@@ -56,6 +58,8 @@ class SourceCandidate:
             extra.append(f"DOI: {self.doi}")
         if self.arxiv_id:
             extra.append(f"arXiv: {self.arxiv_id}")
+        if self.pmid:
+            extra.append(f"PMID: {self.pmid}")
         if self.source_api:
             extra.append(f"Source: {self.source_api}")
 
@@ -673,6 +677,7 @@ def parse_pubmed_json(results: List[Dict[str, Any]]) -> List[SourceCandidate]:
                 citation_count=None,
                 published_date=pub_date,
                 source_api="pubmed",
+                pmid=uid if uid else None,
             )
         )
     return candidates

@@ -28,10 +28,13 @@ class ThothApp {
       web_probe: { label: 'Web Probe', icon: 'globe' },
       local_qa: { label: 'Vault QA', icon: 'book-marked' },
       expand_report: { label: 'Expand Report', icon: 'file-plus' },
-      auto: { label: 'Auto Router', icon: 'sparkles' }
+      auto: { label: 'Auto Router', icon: 'sparkles' },
+      brainstorm: { label: 'Brainstorm', icon: 'brain' }
     };
 
     this.activeMode = 'fast_chat';
+    this.brainstormTurns = [];
+    this.selectedThinkerId = 'auto';
 
     this.scrapeTopN = parseInt(localStorage.getItem('thoth_scrape_top_n')) || 15;
 
@@ -62,6 +65,10 @@ class ThothApp {
     this.activeModeBadge = document.getElementById('activeModeBadge');
     this.activeModeLabel = document.getElementById('activeModeLabel');
     this.deepResearchToggle = document.getElementById('deepResearchToggle');
+    this.brainstormToggle = document.getElementById('brainstormToggle');
+    this.brainstormSelectorBar = document.getElementById('brainstormSelectorBar');
+    this.thinkerSelect = document.getElementById('thinkerSelect');
+    this.thinkerArchetypeLabel = document.getElementById('thinkerArchetypeLabel');
 
     this.paperVolumeBadge = document.getElementById('paperVolumeBadge');
     this.paperVolumeLabel = document.getElementById('paperVolumeLabel');
@@ -188,6 +195,18 @@ class ThothApp {
       }
     });
 
+    this.brainstormToggle?.addEventListener('click', () => {
+      if (this.activeMode === 'brainstorm') {
+        this.setMode('fast_chat');
+      } else {
+        this.setMode('brainstorm');
+      }
+    });
+
+    this.thinkerSelect?.addEventListener('change', (e) => {
+      this.handleThinkerSelectChange(e.target.value);
+    });
+
     document.querySelectorAll('.artifact-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const tab = e.target.getAttribute('data-tab');
@@ -266,6 +285,7 @@ class ThothApp {
     this.activeMode = mode;
     const info = this.modeLabels[mode] || { label: 'Chat', icon: 'message-square' };
     const isResearch = mode === 'deep_research';
+    const isBrainstorm = mode === 'brainstorm';
 
     if (this.activeModeLabel) {
       this.activeModeLabel.textContent = info.label;
@@ -275,19 +295,25 @@ class ThothApp {
     }
     if (this.deepResearchToggle) {
       this.deepResearchToggle.classList.toggle('active', isResearch);
-
-      const btnIcon = this.deepResearchToggle.querySelector('i[data-lucide]');
-      if (btnIcon) btnIcon.setAttribute('data-lucide', isResearch ? 'microscope' : 'microscope');
-      const btnSpan = this.deepResearchToggle.querySelector('span');
-      if (btnSpan) btnSpan.textContent = isResearch ? 'Deep Research' : 'Deep Research';
+    }
+    if (this.brainstormToggle) {
+      this.brainstormToggle.classList.toggle('active', isBrainstorm);
+    }
+    if (this.brainstormSelectorBar) {
+      this.brainstormSelectorBar.classList.toggle('hidden', !isBrainstorm);
     }
 
     if (this.chatSendBtn) {
-      this.chatSendBtn.innerHTML = `<i data-lucide="${isResearch ? 'zap' : 'arrow-up'}" style="width:15px;height:15px;"></i>`;
-      this.chatSendBtn.title = isResearch ? 'Launch Research Swarm' : 'Send Message';
-      this.chatSendBtn.style.background = isResearch
-        ? 'linear-gradient(135deg, hsl(32, 65%, 48%), hsl(42, 80%, 55%))'
-        : '';
+      const sendIcon = isResearch ? 'zap' : (isBrainstorm ? 'brain' : 'arrow-up');
+      this.chatSendBtn.innerHTML = `<i data-lucide="${sendIcon}" style="width:15px;height:15px;"></i>`;
+      this.chatSendBtn.title = isResearch ? 'Launch Research Swarm' : (isBrainstorm ? 'Spar with Thinker' : 'Send Message');
+      if (isResearch) {
+        this.chatSendBtn.style.background = 'linear-gradient(135deg, hsl(32, 65%, 48%), hsl(42, 80%, 55%))';
+      } else if (isBrainstorm) {
+        this.chatSendBtn.style.background = 'linear-gradient(135deg, #c99a6b, #8a5a2b)';
+      } else {
+        this.chatSendBtn.style.background = '';
+      }
     }
 
     document.querySelectorAll('.tool-menu-item').forEach(el => {
@@ -298,6 +324,7 @@ class ThothApp {
 
     const placeholders = {
       deep_research: 'Enter a topic to trigger the 8-agent research swarm & vault synthesis...',
+      brainstorm: 'Spar with the philosopher on your dilemma, hypothesis, or assumptions...',
       web_probe: 'Enter query for live targeted arXiv & web literature search...',
       local_qa: 'Ask a question over your indexed Obsidian notes & research report...',
       expand_report: 'Describe the section or comparison you want added to the report...',
@@ -366,6 +393,114 @@ class ThothApp {
     if (window.lucide) lucide.createIcons();
   }
 
+  handleThinkerSelectChange(thinkerId) {
+    this.selectedThinkerId = thinkerId;
+    const labels = {
+      auto: 'Auto Mode: Diagnoses Root Bottleneck',
+      aristotle: 'Aristotle: Categorical & Causal Architect',
+      descartes: 'Descartes: Foundational Reductionist',
+      bacon: 'Bacon: Eliminative Empiricist',
+      hume: 'Hume: Causal Skeptic & Confounder Detector',
+      darwin: 'Darwin: Evolutionary Selectionist',
+      popper: 'Popper: Falsificationist Warrior',
+      kuhn: 'Kuhn: Paradigmatic Strategist',
+      box: 'Box: Pragmatic Modeling Iterativist',
+      turing: 'Turing: Computational Operationalist',
+      simon: 'Simon: Bounded Rationalist'
+    };
+    if (this.thinkerArchetypeLabel) {
+      this.thinkerArchetypeLabel.textContent = labels[thinkerId] || labels.auto;
+    }
+  }
+
+  async sendBrainstormMessage(text) {
+    this.setGenerating(true);
+    if (!this.brainstormTurns) this.brainstormTurns = [];
+
+    const thinkerId = this.selectedThinkerId || (this.thinkerSelect ? this.thinkerSelect.value : 'auto');
+
+    const msgRow = document.createElement('div');
+    msgRow.className = 'chat-message-row assistant';
+    msgRow.innerHTML = `
+      <div class="chat-avatar"><img src="/assets/thoth_bust.jpg" alt="Thinker"></div>
+      <div class="chat-bubble">
+        <div class="thinker-chat-badge"><i data-lucide="brain" style="width:11px;height:11px;"></i> Sparring in progress...</div>
+        <div class="streaming-cursor"></div>
+      </div>
+    `;
+    this.chatFeed.appendChild(msgRow);
+    this.scrollToBottom(true);
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      const resp = await fetch('/api/brainstorm/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          thinker_id: thinkerId,
+          message: text,
+          chat_turns: this.brainstormTurns
+        })
+      });
+
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+
+      this.brainstormTurns.push({ user: text, assistant: data.reply });
+
+      let badgeLabel = `${data.thinker_name} · ${data.archetype}`;
+      if (data.auto_match) {
+        badgeLabel = `⚡ Auto-Matched: ${data.thinker_name} (${data.archetype})`;
+      }
+
+      let contentHtml = `
+        <div class="thinker-chat-badge">
+          <i data-lucide="award" style="width:11px;height:11px;"></i> ${badgeLabel}
+        </div>
+        <div class="prose">${marked.parse(data.reply)}</div>
+      `;
+
+      if (data.escalation_proposal && data.escalation_proposal.is_ready_for_research) {
+        const p = data.escalation_proposal;
+        const encodedTopic = encodeURIComponent(p.crystallized_topic || text);
+        contentHtml += `
+          <div class="escalation-action-card">
+            <div class="escalation-header">
+              <i data-lucide="sparkles" style="width:14px;height:14px;color:#c99a6b;"></i>
+              <span>Hypothesis Crystallized · Ready for Deep Research</span>
+            </div>
+            <div class="escalation-topic"><strong>Target Topic:</strong> ${p.crystallized_topic}</div>
+            <div class="escalation-hypothesis"><strong>Hypothesis:</strong> ${p.testable_hypothesis}</div>
+            <button class="btn-launch-escalated-research" onclick="window.app.launchEscalatedResearch('${encodedTopic}', '${data.thinker_id}')">
+              <i data-lucide="rocket" style="width:14px;height:14px;"></i>
+              <span>${p.action_pill_label || 'Launch Deep Research'}</span>
+            </button>
+          </div>
+        `;
+      }
+
+      msgRow.querySelector('.chat-bubble').innerHTML = contentHtml;
+      if (window.lucide) lucide.createIcons();
+      this.scrollToBottom(true);
+
+    } catch (err) {
+      msgRow.querySelector('.chat-bubble').innerHTML = `
+        <div class="prose" style="color:#f87171;">
+          <p><strong>Sparring Error:</strong> ${err.message}</p>
+        </div>
+      `;
+    } finally {
+      this.setGenerating(false);
+    }
+  }
+
+  launchEscalatedResearch(encodedTopic, thinkerId) {
+    const topic = decodeURIComponent(encodedTopic);
+    this.showToast(`Escalating to Deep Research with ${thinkerId} rigour!`, 'check-circle');
+    this.setMode('deep_research');
+    this.startResearch(topic, true, true);
+  }
+
   handleHeroLaunch() {
     const topic = this.heroPromptInput.value.trim();
     if (!topic || this.isGenerating) return;
@@ -420,6 +555,11 @@ class ThothApp {
     }
 
     this.appendUserMessage(text);
+
+    if (this.activeMode === 'brainstorm') {
+      this.sendBrainstormMessage(text);
+      return;
+    }
 
     const hasActiveSession = Boolean(this.currentState && (this.currentState.topic || (this.currentState.chat_turns && this.currentState.chat_turns.length > 0)));
 

@@ -215,7 +215,10 @@ async def api_stream_research(request: Request):
                         "cumulative_sources": current_state.get("cumulative_sources", []),
                         "follow_up_questions": current_state.get("follow_up_questions", []),
                         "chat_turns": current_state.get("chat_turns", []),
-                        "conversation_summary": current_state.get("conversation_summary", "")
+                        "conversation_summary": current_state.get("conversation_summary", ""),
+                        "integrity_status": current_state.get("integrity_status", "PENDING"),
+                        "is_verified": current_state.get("is_verified", False),
+                        "integrity_result": current_state.get("integrity_result", {})
                     }
                     event_data = {
                         "node": node_name,
@@ -450,6 +453,63 @@ async def api_detect_escalation(request: Request):
         conversation_summary=summary,
     )
     return JSONResponse(content=escalation)
+
+@app.get("/api/brainstorm/thinkers")
+async def api_list_brainstorm_thinkers():
+    from backend.intellectual_rigour.matcher import ARCHETYPE_DEFINITIONS
+    thinkers_list = []
+    for tid, data in ARCHETYPE_DEFINITIONS.items():
+        thinkers_list.append({
+            "id": tid,
+            "name": data["name"],
+            "tradition": data["tradition"],
+            "archetype": data["archetype"],
+            "description": data["description"],
+            "opening_spar": data["default_opening"],
+        })
+    return JSONResponse(content={"thinkers": thinkers_list})
+
+@app.post("/api/brainstorm/match")
+async def api_match_thinker(request: Request):
+    body = await request.json()
+    query = body.get("query", "")
+    chat_turns = body.get("chat_turns", [])
+    from backend.intellectual_rigour.matcher import match_ideation_archetype
+    result = match_ideation_archetype(user_query=query, chat_history=chat_turns)
+    return JSONResponse(content=result.model_dump())
+
+@app.post("/api/brainstorm/chat")
+async def api_brainstorm_spar(request: Request):
+    body = await request.json()
+    thinker_id = body.get("thinker_id", "auto")
+    message = body.get("message", "")
+    chat_turns = body.get("chat_turns", [])
+
+    from backend.intellectual_rigour.matcher import match_ideation_archetype
+    from backend.intellectual_rigour.sparring import spar_with_thinker
+
+    matched_info = None
+    if thinker_id == "auto" or not thinker_id:
+        match_res = match_ideation_archetype(user_query=message, chat_history=chat_turns)
+        thinker_id = match_res.thinker_id
+        matched_info = match_res.model_dump()
+
+    loop = asyncio.get_running_loop()
+    output = await loop.run_in_executor(
+        None,
+        lambda: spar_with_thinker(
+            thinker_id=thinker_id,
+            user_message=message,
+            chat_turns=chat_turns
+        )
+    )
+
+    data = output.model_dump()
+    if matched_info:
+        data["auto_match"] = matched_info
+
+    return JSONResponse(content=data)
+
 
 _WEB_DIR = os.path.join(_PROJECT_ROOT, "web")
 

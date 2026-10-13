@@ -136,6 +136,9 @@ class ResearchState(TypedDict):
     cumulative_sources: List[Dict[str, Any]]
     conversation_summary: str
     chat_turns: List[Dict[str, Any]]
+    integrity_status: str
+    integrity_result: Dict[str, Any]
+    is_verified: bool
 
 def _extract_domain(url: str) -> str:
     try:
@@ -274,18 +277,40 @@ def search_node(state: ResearchState) -> dict:
     if candidates:
         results = "\n\n------\n\n".join(c.to_formatted_snippet() for c in candidates)
         cumulative_sources = []
-        for c in candidates:
+        seen_ids = set()
+        for idx, c in enumerate(candidates, 1):
             if c.url:
                 domain = _extract_domain(c.url)
+                s_title = c.title or f"Source from {domain}"
+                s_slug = _slugify(s_title, 35)
+                base_src_id = f"src-{s_slug}"
+                src_id = base_src_id
+                suffix = 1
+                while src_id in seen_ids:
+                    src_id = f"{base_src_id}_{suffix}"
+                    suffix += 1
+                seen_ids.add(src_id)
+
                 cumulative_sources.append({
+                    "id": src_id,
                     "url": c.url,
                     "domain": domain,
-                    "title": c.title,
+                    "title": s_title,
+                    "authors": list(c.authors or []),
+                    "abstract": c.abstract or "",
+                    "snippet": c.abstract or "",
+                    "published_date": c.published_date,
                     "doi": c.doi,
                     "arxiv_id": c.arxiv_id,
-                    "source_api": c.source_api,
+                    "paper_id": c.paper_id,
+                    "pmid": getattr(c, "pmid", None),
+                    "source_api": c.source_api or "scholarly",
                     "citation_count": c.citation_count,
-                    "added_in_turn": 0
+                    "relation": c.relation,
+                    "added_in_turn": 0,
+                    "extracted_text": "",
+                    "scrape_status": "unscraped",
+                    "scrape_error": None
                 })
 
         print("\nSearch Results (Scholarly + Web Fallback):\n", results[:300] + "..." if len(results) > 300 else results)
@@ -312,13 +337,39 @@ def search_node(state: ResearchState) -> dict:
     extracted_urls = list(dict.fromkeys(extracted_urls))
 
     cumulative_sources = []
-    for u in extracted_urls:
+    seen_ids = set()
+    for idx, u in enumerate(extracted_urls, 1):
         domain = _extract_domain(u)
+        s_title = f"Registry source from {domain}"
+        s_slug = _slugify(domain or f"source_{idx}", 30)
+        base_src_id = f"src-{s_slug}_{idx}"
+        src_id = base_src_id
+        suffix = 1
+        while src_id in seen_ids:
+            src_id = f"{base_src_id}_{suffix}"
+            suffix += 1
+        seen_ids.add(src_id)
+
         cumulative_sources.append({
+            "id": src_id,
             "url": u,
             "domain": domain,
-            "title": f"Registry source from {domain}",
-            "added_in_turn": 0
+            "title": s_title,
+            "authors": [],
+            "abstract": "",
+            "snippet": "",
+            "published_date": None,
+            "doi": None,
+            "arxiv_id": None,
+            "paper_id": None,
+            "pmid": None,
+            "source_api": "web",
+            "citation_count": None,
+            "relation": None,
+            "added_in_turn": 0,
+            "extracted_text": "",
+            "scrape_status": "unscraped",
+            "scrape_error": None
         })
 
     print("\nSearch Results (Web Fallback):\n", results[:300] + "..." if len(results) > 300 else results)
@@ -375,21 +426,41 @@ def snowball_node(state: ResearchState) -> dict:
         return {"cumulative_sources": cumulative_sources}
 
     new_snippets = []
-    for c in snowballed:
+    seen_ids = {s.get("id") for s in cumulative_sources if s.get("id")}
+    for idx, c in enumerate(snowballed, 1):
         if c.url:
             domain = _extract_domain(c.url)
             if not any(s.get("url") == c.url for s in cumulative_sources):
+                s_title = c.title or f"Source from {domain}"
+                s_slug = _slugify(s_title, 35)
+                base_src_id = f"src-{s_slug}"
+                src_id = base_src_id
+                suffix = 1
+                while src_id in seen_ids:
+                    src_id = f"{base_src_id}_{suffix}"
+                    suffix += 1
+                seen_ids.add(src_id)
+
                 cumulative_sources.append({
+                    "id": src_id,
                     "url": c.url,
                     "domain": domain,
-                    "title": c.title,
+                    "title": s_title,
+                    "authors": list(c.authors or []),
+                    "abstract": c.abstract or "",
+                    "snippet": c.abstract or "",
+                    "published_date": c.published_date,
                     "doi": c.doi,
                     "arxiv_id": c.arxiv_id,
                     "paper_id": c.paper_id,
-                    "source_api": c.source_api,
+                    "pmid": getattr(c, "pmid", None),
+                    "source_api": c.source_api or "snowball",
                     "citation_count": c.citation_count,
                     "relation": c.relation,
-                    "added_in_turn": 0
+                    "added_in_turn": 0,
+                    "extracted_text": "",
+                    "scrape_status": "unscraped",
+                    "scrape_error": None
                 })
                 new_snippets.append(c.to_formatted_snippet())
 
@@ -421,22 +492,62 @@ def scrape_node(state: ResearchState) -> dict:
         urls = raw_urls[:state.get("scrape_top_n", 15)]
 
     scraped_content = ""
-    cumulative_sources = list(existing_sources)
+    cumulative_sources = [dict(s) for s in existing_sources]
+    sources_by_url = {s.get("url"): s for s in cumulative_sources if s.get("url")}
 
     for url in urls:
         print(f"\nScraping: {url}")
         domain = _extract_domain(url)
-        if not any(s.get("url") == url for s in cumulative_sources):
-            cumulative_sources.append({
+        if url not in sources_by_url:
+            s_title = f"Source from {domain}"
+            src_id = f"src-{_slugify(s_title, 35)}"
+            new_record = {
+                "id": src_id,
                 "url": url,
                 "domain": domain,
-                "title": f"Source from {domain}",
-                "added_in_turn": 0
-            })
+                "title": s_title,
+                "authors": [],
+                "abstract": "",
+                "snippet": "",
+                "published_date": None,
+                "doi": None,
+                "arxiv_id": None,
+                "paper_id": None,
+                "pmid": None,
+                "source_api": "web",
+                "citation_count": None,
+                "relation": None,
+                "added_in_turn": 0,
+                "extracted_text": "",
+                "scrape_status": "pending",
+                "scrape_error": None
+            }
+            cumulative_sources.append(new_record)
+            sources_by_url[url] = new_record
+
+        target_source = sources_by_url[url]
         try:
             scrape_res = scrape_url.invoke({"url": url})
-            scraped_content += f"\n\n--- Source: {url} ---\n{scrape_res[:3000]}"
+            if isinstance(scrape_res, str) and (scrape_res.startswith("Could not scrape URL:") or scrape_res.startswith("(Failed to scrape:")):
+                target_source["extracted_text"] = ""
+                target_source["scrape_status"] = "failed"
+                target_source["scrape_error"] = str(scrape_res)
+                scraped_content += f"\n\n--- Source: {url} ---\n(Failed to scrape: {scrape_res})"
+            elif not scrape_res or not str(scrape_res).strip():
+                target_source["extracted_text"] = ""
+                target_source["scrape_status"] = "empty"
+                target_source["scrape_error"] = "Empty content extracted"
+                scraped_content += f"\n\n--- Source: {url} ---\n(Empty content)"
+            else:
+                extracted = str(scrape_res)[:3000]
+                target_source["extracted_text"] = extracted
+                target_source["scrape_status"] = "success"
+                target_source["scrape_error"] = None
+                scraped_content += f"\n\n--- Source: {url} ---\n{extracted}"
         except Exception as e:
+            target_source["extracted_text"] = ""
+            target_source["scrape_status"] = "failed"
+            target_source["scrape_error"] = str(e)
             scraped_content += f"\n\n--- Source: {url} ---\n(Failed to scrape: {e})"
 
     print("\nScraped Content length:", len(scraped_content))
@@ -467,8 +578,28 @@ def writer_node(state: ResearchState) -> dict:
         initial_summary=state.get("conversation_summary", ""),
         initial_turns=state.get("chat_turns", [])
     )
+    source_cat_lines = []
+    for s in state.get("cumulative_sources", []):
+        sid = s.get("id") or f"src-{_slugify(s.get('title') or s.get('url') or '', 35)}"
+        title = s.get("title", "Untitled")
+        url = s.get("url", "")
+        auth = ", ".join(s.get("authors", [])) if s.get("authors") else "Unknown"
+        dt = s.get("published_date") or "Unknown"
+        doi_str = f"DOI: {s['doi']}" if s.get("doi") else ""
+        arxiv_str = f"arXiv: {s['arxiv_id']}" if s.get("arxiv_id") else ""
+        pmid_str = f"PMID: {s['pmid']}" if s.get("pmid") else ""
+        id_str = " | ".join(filter(None, [doi_str, arxiv_str, pmid_str]))
+        id_line = f"Identifiers: {id_str}\n" if id_str else ""
+        ev = (s.get("extracted_text") or s.get("abstract") or s.get("snippet") or "").strip()
+        ev_sample = f"Evidence Excerpt:\n{ev[:1200]}" if ev else "(No substantive text extracted)"
+        source_cat_lines.append(
+            f"[{sid}] {title} ({dt})\nAuthors: {auth}\nURL: {url}\n{id_line}{ev_sample}"
+        )
+    source_cat_text = "\n\n---\n\n".join(source_cat_lines) if source_cat_lines else "(No sources available)"
+
     raw_research = (
         f"SEARCH RESULTS:\n{state.get('search_results', '')}\n\n"
+        f"SOURCE CATALOGUE (Cite using [[src-id]]):\n{source_cat_text}\n\n"
         f"DETAILED SCRAPED CONTENT:\n{state.get('scraped_content', '')}"
     )
     if vault_notes_text:
@@ -487,7 +618,7 @@ def writer_node(state: ResearchState) -> dict:
 
     prior_feedback = ""
     if state.get("verifier_feedback"):
-        prior_feedback += f"\nFact Verifier Feedback:\n{state['verifier_feedback']}\n"
+        prior_feedback += f"\nFact Verifier / Integrity Feedback:\n{state['verifier_feedback']}\n"
     if state.get("feedback"):
         prior_feedback += f"\nCritic Quality Feedback:\n{state['feedback']}\n"
 
@@ -517,10 +648,41 @@ def verifier_node(state: ResearchState) -> dict:
     for idx, s in enumerate(state.get("cumulative_sources", []), 1):
         s_title = s.get("title") or s.get("url") or f"source_{idx}"
         s_slug = _slugify(s_title, 35)
-        src_id = f"src-{s_slug}"
-        content_snippet = s.get("snippet") or s.get("abstract") or ""
+        src_id = s.get("id") or f"src-{s_slug}"
+
+        extracted_text = (s.get("extracted_text") or "").strip()
+        abstract = (s.get("abstract") or s.get("snippet") or "").strip()
+
+        evidence_parts = []
+        if abstract:
+            evidence_parts.append(f"Abstract / Summary:\n{abstract[:1000]}")
+        if extracted_text:
+            if not abstract or extracted_text[:200] != abstract[:200]:
+                evidence_parts.append(f"Extracted Content:\n{extracted_text[:1500]}")
+
+        if evidence_parts:
+            content_text = "\n\n".join(evidence_parts)
+        else:
+            status = s.get("scrape_status") or "unscraped"
+            err = f" ({s.get('scrape_error')})" if s.get("scrape_error") else ""
+            content_text = f"(No substantive text or abstract available for this source. Scrape status: {status}{err})"
+
+        meta_lines = []
+        if s.get("authors"):
+            meta_lines.append(f"Authors: {', '.join(s['authors'][:5])}")
+        if s.get("published_date"):
+            meta_lines.append(f"Date: {s['published_date']}")
+        if s.get("doi"):
+            meta_lines.append(f"DOI: {s['doi']}")
+        if s.get("arxiv_id"):
+            meta_lines.append(f"arXiv: {s['arxiv_id']}")
+        if s.get("pmid"):
+            meta_lines.append(f"PMID: {s['pmid']}")
+
+        meta_str = ("\n" + "\n".join(meta_lines)) if meta_lines else ""
+
         sources_blocks.append(
-            f"[{src_id}] Title: {s.get('title', 'N/A')}\nURL: {s.get('url', 'N/A')}\nContent:\n{content_snippet[:1500]}"
+            f"[{src_id}] Title: {s.get('title', 'N/A')}\nURL: {s.get('url', 'N/A')}{meta_str}\nContent:\n{content_text}"
         )
 
     if sources_blocks:
@@ -539,39 +701,55 @@ def verifier_node(state: ResearchState) -> dict:
         "current_date": current_date
     })
 
-    parsed = safe_extract_json(raw_response, default=None)
+    from backend.intellectual_rigour.integrity_gate import audit_report_integrity
+    integrity_audit = audit_report_integrity(
+        report_text=state.get("report", ""),
+        cumulative_sources=state.get("cumulative_sources", []),
+        raw_verifier_response=raw_response
+    )
 
-    has_issues = False
     feedback_lines = []
-    verification_results = []
+    for expl in integrity_audit.failure_explanations:
+        feedback_lines.append(f"- {expl}")
+    for err in integrity_audit.provenance_errors:
+        if err not in feedback_lines and f"- {err}" not in feedback_lines:
+            feedback_lines.append(f"- Provenance Error: {err}")
 
-    if parsed and isinstance(parsed, dict) and "results" in parsed:
-        try:
-            report_obj = FactVerificationReport(**parsed)
-            for res in report_obj.results:
-                verification_results.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
-                if not res.is_valid:
-                    has_issues = True
-                    feedback_lines.append(f"- CLAIM: '{res.claim}' -> {res.reason_if_failed}")
-        except Exception:
-            for res in parsed.get("results", []):
-                if isinstance(res, dict):
-                    verification_results.append(res)
-                    if not res.get("is_valid", True):
-                        has_issues = True
-                        reason = res.get("reason_if_failed", "Contradiction or unsupported claim.")
-                        feedback_lines.append(f"- CLAIM: '{res.get('claim')}' -> {reason}")
-    elif isinstance(raw_response, str) and ("contradict" in raw_response.lower() or "unsupported" in raw_response.lower() or "false" in raw_response.lower()):
-        has_issues = True
+    # Fallback to direct raw_response text if string warnings present
+    if not feedback_lines and isinstance(raw_response, str) and (
+        "contradict" in raw_response.lower() or "unsupported" in raw_response.lower() or "false" in raw_response.lower()
+    ):
         feedback_lines.append(raw_response)
 
-    verifier_log = raw_response if isinstance(raw_response, str) else json.dumps(parsed, indent=2)
-    feedback = "\n".join(feedback_lines) if has_issues else ""
+    feedback = "\n".join(feedback_lines) if (integrity_audit.status != "PASSED" or feedback_lines) else ""
+
+    verification_results = []
+    for c in integrity_audit.claims:
+        verification_results.append({
+            "claim": c.claim,
+            "is_valid": (c.verification_status in ("DIRECTLY_SUPPORTED", "QUALIFIED_SUPPORT")),
+            "reason_if_failed": c.reason if c.verification_status not in ("DIRECTLY_SUPPORTED", "QUALIFIED_SUPPORT") else "",
+            "supporting_source_id": c.source_ids[0] if c.source_ids and c.verification_status in ("DIRECTLY_SUPPORTED", "QUALIFIED_SUPPORT") else "",
+            "claim_id": c.claim_id,
+            "claim_type": c.claim_type,
+            "source_ids": c.source_ids,
+            "verification_status": c.verification_status,
+            "disposition": c.disposition,
+            "quoted_evidence": c.quoted_evidence,
+            "provenance_verified": c.provenance_verified
+        })
+
+    verifier_log = raw_response if isinstance(raw_response, str) else json.dumps(integrity_audit.model_dump(), indent=2)
 
     print("\nSLM Truth Guard Log:\n", verifier_log)
-    print(f"\nVerification Status: {'FLAGGED FOR REVISION' if has_issues else 'PASSED'}")
+    print(f"\nVerification Status: {integrity_audit.status} ({'FLAGGED FOR REVISION' if feedback else 'PASSED'})")
 
-    return {"verifier_feedback": feedback, "verification_results": verification_results}
+    return {
+        "verifier_feedback": feedback,
+        "verification_results": verification_results,
+        "integrity_result": integrity_audit.model_dump(),
+        "integrity_status": integrity_audit.status
+    }
 
 @observe(type="llm")
 def critic_node(state: ResearchState) -> dict:
@@ -1037,16 +1215,52 @@ def stream_followup_turn(
                 new_source_ids.append(src_id)
 
                 if not any(s.get("url") == u for s in cumulative_sources):
-                    cumulative_sources.append({
+                    followup_rec = {
+                        "id": src_id,
                         "url": u,
                         "domain": domain,
                         "title": f"Follow-up probe: {search_query[:35]}",
-                        "added_in_turn": turn_index
-                    })
+                        "authors": [],
+                        "abstract": "",
+                        "snippet": "",
+                        "published_date": None,
+                        "doi": None,
+                        "arxiv_id": None,
+                        "paper_id": None,
+                        "pmid": None,
+                        "source_api": "web",
+                        "citation_count": None,
+                        "relation": None,
+                        "added_in_turn": turn_index,
+                        "extracted_text": "",
+                        "scrape_status": "pending",
+                        "scrape_error": None
+                    }
+                    cumulative_sources.append(followup_rec)
+                else:
+                    followup_rec = next(s for s in cumulative_sources if s.get("url") == u)
+
                 try:
                     scrape_content = scrape_url.invoke({"url": u})
-                    new_scraped_data += f"\n\n--- Source: {u} ---\n{scrape_content[:2000]}"
+                    if isinstance(scrape_content, str) and (scrape_content.startswith("Could not scrape URL:") or scrape_content.startswith("(Failed to scrape:")):
+                        followup_rec["extracted_text"] = ""
+                        followup_rec["scrape_status"] = "failed"
+                        followup_rec["scrape_error"] = str(scrape_content)
+                        new_scraped_data += f"\n\n--- Source: {u} ---\n{scrape_content}"
+                    elif not scrape_content or not str(scrape_content).strip():
+                        followup_rec["extracted_text"] = ""
+                        followup_rec["scrape_status"] = "empty"
+                        followup_rec["scrape_error"] = "Empty content extracted"
+                        new_scraped_data += f"\n\n--- Source: {u} ---\n(Empty content)"
+                    else:
+                        followup_rec["extracted_text"] = str(scrape_content)[:2000]
+                        followup_rec["scrape_status"] = "success"
+                        followup_rec["scrape_error"] = None
+                        new_scraped_data += f"\n\n--- Source: {u} ---\n{scrape_content[:2000]}"
                 except Exception as e:
+                    followup_rec["extracted_text"] = ""
+                    followup_rec["scrape_status"] = "failed"
+                    followup_rec["scrape_error"] = str(e)
                     scrape_content = f"(Scrape error: {e})"
                     new_scraped_data += f"\n\n--- Source: {u} ---\n{scrape_content}"
 

@@ -175,14 +175,54 @@ def build_search_agent():
         )
     )
 
+class EvidencePassage(BaseModel):
+    source_id: str = Field(description="Source identifier matching retained source records")
+    title: str = Field(default="", description="Source title")
+    url: str = Field(default="", description="Canonical source URL")
+    quote: str = Field(description="Exact quoted evidence passage")
+    origin: str = Field(default="extracted_text", description="extracted_text, abstract, or provider_snippet")
+    location: Optional[str] = Field(default=None, description="Location or section marker if available")
+    provenance_verified: bool = Field(default=False, description="True if verified against retained source text")
+
+class ReportClaim(BaseModel):
+    claim_id: str = Field(description="Stable claim identifier, e.g. claim-1")
+    claim: str = Field(description="The claim's text as it appears in the report")
+    claim_type: str = Field(default="factual_finding", description="factual_finding, empirical_metric, methodological_statement, theoretical_synthesis")
+    source_ids: List[str] = Field(default_factory=list, description="Applicable source identifiers")
+    verification_status: str = Field(default="UNRESOLVED", description="DIRECTLY_SUPPORTED, QUALIFIED_SUPPORT, UNSUPPORTED, CONTRADICTED, UNRESOLVED")
+    disposition: str = Field(default="unresolved", description="retain, qualify, remove, unresolved")
+    reason: str = Field(default="", description="Explanation grounded in evidence")
+    quoted_evidence: Optional[str] = Field(default="", description="Exact quote from source")
+    provenance_verified: bool = Field(default=False, description="Whether deterministic quote and source check passed")
+
+class ReportIntegrityResult(BaseModel):
+    status: str = Field(description="Overall integrity status: PASSED, FAILED, or INCOMPLETE")
+    total_claims: int = Field(default=0, description="Number of claims audited")
+    directly_supported_count: int = Field(default=0, description="Number directly supported")
+    qualified_count: int = Field(default=0, description="Number requiring qualification")
+    unsupported_or_contradicted_count: int = Field(default=0, description="Number unsupported or contradicted")
+    unresolved_count: int = Field(default=0, description="Number unresolved because required evidence was unavailable")
+    provenance_errors: List[str] = Field(default_factory=list, description="Bibliographic and provenance errors detected")
+    failure_explanations: List[str] = Field(default_factory=list, description="Human-readable explanations for failures")
+    claims: List[ReportClaim] = Field(default_factory=list, description="Audited claims")
+    is_verified: bool = Field(default=False, description="True ONLY when status == 'PASSED'")
+
 class VerificationResult(BaseModel):
     claim: str = Field(description="The claim being verified from the report")
     is_valid: bool = Field(description="True if supported by sources/web search, False if contradicted or unsupported")
     reason_if_failed: str = Field(default="", description="Clear explanation of the contradiction or why it is unsupported; empty if verified")
     supporting_source_id: Optional[str] = Field(default="", description="The exact source identifier (e.g. 'src-...' or '[src-...]') that supports this claim; populated ONLY when is_valid is true, empty string otherwise")
+    claim_id: Optional[str] = Field(default=None, description="Stable claim identifier, e.g. claim-1")
+    claim_type: Optional[str] = Field(default="factual_finding", description="factual_finding, empirical_metric, methodological_statement, theoretical_synthesis")
+    source_ids: Optional[List[str]] = Field(default_factory=list, description="Applicable source identifiers")
+    verification_status: Optional[str] = Field(default=None, description="DIRECTLY_SUPPORTED, QUALIFIED_SUPPORT, UNSUPPORTED, CONTRADICTED, UNRESOLVED")
+    disposition: Optional[str] = Field(default=None, description="retain, qualify, remove, unresolved")
+    quoted_evidence: Optional[str] = Field(default="", description="Exact quote from source text")
+    provenance_verified: Optional[bool] = Field(default=None, description="Whether quote provenance and source ID match retained source text")
 
 class FactVerificationReport(BaseModel):
     results: List[VerificationResult] = Field(description="List of verification results for all key claims in the report")
+    integrity_result: Optional[ReportIntegrityResult] = Field(default=None, description="Overall structured report integrity audit")
 
 class CriticScore(BaseModel):
     faithfulness: float = Field(ge=0.0, le=10.0, description="Score out of 10 for factual grounding in sources with no hallucinations")
@@ -199,23 +239,40 @@ class CriticScore(BaseModel):
 verifier_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are the Fact-Verifier Agent (The Truth Guard). Today's date is {current_date}.
 
-Your job is to analyze key factual claims in the drafted research report and verify them against the provided source material.
-Each source in the source material is labeled with an explicit identifier like `[src-identifier]` or `Source 1 (src-identifier): ...`.
+Your job is to analyze key factual, empirical, and methodological claims in the drafted research report and rigorously verify them against the provided source catalogue.
+Each source in the source catalogue is labeled with an explicit identifier like `[src-identifier]` along with its bibliographic metadata and extracted content.
 
 Rules for Verification:
-1. For each key claim in the report, determine if it is VERIFIED (is_valid: true) or CONTRADICTED/FABRICATED (is_valid: false).
-2. Directly Supported Facts & Empirical Numbers: Must directly match the source material. Specify the exact `supporting_source_id` (e.g. "src-arxiv_1311_2485" or "src-brave_aa1").
-3. Plausible Logical Inferences & Domain Synthesis: High-level logical deductions that naturally synthesize findings without inventing false data (e.g. "Translating multi-omics pipelines to clinical practice requires prospective cohort trials") should be marked `is_valid: true` attributed to the primary related source ID.
-4. Hard Contradictions & Fabricated Specifics: If a claim invents non-existent trial names, falsifies specific statistics/percentages, or directly contradicts source material, mark `is_valid: false`, set `supporting_source_id` to "", and provide a clear explanation in `reason_if_failed`.
+1. Extract every material factual, empirical, or methodological claim.
+2. For each claim, assign:
+   - claim_id: Stable identifier like "claim-1", "claim-2"
+   - claim: The exact statement from the report
+   - claim_type: "factual_finding", "empirical_metric", "methodological_statement", or "theoretical_synthesis"
+   - source_ids: List of source identifiers cited or linked (e.g. ["src-quantum_optics"])
+   - supporting_source_id: The primary source ID supporting the claim (empty string if unsupported)
+   - quoted_evidence: The EXACT verbatim quote from the provided source material that supports this claim
+   - verification_status:
+     * "DIRECTLY_SUPPORTED" (is_valid: true): Directly corroborated by quoted empirical text.
+     * "QUALIFIED_SUPPORT" (is_valid: true): Valid theoretical synthesis combining sources without falsifying unmeasured specifics.
+     * "UNSUPPORTED" (is_valid: false): Claim lacks evidence, asserts metrics not in source, or source text is unrelated.
+     * "CONTRADICTED" (is_valid: false): Direct factual contradiction (e.g. claimed r = 0.48 but source reports negative correlation r = -0.12, or fabricated trial findings).
+     * "UNRESOLVED" (is_valid: false): Source text is missing, unscraped, or insufficient to evaluate.
+3. Plausibility is NOT proof: Do not use your own background knowledge to fill in missing source evidence.
+4. If is_valid is false, set supporting_source_id to "", and clearly explain the failure in reason_if_failed.
 
 Output strictly valid JSON matching this schema:
 {{
   "results": [
     {{
+      "claim_id": "claim-1",
       "claim": "The claim being verified",
+      "claim_type": "factual_finding",
+      "source_ids": ["src-exact_source_id"],
+      "supporting_source_id": "src-exact_source_id",
+      "quoted_evidence": "Exact quoted text from source material",
+      "verification_status": "DIRECTLY_SUPPORTED",
       "is_valid": true,
-      "reason_if_failed": "",
-      "supporting_source_id": "src-exact_source_id"
+      "reason_if_failed": ""
     }}
   ]
 }}
@@ -238,13 +295,18 @@ def build_verifier_agent():
 writer_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a {role}. Write in a {tone} tone and respond in {language}. Today's date is {current_date}.
 
-Given raw web research data, produce a structured research report with these sections:
+Given raw research data and source catalogue, produce a structured research report with these sections:
 - **Introduction**: What the topic is and why it matters.
 - **Key Findings**: At least 2 well-explained findings backed by the research.
 - **Knowledge Gaps**: Gaps in current literature, each with a suggested search string to investigate further.
 - **Methodology**: How the research was gathered and assessed.
 - **Conclusion**: Key takeaways and actionable insights.
-- **Sources**: Numbered list of all URLs from the research data. Do not fabricate sources.
+
+Citation and Integrity Rules:
+1. Cite real sources using the provided internal identifier syntax `[[src-identifier]]` directly after each factual assertion or empirical finding (e.g. "...achieved 99.8% fidelity [[src-quantum_optics]].").
+2. Do NOT invent or hallucinate source IDs, DOIs, arXiv identifiers, authors, or publication dates.
+3. Do NOT fabricate statistical numbers, correlations, effect sizes, or sample counts.
+4. Do NOT include a manual Sources or References section; the system deterministically compiles the bibliography from validated citations.
 
 Be evidence-based and do not skip any section."""),
     ("human", """Topic: {topic}

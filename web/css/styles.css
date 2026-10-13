@@ -1653,6 +1653,164 @@ html, body {
   transform: translateY(-1px);
 }
 
+/* ==========================================================================
+   Epistemic Brainstorming & Philosopher Sparring
+   ========================================================================== */
+.brainstorm-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(201, 154, 107, 0.08);
+  border: 1px solid rgba(201, 154, 107, 0.25);
+  border-radius: var(--radius-full);
+  padding: 6px 12px;
+  color: hsl(var(--foreground));
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+  user-select: none;
+}
+
+.brainstorm-toggle:hover {
+  background: rgba(201, 154, 107, 0.18);
+  border-color: rgba(201, 154, 107, 0.5);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.brainstorm-toggle.active {
+  background: linear-gradient(135deg, rgba(201, 154, 107, 0.3), rgba(160, 110, 60, 0.4));
+  border-color: #c99a6b;
+  color: #fce7cf;
+  box-shadow: 0 0 12px rgba(201, 154, 107, 0.35);
+}
+
+.brainstorm-selector-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: rgba(18, 18, 22, 0.95);
+  border-bottom: 1px solid rgba(201, 154, 107, 0.2);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.brainstorm-selector-bar.hidden {
+  display: none !important;
+}
+
+.thinker-picker-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thinker-dropdown {
+  background: hsl(var(--card));
+  border: 1px solid rgba(201, 154, 107, 0.3);
+  border-radius: var(--radius-md);
+  color: hsl(var(--foreground));
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.thinker-dropdown:focus {
+  border-color: #c99a6b;
+}
+
+.thinker-archetype-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.73rem;
+  color: #c99a6b;
+  font-weight: 500;
+  background: rgba(201, 154, 107, 0.08);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(201, 154, 107, 0.15);
+}
+
+.thinker-chat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #c99a6b;
+  background: rgba(201, 154, 107, 0.12);
+  border: 1px solid rgba(201, 154, 107, 0.3);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  margin-bottom: 8px;
+}
+
+.escalation-action-card {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(28, 24, 20, 0.95), rgba(40, 32, 24, 0.95));
+  border: 1px solid rgba(201, 154, 107, 0.45);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 16px rgba(201, 154, 107, 0.15);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.escalation-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #e5b98a;
+  margin-bottom: 6px;
+}
+
+.escalation-topic {
+  font-size: 0.85rem;
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.escalation-hypothesis {
+  font-size: 0.80rem;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.btn-launch-escalated-research {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #c99a6b, #b37e49);
+  color: #12100d;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(201, 154, 107, 0.35);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.btn-launch-escalated-research:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(201, 154, 107, 0.5);
+  background: linear-gradient(135deg, #dfaf7f, #c99a6b);
+}
+
+
 @media print {
   body * {
     visibility: hidden;

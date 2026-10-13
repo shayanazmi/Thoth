@@ -280,6 +280,13 @@
                 <div class="tool-item-desc">Direct instant responses without web search</div>
               </div>
             </div>
+            <div class="tool-menu-item" data-mode="brainstorm">
+              <div class="tool-item-icon"><i data-lucide="brain"></i></div>
+              <div class="tool-item-meta">
+                <div class="tool-item-title">Epistemic Brainstorming</div>
+                <div class="tool-item-desc">Spar with the 10 Thinkers & Auto-escalate to Research</div>
+              </div>
+            </div>
 
             <div class="tool-menu-divider"></div>
             <div class="tool-menu-section-header">
@@ -296,6 +303,30 @@
           </div>
 
           <div class="chat-input-container">
+            <div class="brainstorm-selector-bar hidden" id="brainstormSelectorBar">
+              <div class="thinker-picker-pill">
+                <i data-lucide="sparkles" style="width:13px;height:13px;color:#c99a6b;"></i>
+                <span style="font-size:0.75rem;font-weight:600;color:hsl(var(--muted-foreground));">Thinker:</span>
+                <select id="thinkerSelect" class="thinker-dropdown">
+                  <option value="auto">⚡ Auto-Match Thinker</option>
+                  <option value="aristotle">Aristotle (Categorical Architect)</option>
+                  <option value="descartes">René Descartes (Foundational Reductionist)</option>
+                  <option value="bacon">Francis Bacon (Eliminative Empiricist)</option>
+                  <option value="hume">David Hume (Causal Skeptic)</option>
+                  <option value="darwin">Charles Darwin (Evolutionary Selectionist)</option>
+                  <option value="popper">Karl Popper (Falsificationist Warrior)</option>
+                  <option value="kuhn">Thomas Kuhn (Paradigmatic Strategist)</option>
+                  <option value="box">George Box (Pragmatic Modeling Iterativist)</option>
+                  <option value="turing">Alan Turing (Computational Operationalist)</option>
+                  <option value="simon">Herbert Simon (Bounded Rationalist)</option>
+                </select>
+              </div>
+              <div class="thinker-archetype-tag" id="thinkerArchetypeTag">
+                <span class="status-dot pulse" style="background:#c99a6b;"></span>
+                <span id="thinkerArchetypeLabel">Auto Mode: Diagnoses Root Bottleneck</span>
+              </div>
+            </div>
+
             <div class="chat-input-row">
               <textarea id="chatInput" class="chat-textarea" placeholder="Ask follow-up questions, request sub-topic probes, or type /help..."></textarea>
             </div>
@@ -316,6 +347,10 @@
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
+                <button class="brainstorm-toggle" id="brainstormToggle" title="Toggle Philosopher Brainstorming">
+                  <i data-lucide="brain" style="width:13px;height:13px;"></i>
+                  <span>Brainstorm</span>
+                </button>
                 <button class="deep-research-toggle" id="deepResearchToggle" title="Toggle Deep Research">
                   <i data-lucide="microscope" style="width:13px;height:13px;"></i>
                   <span>Deep Research</span>

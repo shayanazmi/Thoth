@@ -106,3 +106,31 @@ def detect_escalation_intent(
         "reason": "Conversational dialogue / brainstorming.",
         "prompt_user": False,
     }
+
+def evaluate_brainstorm_escalation(
+    query: str,
+    chat_turns: Optional[List[Dict[str, Any]]] = None,
+    thinker_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    from backend.intellectual_rigour.sparring import evaluate_ideation_convergence
+    tid = (thinker_id or "popper").lower().strip()
+    proposal = evaluate_ideation_convergence(tid, chat_turns or [])
+    if proposal and proposal.is_ready_for_research:
+        return {
+            "state": EscalationState.RESEARCH_READY,
+            "confidence": proposal.readiness_score,
+            "reason": proposal.escalation_reason,
+            "prompt_user": True,
+            "action_pill_label": proposal.action_pill_label,
+            "crystallized_topic": proposal.crystallized_topic,
+            "testable_hypothesis": proposal.testable_hypothesis,
+            "constraints": proposal.identified_constraints,
+            "test_criteria": proposal.falsification_or_test_criteria,
+        }
+    return {
+        "state": EscalationState.CHAT,
+        "confidence": 0.20,
+        "reason": "Brainstorming is active; awaiting hypothesis crystallization.",
+        "prompt_user": False,
+    }
+
