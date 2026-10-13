@@ -102,4 +102,5 @@ vault/sources/*.md
 .gemini/
 
 *.log
+supabase/.temp/
 

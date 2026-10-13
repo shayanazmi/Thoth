@@ -128,9 +128,12 @@ def migrate_to_supabase(
             try:
                 payload = {
                     "id": s.get("id"),
-                    "topic": s.get("topic", "Untitled Research"),
-                    "status": s.get("status", "completed"),
-                    "state": s.get("state", {}),
+                    "title": s.get("topic") or s.get("title") or "Untitled Research",
+                    "summary": s.get("summary", ""),
+                    "metadata": {
+                        "status": s.get("status", "completed"),
+                        "state": s.get("state", {})
+                    },
                     "created_at": s.get("created_at"),
                     "updated_at": s.get("updated_at"),
                 }
@@ -146,9 +149,11 @@ def migrate_to_supabase(
                 payload = {
                     "id": r.get("id"),
                     "session_id": r.get("session_id"),
-                    "topic": r.get("topic", ""),
-                    "markdown": r.get("markdown") or r.get("report") or "",
-                    "sources": r.get("sources", []),
+                    "topic": r.get("topic", "Untitled Report"),
+                    "content": r.get("markdown") or r.get("report") or r.get("content") or "",
+                    "score": float(r.get("score", 0.0) or 0.0),
+                    "verifier_feedback": r.get("verifier_feedback", ""),
+                    "mindmap": r.get("mindmap", {}),
                     "created_at": r.get("created_at"),
                 }
                 client.table("reports").upsert(payload).execute()

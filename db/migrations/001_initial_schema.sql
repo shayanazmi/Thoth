@@ -6,8 +6,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Sessions Table
 CREATE TABLE IF NOT EXISTS public.sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     summary TEXT DEFAULT '',
     metadata JSONB DEFAULT '{}'::jsonb,
@@ -20,9 +20,9 @@ CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON public.sessions(created_at
 
 -- 2. Reports Table
 CREATE TABLE IF NOT EXISTS public.reports (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     topic TEXT NOT NULL,
     content TEXT NOT NULL,
     score DOUBLE PRECISION DEFAULT 0.0,
@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS idx_reports_user_id ON public.reports(user_id);
 -- 3. Notes Table (Knowledge Vault)
 CREATE TABLE IF NOT EXISTS public.notes (
     note_id TEXT PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     type TEXT NOT NULL, -- 'source', 'topic', 'claim', 'fact'
     title TEXT DEFAULT '',
     content TEXT NOT NULL,
