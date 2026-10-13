@@ -303,8 +303,9 @@ class TestSchemaConsumersMalformedLLMOutputs(unittest.TestCase):
 
         clean_json = '{"results": [{"claim": "Qubits exist", "is_valid": true, "supporting_source_id": "src-paper", "reason_if_failed": ""}]}'
         mock_verifier.invoke.return_value = clean_json
+        sample_source = {"id": "src-paper", "title": "Paper", "url": "https://arxiv.org/abs/123", "extracted_text": "Qubits exist in physical quantum systems."}
         with patch("backend.pipeline.verifier_chain", mock_verifier):
-            res2 = verifier_node({"cumulative_sources": [], "report": "Report text"})
+            res2 = verifier_node({"cumulative_sources": [sample_source], "report": "Report text [[src-paper]]"})
             self.assertEqual(res2["verifier_feedback"], "")
             self.assertEqual(len(res2["verification_results"]), 1)
 

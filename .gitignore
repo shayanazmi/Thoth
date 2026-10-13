@@ -93,8 +93,8 @@ yarn-error.log*
 .deepeval_cache/
 
 thoth_modification_plan.md
-todo-shayanwentonawalk
-eval_sandbox/production_eval_results.json
+evals/production_eval_results.json
+evals/.deepeval/
 
 vault/topics/*.md
 vault/sources/*.md

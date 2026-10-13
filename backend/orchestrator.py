@@ -269,8 +269,10 @@ def stream_research_pipeline(
 
         attempt = state.get("attempt", 0) + 1
         logger.info(f"[ORCHESTRATOR - ACT] Writer drafting report (attempt {attempt})...")
-        writer_update = writer_node(state)
+        writer_update = dict(writer_node(state))
+        writer_update["attempt"] = attempt
         state.update(writer_update)
+        state["attempt"] = attempt
 
         if attempt > 1 and state.get("rejected_claims"):
             from backend.eval.logical_integrity import detect_circular_replan
