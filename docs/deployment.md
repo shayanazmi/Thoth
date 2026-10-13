@@ -58,23 +58,24 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
 ```
 
-### 2.2 Web Service (`web/railway.toml`)
+### 2.2 Web Service (`frontend/railway.toml`)
 Configures the static web frontend:
 ```toml
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "web/Dockerfile"
+dockerfilePath = "frontend/Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
 restartPolicyType = "ON_FAILURE"
 ```
 
-### 2.3 Web Containerfile (`web/Dockerfile`)
+### 2.3 Web Containerfile (`frontend/Dockerfile`)
 ```dockerfile
 FROM nginx:alpine
-COPY web /usr/share/nginx/html
-COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+RUN rm -rf /usr/share/nginx/html/*
+COPY . /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 ```
