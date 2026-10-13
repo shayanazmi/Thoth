@@ -735,16 +735,40 @@ class ThothApp {
   }
 
   handlePipelineEvent(event, msgId) {
+    const { node = '', update = {}, state = {} } = event || {};
+
     if (state && Object.keys(state).length > 0) {
       this.currentState = { ...(this.currentState || {}), ...state };
     }
-
 
     const msgContainer = document.getElementById(msgId);
     if (!msgContainer) return;
 
     const cotBody = msgContainer.querySelector('.cot-body');
     const contentBody = msgContainer.querySelector('.message-prose');
+
+    if (node === 'clarification_gate') {
+      const promptText = update.clarification_prompt || 'Clarification requested for this research scope:';
+      const options = update.options || [];
+      if (contentBody) {
+        let optionsHtml = '';
+        if (options.length > 0) {
+          optionsHtml = `<div class="clarification-options" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">` +
+            options.map(opt => `<button type="button" class="proactive-pill" onclick="window.app.startResearch('${opt.replace(/'/g, "\\'")}', true, true)">${opt}</button>`).join('') +
+            `</div>`;
+        }
+        contentBody.innerHTML = `
+          <div class="clarification-card" style="padding:12px;border-radius:var(--radius-md);background:hsl(var(--muted)/0.5);border:1px solid hsl(var(--border));margin-bottom:8px;">
+            <div style="font-weight:600;font-size:0.9rem;margin-bottom:6px;color:hsl(var(--foreground));"><i data-lucide="help-circle" style="width:15px;height:15px;vertical-align:middle;margin-right:6px;color:hsl(var(--primary));"></i>${promptText}</div>
+            ${optionsHtml}
+          </div>
+          <div style="color:hsl(var(--muted-foreground));font-size:0.8rem;margin-top:4px;"><i data-lucide="loader" class="animate-spin" style="width:12px;height:12px;vertical-align:middle;margin-right:4px;"></i> Scribe is initiating broad academic search in parallel...</div>
+        `;
+        if (window.lucide) lucide.createIcons();
+      }
+      this.scrollToBottom();
+      return;
+    }
 
     if (node === 'direct_chat') {
       const directAnswer = update.answer || state.direct_answer || '';
@@ -792,6 +816,7 @@ class ThothApp {
     } else if (contentBody) {
       const count = this.scrapeTopN || 15;
       const stageMessages = {
+        'clarification_gate': '🔍 Evaluating research mandate & topic scope...',
         'search': `🔍 Discovering top ${count} peer-reviewed papers across arXiv, Semantic Scholar & OpenAlex...`,
         'snowball': '🌐 Snowballing academic citation network & recommendations...',
         'scrape': `📖 Fanning out concurrent scrape across top ${count} primary sources...`,
@@ -829,7 +854,7 @@ class ThothApp {
 
   sendFollowup(query) {
     if (!this.currentState) {
-      this.startResearch(query);
+      this.startResearch(query, false, true);
       return;
     }
 
