@@ -1,8 +1,3 @@
-"""
-backend/eval/runner.py - Comprehensive Evaluation Suite Runner for Thoth.
-Executes multi-agent Golden evaluations, tracks pass rates, measures Router reliability,
-and computes calibrated percentile thresholds.
-"""
 import logging
 from typing import Dict, Any, List, Optional, Set, Tuple
 import json
@@ -69,9 +64,7 @@ from backend.agents import (
 
 logger = logging.getLogger("ThothEvalRunner")
 
-
 def evaluate_six_agents(judge: Optional[ThothJudgeModel] = None) -> Dict[str, Any]:
-    """Runs evaluation across the 6 newly covered multi-agent stages with per-golden detail."""
     judge = judge or get_thoth_judge_model()
     results = {}
 
@@ -89,7 +82,6 @@ def evaluate_six_agents(judge: Optional[ThothJudgeModel] = None) -> Dict[str, An
         details = []
         for g in goldens:
             if agent_name == "mindmap_updater":
-                # Assert programmatic uniqueness of node IDs in actual output
                 try:
                     parsed_out = json.loads(g.expected_output)
                     node_ids = [n["id"] for n in parsed_out.get("nodes", [])]
@@ -121,9 +113,7 @@ def evaluate_six_agents(judge: Optional[ThothJudgeModel] = None) -> Dict[str, An
 
     return results
 
-
 def evaluate_adversarial_groundedness(judge: Optional[ThothJudgeModel] = None) -> Dict[str, Any]:
-    """Evaluates Truth Guard against adversarial mixed true/false goldens."""
     judge = judge or get_thoth_judge_model()
     metric = get_adversarial_groundedness_metric(judge)
     goldens = get_adversarial_groundedness_goldens()
@@ -151,12 +141,7 @@ def evaluate_adversarial_groundedness(judge: Optional[ThothJudgeModel] = None) -
         "avg": sum(scores) / len(scores) if scores else 0.0
     }
 
-
 def evaluate_calibrated_report_benchmark(judge: Optional[ThothJudgeModel] = None) -> Dict[str, Any]:
-    """
-    Evaluates 16 hand-labeled benchmark reports (8 good, 8 bad) with per-report details
-    and calculates empirical pass threshold separating the distributions.
-    """
     judge = judge or get_thoth_judge_model()
     metric = get_report_correctness_metric(judge, threshold=0.7)
     benchmarks = get_report_correctness_benchmark()
@@ -200,14 +185,7 @@ def evaluate_calibrated_report_benchmark(judge: Optional[ThothJudgeModel] = None
         "total_evaluated": len(benchmarks)
     }
 
-
 def evaluate_router_reliability_stress(judge: Optional[ThothJudgeModel] = None, router_chain_instance: Optional[Any] = None) -> Dict[str, Any]:
-    """
-    Stress-tests the Intent Router over 20+ queries:
-    1. Measures discrete exact route classification accuracy (correct_count / total)
-    2. Measures continuous GEval alignment score
-    3. Measures raw JSON parse failures independently (must be 0%)
-    """
     from unittest.mock import patch
     judge = judge or get_thoth_judge_model()
     router_metric = get_router_accuracy_metric(judge)
@@ -222,7 +200,6 @@ def evaluate_router_reliability_stress(judge: Optional[ThothJudgeModel] = None, 
         user_query = g.input
         expected_route = g.expected_output
 
-        # Invoke route_followup_intent logic
         if router_chain_instance is not None:
             with patch("backend.pipeline.router_chain", router_chain_instance):
                 decision = route_followup_intent(
@@ -241,7 +218,6 @@ def evaluate_router_reliability_stress(judge: Optional[ThothJudgeModel] = None, 
 
         chosen_route = decision.get("route")
 
-        # Check raw parse validity
         if not chosen_route or chosen_route not in {"LOCAL_QA", "WEB_SEARCH", "REPORT_EXPANSION"}:
             parse_failures += 1
 
@@ -249,7 +225,6 @@ def evaluate_router_reliability_stress(judge: Optional[ThothJudgeModel] = None, 
         if is_exact_match:
             discrete_matches += 1
 
-        # GEval evaluation
         tc = LLMTestCase(
             input=user_query,
             context=[f"Expected route: {expected_route}. User asked: {user_query}"],
@@ -282,20 +257,11 @@ def evaluate_router_reliability_stress(judge: Optional[ThothJudgeModel] = None, 
         "detailed_queries": detailed_queries
     }
 
-
-# =============================================================================
-# 5. MULTI-TURN CONVERSATION SIMULATION & EVALUATION RUNNER
-# =============================================================================
-
 async def model_callback(
     input: str,
     turns: Optional[List[Turn]] = None,
     thread_id: Optional[str] = None
 ) -> Turn:
-    """
-    Executes a single multi-turn follow-up turn using stream_followup_turn.
-    Maps simulator thread_id directly to Thoth's SQLite session_id (db.py schema).
-    """
     from backend.memory.db import get_session, save_session
     from backend.memory.index import hybrid_search
     from backend.pipeline import stream_followup_turn
@@ -303,7 +269,6 @@ async def model_callback(
     thread_id = thread_id or "default-session-sim"
     turns = turns or []
 
-    # 1. Retrieve or create session state from database
     db_session = get_session(thread_id)
     if db_session:
         try:
@@ -341,7 +306,6 @@ async def model_callback(
             })
         )
 
-    # 2. Build current_state
     chat_turns = []
     for i in range(0, len(turns), 2):
         u_turn = turns[i] if i < len(turns) else None
@@ -369,7 +333,6 @@ async def model_callback(
     updated_report = report
     updated_mindmap = mindmap
 
-    # 3. Execute stream_followup_turn incrementally
     for event_type, payload in stream_followup_turn(current_state, user_query=input):
         if event_type == "subsearch":
             sq = payload.get("query", "")
@@ -389,7 +352,6 @@ async def model_callback(
         elif event_type == "answer":
             answer_text = payload.get("answer", "")
 
-    # 4. Extract retrieval context if not yet populated
     if not retrieval_context:
         try:
             matched_notes = hybrid_search(input, top_k=4)
@@ -405,7 +367,6 @@ async def model_callback(
             "[src-fowler-2012-surface]: Surface codes: Towards practical large-scale quantum computation."
         ]
 
-    # 5. Persist updated turn history and session state to database
     chat_turns.append({
         "user_query": input,
         "assistant_response": answer_text,
@@ -432,9 +393,7 @@ async def model_callback(
         tools_called=tools_called if tools_called else None
     )
 
-
 def categorize_golden_scenario(golden_name: str) -> str:
-    """Categorizes a ConversationalGolden by scenario type for granular pass rate tracking."""
     name = (golden_name or "").upper()
     if "TOPIC_KICKOFF" in name:
         return "new_topic"
@@ -454,12 +413,7 @@ def categorize_golden_scenario(golden_name: str) -> str:
         return "mixed_dialogue"
     return "general_followup"
 
-
 def extract_vault_note_ids_from_context(retrieval_context: Optional[List[str]]) -> Set[str]:
-    """
-    Extracts deterministic Vault Note IDs (e.g., 'src-quantum-surface-code', 'topic-surface_codes',
-    'claim-threshold-1pct', or bracketed identifiers '[note_id]') from a turn's retrieval_context list.
-    """
     note_ids: Set[str] = set()
     if not retrieval_context:
         return note_ids
@@ -469,31 +423,26 @@ def extract_vault_note_ids_from_context(retrieval_context: Optional[List[str]]) 
             continue
         text = str(entry).strip()
 
-        # Pattern 1: "[note_id]: snippet text..."
         bracket_match = re.match(r"^\[([^\]]+)\]", text)
         if bracket_match:
             note_ids.add(bracket_match.group(1).strip())
             continue
 
-        # Pattern 2: "Vault Note: note_id"
         vault_note_match = re.match(r"^Vault Note:\s*([^\s,;]+)", text, re.IGNORECASE)
         if vault_note_match:
             note_ids.add(vault_note_match.group(1).strip())
             continue
 
-        # Pattern 3: Embedded Thoth standard note ID prefixes (topic-*, src-*, claim-*)
         embedded_ids = re.findall(r"\b(?:topic|src|claim)-[a-zA-Z0-9_\-\.]+\b", text)
         if embedded_ids:
             for eid in embedded_ids:
                 note_ids.add(eid.strip())
             continue
 
-        # Pattern 4: Identifier-like standalone token
         if len(text) < 60 and " " not in text and ":" not in text:
             note_ids.add(text)
 
     return note_ids
-
 
 def compute_search_stability_vault_overlap(
     simulated_cases: List[Any],
@@ -505,23 +454,6 @@ def compute_search_stability_vault_overlap(
     ),
     threshold_pct: float = 50.0
 ) -> Dict[str, Any]:
-    """
-    Directly inspects retrieval_context across the three same-question-different-phrasing goldens
-    on the relevant turn to compute the deterministic overlap percentage of retrieved vault note IDs.
-
-    This provides a deterministic check on top of LLM-judged metrics, isolating hybrid_search
-    retrieval consistency from downstream generation and LLM judge variance.
-
-    Returns:
-        Dict containing:
-            - phrasing_note_ids: Dict mapping each formulation name to its retrieved note ID set.
-            - shared_note_ids: List of note IDs present in all 3 phrasings (3-way intersection).
-            - union_note_ids: List of all unique note IDs across all 3 phrasings.
-            - jaccard_overlap_pct: 3-way Jaccard overlap (|A ∩ B ∩ C| / |A ∪ B ∪ C| * 100).
-            - pairwise_overlaps: Dict of pairwise Jaccard percentages (A_vs_B, B_vs_C, A_vs_C).
-            - pairwise_avg_overlap_pct: Average of the three pairwise overlaps.
-            - is_stable: Boolean indicating if 3-way overlap meets or exceeds threshold_pct.
-    """
     eval_goldens = goldens or get_multiturn_goldens()
     name_to_case = {}
     for tc, g in zip(simulated_cases, eval_goldens):
@@ -550,7 +482,6 @@ def compute_search_stability_vault_overlap(
     s_b = note_sets.get(formulations[1], set())
     s_c = note_sets.get(formulations[2], set())
 
-    # 3-way intersection & union
     intersection_3way = s_a & s_b & s_c
     union_3way = s_a | s_b | s_c
 
@@ -585,23 +516,16 @@ def compute_search_stability_vault_overlap(
         "is_stable": jaccard_3way_pct >= threshold_pct
     }
 
-
 def run_conversational_simulation_and_evals(
     goldens: Optional[List[ConversationalGolden]] = None,
     judge: Optional[ThothJudgeModel] = None,
     max_user_simulations: int = 8,
     model_callback_fn: Optional[Any] = None
 ) -> Dict[str, Any]:
-    """
-    Simulates multi-turn conversations using ConversationSimulator and evaluates
-    across all 6 conversational metrics, tracking pass rate per metric and per scenario type.
-    Also computes deterministic vault note ID retrieval overlap across search-stability phrasings.
-    """
     judge = judge or get_thoth_judge_model()
     eval_goldens = goldens or get_multiturn_goldens()
     cb = model_callback_fn or model_callback
 
-    # 1. Run ConversationSimulator
     simulator = ConversationSimulator(
         model_callback=cb,
         simulator_model=judge,
@@ -612,7 +536,6 @@ def run_conversational_simulation_and_evals(
         max_user_simulations=max_user_simulations
     )
 
-    # 2. Instantiate all 6 Conversational Metrics
     completeness_metric = get_conversation_completeness_metric(judge)
     retention_metric = get_knowledge_retention_metric(judge)
     topic_adherence_metric = get_topic_adherence_metric(
@@ -632,7 +555,6 @@ def run_conversational_simulation_and_evals(
         "tool_use": tool_use_metric
     }
 
-    # 3. Evaluate each test case and collect scores
     scenario_stats: Dict[str, Dict[str, List[float]]] = {}
     metric_scores: Dict[str, List[float]] = {m: [] for m in metrics_map}
     detailed_cases = []
@@ -661,7 +583,6 @@ def run_conversational_simulation_and_evals(
 
         detailed_cases.append(case_result)
 
-    # 4. Compute aggregate and per-scenario pass rates (threshold >= 0.70)
     pass_rate_by_metric = {}
     for m_name, scores in metric_scores.items():
         pass_count = sum(1 for s in scores if s >= 0.70)
@@ -674,13 +595,11 @@ def run_conversational_simulation_and_evals(
             p_count = sum(1 for s in scores if s >= 0.70)
             pass_rate_by_scenario[sc_type][m_name] = round((p_count / len(scores)) if scores else 0.0, 3)
 
-    # 5. Compute deterministic search stability vault note ID overlap across phrasing goldens
     stability_overlap = compute_search_stability_vault_overlap(
         simulated_cases=simulated_cases,
         goldens=eval_goldens
     )
 
-    # 6. Compute Wasted-Token & Retrieval Precision Metrics across all simulated turns
     from backend.eval.logical_integrity import compute_retrieval_precision_and_wasted_tokens
     turn_precisions = []
     total_wasted_tokens = 0

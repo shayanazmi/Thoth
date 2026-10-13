@@ -1,9 +1,3 @@
-"""
-Living Report Manipulation Package for Thoth.
-Provides heading detection, safe in-place section patching,
-and markdown structure validation.
-"""
-
 from backend.reports.sections import (
     MarkdownSection,
     find_markdown_sections,

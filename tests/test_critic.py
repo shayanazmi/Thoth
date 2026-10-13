@@ -4,7 +4,6 @@ from backend.agents import CriticScore, critic_chain
 from backend.pipeline import critic_node, ResearchState
 from langchain_core.runnables import RunnableSequence
 
-
 class TestCriticScoreAndNode(unittest.TestCase):
     def test_critic_score_pydantic_validation(self):
         valid_dict = {
@@ -52,7 +51,6 @@ class TestCriticScoreAndNode(unittest.TestCase):
 
     @patch.object(RunnableSequence, "invoke")
     def test_critic_node_loud_error_on_invalid_json(self, mock_invoke):
-        # Corrupted response missing overall_score and fields
         mock_invoke.return_value = {"invalid_field": "bad content"}
 
         state: ResearchState = {
@@ -67,7 +65,7 @@ class TestCriticScoreAndNode(unittest.TestCase):
 
         with self.assertRaises(ValueError) as cm:
             critic_node(state)
-        
+
         self.assertIn("Failed to parse structured CriticScore", str(cm.exception))
 
     @patch.object(RunnableSequence, "invoke")
@@ -105,7 +103,6 @@ class TestCriticScoreAndNode(unittest.TestCase):
         res = critic_node(state)
         self.assertEqual(res["score"], 8.6)
         self.assertIn("**Overall** | **8.6**", res["feedback"])
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""
-Thoth · Web Server Gateway (FastAPI + SSE)
-===========================================
-High-performance asynchronous API gateway streaming multi-agent research telemetry,
-multi-turn conversational turns, and serving the 3D shadcn/ui frontend.
-"""
-
 import os
 import sys
 import json
@@ -18,14 +10,17 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
-# Add project root to sys.path
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from backend.orchestrator import stream_research_pipeline
 from backend.pipeline import stream_followup_turn
-from backend.agents import direct_chat_chain, strip_chain_of_thought
+from backend.agents import (
+    direct_chat_chain,
+    strip_chain_of_thought,
+    sanitize_log_message,
+)
 from backend.memory.vault import list_notes, read_note, DEFAULT_VAULT_DIR
 from backend.conversation import (
     synthesize_research_mandate,
@@ -36,7 +31,6 @@ from backend.conversation import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ThothWebServer")
-
 
 app = FastAPI(title="Thoth Research Gateway", version="3.0.0")
 
@@ -51,42 +45,58 @@ app.add_middleware(
 import re
 
 def is_casual_query(text: str) -> bool:
-    """Detects simple greetings, meta-questions, or casual chat that does not require an 8-agent academic pipeline."""
-    clean = text.strip().lower()
-    clean = re.sub(r"[^\w\s]", "", clean)
-    
-    casual_patterns = [
-        r"^(hello|hi|hey|greetings|howdy|hola|yo)$",
-        r"^(who are you|what are you|what is your name|who made you)$",
-        r"^(how are you|how do you do|whats up|sup)$",
-        r"^(help|what can you do|what do you do|how to use|commands)$",
-        r"^(thanks|thank you|thx|cheers)$",
-        r"^(good morning|good afternoon|good evening|good day)$",
-        r"^(test|testing|ping|are you there)$"
-    ]
-    if any(re.match(p, clean) for p in casual_patterns):
-        return True
-    
-    if len(clean.split()) == 1 and clean in {"hi", "hello", "hey", "hola", "sup", "thoth", "help"}:
-        return True
-    
-    return False
+    if not text or not isinstance(text, str):
+        return False
 
+    raw = text.strip()
+    if not raw or raw.startswith("/"):
+        return False
+
+    try:
+        from backend.intellectual_rigour import resolve_thinker_command
+        if resolve_thinker_command(raw) is not None:
+            return False
+    except ImportError:
+        pass
+
+    try:
+        esc = detect_escalation_intent(raw)
+        if esc.get("state") == EscalationState.RESEARCH_READY:
+            return False
+    except Exception:
+        pass
+
+    clean = re.sub(r"[^\w\s\']", " ", raw.lower())
+    clean = clean.replace("'", "")
+    clean = re.sub(r"\s+", " ", clean).strip()
+    if not clean:
+        return False
+
+    casual_patterns = [
+        r"^(thoth\s+)?(hello|hi|hey|greetings|howdy|hola|yo)(\s+(there|thoth|friend|assistant|bot))?$",
+        r"^thoth$",
+        r"^((?:(?:hello|hi|hey|greetings|howdy|hola|yo)(?:\s+(?:there|thoth|friend|assistant|bot))?\s+)?)(how\s+are\s+you(\s+doing)?|how\s+do\s+you\s+do|how\s+is\s+it\s+going|hows\s+it\s+going|whats\s+up|what\s+is\s+up|sup)(\s+(today|thoth|there))?$",
+        r"^((?:(?:hello|hi|hey|greetings)(?:\s+(?:there|thoth))?\s+)?)(good\s+(morning|afternoon|evening|day|night))(\s+thoth)?$",
+        r"^((?:(?:hello|hi|hey|greetings)(?:\s+(?:there|thoth))?\s+)?)(who\s+are\s+you|what\s+are\s+you|what\s+is\s+your\s+name|who\s+made\s+you|who\s+created\s+you|who\s+is\s+thoth|what\s+is\s+thoth|tell\s+me\s+about\s+yourself)(\s+thoth)?$",
+        r"^((?:(?:hello|hi|hey|greetings)(?:\s+(?:there|thoth))?\s+)?)(help|what\s+can\s+you\s+do|what\s+do\s+you\s+do|how\s+to\s+use|commands|what\s+are\s+your\s+capabilities|can\s+you\s+help\s+me)(\s+thoth)?$",
+        r"^(thanks|thank\s+you|thank\s+you\s+very\s+much|thanks\s+a\s+lot|thank\s+you\s+so\s+much|many\s+thanks|thx|cheers)(\s+thoth)?$",
+        r"^(youre\s+welcome|you\s+are\s+welcome|no\s+problem|anytime|my\s+pleasure)$",
+        r"^(ok|okay|got\s+it|understood|great|cool|awesome|nice)(\s+thanks|\s+thank\s+you)?$",
+        r"^((bye|goodbye|see\s+you(\s+later)?|see\s+ya|talk\s+to\s+you\s+later|have\s+a\s+good\s+day|cya)(\s+thoth)?)$",
+        r"^(test|testing|ping|pong|are\s+you\s+there|are\s+you\s+alive|status)$",
+    ]
+
+    return any(re.match(p, clean) for p in casual_patterns)
 
 @app.post("/api/research/stream")
 async def api_stream_research(request: Request):
-    """
-    Server-Sent Events endpoint streaming the 8-agent research pipeline in real-time,
-    with an ultra-fast path for casual greetings and general inquiries.
-    """
     body = await request.json()
     topic = body.get("topic", "Autonomous Research Topic")
     mode = body.get("mode", "auto")
     role = body.get("role", "senior academic researcher")
     tone = body.get("tone", "formal and analytical")
     scrape_top_n = int(body.get("scrape_top_n", 15))
-    
-    # Natural language paper count detection (e.g. 'research X with 20 papers' or 'top 10 papers')
+
     match_papers = re.search(r'\b(?:top|scrape|fetch|analyze|with)\s+(\d{1,2})\s+papers?\b', topic, re.IGNORECASE)
     if match_papers:
         try:
@@ -102,32 +112,48 @@ async def api_stream_research(request: Request):
     logger.info(f"[SSE STREAM] Request for topic: '{topic}' (mode={mode}, papers={scrape_top_n}, inherited_turns={len(initial_turns)})")
 
     async def event_generator():
-        # Fast path for greetings and casual conversation (<500ms)
         if mode == "fast_chat" or is_casual_query(topic):
             logger.info(f"[SSE FAST-PATH] Detected casual/greeting query: '{topic}'. Generating direct conversational response.")
+            is_fallback = False
+            error_details = None
             try:
                 loop = asyncio.get_running_loop()
                 raw_ans = await loop.run_in_executor(None, lambda: direct_chat_chain.invoke({"user_query": topic}))
                 clean_ans = strip_chain_of_thought(raw_ans)
             except Exception as e:
+                is_fallback = True
+                error_details = f"{type(e).__name__}: {sanitize_log_message(str(e))}"
+                logger.error(f"[SSE FAST-PATH ERROR] Direct chat invocation failed in /api/research/stream ({type(e).__name__}): {sanitize_log_message(str(e))}")
                 clean_ans = f"Greetings! I am Thoth, the Divine Scribe. How may I assist your scientific or technical research today?"
+
+            update_data = {
+                "answer": clean_ans,
+                "fallback": is_fallback,
+                "degraded": is_fallback,
+            }
+            if is_fallback:
+                update_data["error"] = error_details
+
+            state_data = {
+                "topic": "General Inquiries & Exploration",
+                "report": "",
+                "direct_answer": clean_ans,
+                "fallback": is_fallback,
+                "degraded": is_fallback,
+                "follow_up_questions": [
+                    "Quantum Computing Surface Codes Error Correction",
+                    "CRISPR Prime Editing off-target fidelity breakthroughs",
+                    "LLM Mechanistic Interpretability sparse autoencoders",
+                    "How does Thoth's Truth Guard verify claims against primary sources?"
+                ] if not is_fallback else []
+            }
 
             yield {
                 "event": "message",
                 "data": json.dumps({
                     "node": "direct_chat",
-                    "update": {"answer": clean_ans},
-                    "state": {
-                        "topic": "General Inquiries & Exploration",
-                        "report": "",
-                        "direct_answer": clean_ans,
-                        "follow_up_questions": [
-                            "Quantum Computing Surface Codes Error Correction",
-                            "CRISPR Prime Editing off-target fidelity breakthroughs",
-                            "LLM Mechanistic Interpretability sparse autoencoders",
-                            "How does Thoth's Truth Guard verify claims against primary sources?"
-                        ]
-                    }
+                    "update": update_data,
+                    "state": state_data
                 })
             }
             yield {
@@ -136,7 +162,6 @@ async def api_stream_research(request: Request):
             }
             return
 
-        # Pre-flight Clarification Check
         mandate = synthesize_research_mandate(
             user_query=topic,
             chat_turns=initial_turns,
@@ -166,11 +191,8 @@ async def api_stream_research(request: Request):
                 }
                 return
 
-        # Execute full multi-agent stream_research_pipeline in threadpool
         loop = asyncio.get_running_loop()
         queue = asyncio.Queue()
-
-
 
         def _worker():
             try:
@@ -183,7 +205,6 @@ async def api_stream_research(request: Request):
                     initial_turns=initial_turns,
                     initial_summary=initial_summary
                 ):
-                    # Clean state for JSON serialization
                     clean_state = {
                         "topic": current_state.get("topic", ""),
                         "report": current_state.get("report", ""),
@@ -208,7 +229,6 @@ async def api_stream_research(request: Request):
             finally:
                 asyncio.run_coroutine_threadsafe(queue.put(None), loop)
 
-        # Run generator in separate background thread
         loop.run_in_executor(None, _worker)
 
         while True:
@@ -227,12 +247,8 @@ async def api_stream_research(request: Request):
 
     return EventSourceResponse(event_generator())
 
-
 @app.post("/api/followup/stream")
 async def api_stream_followup(request: Request):
-    """
-    Server-Sent Events endpoint streaming multi-turn follow-up dialogue and living report expansions.
-    """
     body = await request.json()
     current_state = body.get("state", {})
     user_query = body.get("user_query", "")
@@ -243,51 +259,69 @@ async def api_stream_followup(request: Request):
     async def event_generator():
         loop = asyncio.get_running_loop()
 
-        # Fast direct dialogue path (<500ms)
         if mode_override == "fast_chat" or is_casual_query(user_query):
             logger.info(f"[SSE FAST FOLLOWUP] Direct dialogue path for: '{user_query}'")
+            is_fallback = False
+            error_details = None
             try:
                 raw_ans = await loop.run_in_executor(None, lambda: direct_chat_chain.invoke({"user_query": user_query}))
                 clean_ans = strip_chain_of_thought(raw_ans)
             except Exception as e:
+                is_fallback = True
+                error_details = f"{type(e).__name__}: {sanitize_log_message(str(e))}"
+                logger.error(f"[SSE FAST FOLLOWUP ERROR] Direct chat invocation failed in /api/followup/stream ({type(e).__name__}): {sanitize_log_message(str(e))}")
                 clean_ans = "I am at your service. How may I assist your research?"
-            
+
             chat_turns = list(current_state.get("chat_turns", []))
-            chat_turns.append({
+            turn_record = {
                 "turn": len(chat_turns) + 1,
                 "user_query": user_query,
                 "assistant_response": clean_ans,
-                "route": "FAST_CHAT"
-            })
+                "route": "FAST_CHAT",
+                "fallback": is_fallback,
+                "degraded": is_fallback,
+            }
+            chat_turns.append(turn_record)
+
+            ans_payload = {
+                "answer": clean_ans,
+                "route": "FAST_CHAT",
+                "citations": [],
+                "fallback": is_fallback,
+                "degraded": is_fallback,
+            }
+            if is_fallback:
+                ans_payload["error"] = error_details
 
             yield {
                 "event": "message",
                 "data": json.dumps({
                     "event": "answer",
-                    "payload": {
-                        "answer": clean_ans,
-                        "route": "FAST_CHAT",
-                        "citations": []
-                    }
+                    "payload": ans_payload
                 })
             }
+
+            comp_payload = {
+                "user_query": user_query,
+                "answer": clean_ans,
+                "route": "FAST_CHAT",
+                "citations": [],
+                "chat_turns": chat_turns,
+                "conversation_summary": current_state.get("conversation_summary", ""),
+                "fallback": is_fallback,
+                "degraded": is_fallback,
+                "follow_up_questions": [
+                    "Explore key breakthroughs in this area",
+                    "What are the major contradictory perspectives in the literature?",
+                    "How can these findings be applied in real-world deployment?"
+                ] if not is_fallback else []
+            }
+
             yield {
                 "event": "message",
                 "data": json.dumps({
                     "event": "followup_complete",
-                    "payload": {
-                        "user_query": user_query,
-                        "answer": clean_ans,
-                        "route": "FAST_CHAT",
-                        "citations": [],
-                        "chat_turns": chat_turns,
-                        "conversation_summary": current_state.get("conversation_summary", ""),
-                        "follow_up_questions": [
-                            "Explore key breakthroughs in this area",
-                            "What are the major contradictory perspectives in the literature?",
-                            "How can these findings be applied in real-world deployment?"
-                        ]
-                    }
+                    "payload": comp_payload
                 })
             }
             return
@@ -307,8 +341,9 @@ async def api_stream_followup(request: Request):
                     }
                     asyncio.run_coroutine_threadsafe(queue.put(event_data), loop)
             except Exception as e:
-                logger.error(f"[SSE FOLLOWUP ERROR] {e}")
-                asyncio.run_coroutine_threadsafe(queue.put({"event": "error", "payload": {"error": str(e)}}), loop)
+                clean_err = sanitize_log_message(str(e))
+                logger.error(f"[SSE FOLLOWUP ERROR] {clean_err}")
+                asyncio.run_coroutine_threadsafe(queue.put({"event": "error", "payload": {"error": clean_err}}), loop)
             finally:
                 asyncio.run_coroutine_threadsafe(queue.put(None), loop)
 
@@ -325,45 +360,33 @@ async def api_stream_followup(request: Request):
 
     return EventSourceResponse(event_generator())
 
-
 @app.get("/health")
 def api_health():
-    """Health check endpoint."""
     return {"status": "ok", "app": "Thoth Research Intelligence"}
-
 
 @app.get("/api/status")
 def api_status():
-    """Returns telemetry and circuit breaker status."""
     from backend.telemetry import get_telemetry_status
     return get_telemetry_status()
 
-
 @app.get("/api/sessions")
 def api_list_sessions(limit: int = 20):
-    """Lists saved research sessions from SQLite database."""
     from backend.memory.db import list_sessions
     return list_sessions(limit=limit)
 
-
 @app.get("/api/reports")
 def api_list_reports(limit: int = 20):
-    """Lists saved synthesis reports from SQLite database."""
     from backend.memory.db import list_reports
     return list_reports(limit=limit)
 
-
 @app.get("/api/vault/graph")
 def api_vault_graph(root_node: Optional[str] = None, max_depth: int = 2):
-    """Returns nodes and edges from the Obsidian vault knowledge graph."""
     from backend.memory.graph import export_citation_subgraph
     start = [root_node] if root_node else None
     return export_citation_subgraph(start_notes=start, max_depth=max_depth)
 
-
 @app.get("/api/vault/notes")
 def api_list_vault_notes():
-    """Returns all topic and source notes cataloged in the Obsidian Vault."""
     try:
         notes = list_notes(DEFAULT_VAULT_DIR)
         return {"notes": notes}
@@ -371,30 +394,31 @@ def api_list_vault_notes():
         logger.error(f"[VAULT LIST ERROR] {e}")
         return {"notes": []}
 
-
 @app.get("/api/vault/note/{note_id}")
 def api_get_vault_note(note_id: str):
-    """Reads content and frontmatter of a specific note from the Vault."""
     try:
         note_obj = read_note(note_id, vault_dir=DEFAULT_VAULT_DIR)
         if not note_obj:
-            raise HTTPException(status_code=404, detail="Note not found")
+            raise HTTPException(status_code=404, detail=f"Note '{note_id}' not found")
         return {
-            "id": note_obj.id,
-            "type": note_obj.type,
+            "id": note_obj.note_id,
+            "type": note_obj.note_type,
             "content": note_obj.content,
-            "frontmatter": note_obj.frontmatter
+            "frontmatter": note_obj.frontmatter,
+            "note_id": note_obj.note_id,
+            "note_type": note_obj.note_type,
+            "file_path": note_obj.file_path,
         }
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Note '{note_id}' not found")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[VAULT READ ERROR] {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/api/research/clarify")
 async def api_check_clarification(request: Request):
-    """
-    Evaluates whether a proposed research topic requires scoping clarification.
-    """
     body = await request.json()
     topic = body.get("topic", "")
     chat_turns = body.get("chat_turns", [])
@@ -413,13 +437,8 @@ async def api_check_clarification(request: Request):
         }
     )
 
-
 @app.post("/api/conversation/escalate")
 async def api_detect_escalation(request: Request):
-    """
-    Evaluates conversational intent to detect whether dialogue has reached
-    a point where Deep Research should be suggested or triggered.
-    """
     body = await request.json()
     query = body.get("query", "")
     chat_turns = body.get("chat_turns", [])
@@ -432,24 +451,19 @@ async def api_detect_escalation(request: Request):
     )
     return JSONResponse(content=escalation)
 
-
-# Mount Static Assets
 _WEB_DIR = os.path.join(_PROJECT_ROOT, "web")
 
 app.mount("/css", StaticFiles(directory=os.path.join(_WEB_DIR, "css")), name="css")
 app.mount("/js", StaticFiles(directory=os.path.join(_WEB_DIR, "js")), name="js")
 app.mount("/assets", StaticFiles(directory=os.path.join(_WEB_DIR, "assets")), name="assets")
 
-
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
-    """Serves the main single-page application."""
     index_file = os.path.join(_WEB_DIR, "index.html")
     if os.path.exists(index_file):
         with open(index_file, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     return HTMLResponse("<h1>Thoth Studio index.html not found.</h1>", status_code=404)
-
 
 if __name__ == "__main__":
     import uvicorn

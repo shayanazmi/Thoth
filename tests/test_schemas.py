@@ -1,4 +1,5 @@
 import unittest
+import json
 import pydantic
 from pydantic import ValidationError
 from unittest.mock import patch, MagicMock
@@ -8,7 +9,8 @@ from backend.agents import (
     FactVerificationReport,
     CriticScore,
     safe_extract_json,
-    strip_chain_of_thought
+    strip_chain_of_thought,
+    router_prompt
 )
 from backend.scholarly import SourceCandidate
 from backend.memory.vault import Note
@@ -25,14 +27,7 @@ from backend.pipeline import (
 )
 from backend.orchestrator import create_initial_state
 
-
 class TestPydanticSchemas(unittest.TestCase):
-    """Validation tests for all Pydantic models in backend/agents.py."""
-
-    # -------------------------------------------------------------------------
-    # 1. VerificationResult & FactVerificationReport
-    # -------------------------------------------------------------------------
-
     def test_verification_result_valid_construction(self):
         res = VerificationResult(
             claim="Superconducting qubits require dilution refrigerators.",
@@ -46,16 +41,13 @@ class TestPydanticSchemas(unittest.TestCase):
         self.assertEqual(res.reason_if_failed, "")
 
     def test_verification_result_missing_required_field_raises(self):
-        # Missing 'claim'
         with self.assertRaises(ValidationError):
             VerificationResult(is_valid=True)
 
-        # Missing 'is_valid'
         with self.assertRaises(ValidationError):
             VerificationResult(claim="Quantum claim")
 
     def test_verification_result_invalid_types_raise(self):
-        # Unsupported complex type for boolean is_valid
         with self.assertRaises(ValidationError):
             VerificationResult(claim="Claim", is_valid=[1, 2, 3])
 
@@ -69,17 +61,11 @@ class TestPydanticSchemas(unittest.TestCase):
         self.assertEqual(len(report.results), 1)
         self.assertEqual(report.results[0].claim, "Cat qubits have biased noise.")
 
-        # Missing results field
         with self.assertRaises(ValidationError):
             FactVerificationReport()
 
-        # Invalid item inside results list
         with self.assertRaises(ValidationError):
             FactVerificationReport(results=[{"invalid_key": "bad"}])
-
-    # -------------------------------------------------------------------------
-    # 2. CriticScore (including 0.0 - 10.0 range constraints)
-    # -------------------------------------------------------------------------
 
     def test_critic_score_valid_construction(self):
         score = CriticScore(
@@ -99,7 +85,6 @@ class TestPydanticSchemas(unittest.TestCase):
         self.assertEqual(len(score.areas_to_improve), 1)
 
     def test_critic_score_missing_required_fields_raises(self):
-        # Missing reasoning and verdict
         with self.assertRaises(ValidationError):
             CriticScore(
                 faithfulness=8.0,
@@ -113,7 +98,6 @@ class TestPydanticSchemas(unittest.TestCase):
             )
 
     def test_critic_score_out_of_bounds_raises_validation_error(self):
-        """Confirms Field(ge=0.0, le=10.0) constraint prevents out-of-range scores."""
         valid_kwargs = {
             "faithfulness": 8.0,
             "relevance": 8.0,
@@ -127,7 +111,6 @@ class TestPydanticSchemas(unittest.TestCase):
             "reasoning": "Solid"
         }
 
-        # Test upper bound violation (> 10.0) for each dimensional field and overall_score
         score_fields = [
             "faithfulness",
             "relevance",
@@ -148,10 +131,7 @@ class TestPydanticSchemas(unittest.TestCase):
             with self.assertRaises(ValidationError, msg=f"Score < 0.0 for {field_name} did not raise ValidationError"):
                 CriticScore(**bad_low)
 
-
 class TestDataclassSchemas(unittest.TestCase):
-    """Validation tests for dataclasses in backend/scholarly.py and backend/memory/vault.py."""
-
     def test_source_candidate_valid_construction(self):
         candidate = SourceCandidate(
             title="A Survey of Quantum Error Correction",
@@ -167,18 +147,15 @@ class TestDataclassSchemas(unittest.TestCase):
         self.assertEqual(candidate.title, "A Survey of Quantum Error Correction")
         self.assertEqual(candidate.citation_count, 42)
 
-        # Verify to_dict serialization
         d = candidate.to_dict()
         self.assertEqual(d["title"], candidate.title)
         self.assertEqual(d["source_api"], "arxiv")
 
-        # Verify snippet generation
         snippet = candidate.to_formatted_snippet()
         self.assertIn("A Survey of Quantum Error Correction", snippet)
         self.assertIn("10.1000/qec123", snippet)
 
     def test_source_candidate_missing_required_positional_args_raises(self):
-        # Missing all required positional fields
         with self.assertRaises(TypeError):
             SourceCandidate()
 
@@ -194,25 +171,17 @@ class TestDataclassSchemas(unittest.TestCase):
         self.assertEqual(note.note_type, "concept")
         self.assertEqual(note.frontmatter["title"], "Topological Qubits")
 
-        # Verify to_dict output
         d = note.to_dict()
         self.assertEqual(d["note_id"], "note_topological_qubits")
         self.assertEqual(d["type"], "concept")
         self.assertEqual(d["content"], note.content)
 
     def test_note_missing_required_positional_args_raises(self):
-        # Missing required positional fields (note_id, note_type, content)
         with self.assertRaises(TypeError):
             Note()
 
-
 class TestTypedDictsAndConstructors(unittest.TestCase):
-    """Validation tests for TypedDict shapes and their producing factory functions."""
-
     def test_research_state_created_with_all_required_keys(self):
-        """
-        Confirms create_initial_state populates every key declared in ResearchState TypedDict.
-        """
         state = create_initial_state(
             topic="Fault-Tolerant Quantum Computing",
             role="senior scientist",
@@ -249,23 +218,18 @@ class TestTypedDictsAndConstructors(unittest.TestCase):
             self.assertIn(key, state, f"Key '{key}' was missing from constructed ResearchState dictionary")
             self.assertIsNotNone(state[key], f"Key '{key}' was None in constructed ResearchState dictionary")
 
-        # Confirm nested mindmap TypedDict structure in state
         self.assertIn("nodes", state["mindmap"])
         self.assertIn("edges", state["mindmap"])
         self.assertIsInstance(state["mindmap"]["nodes"], list)
         self.assertIsInstance(state["mindmap"]["edges"], list)
 
     def test_mindmap_node_construction_and_structure(self):
-        """
-        Tests that mindmap_node produces valid MindMapNode and MindMapEdge structures.
-        """
         sample_state = {
             "topic": "Neutral Atom Qubits",
             "report": "# Neutral Atom Qubits\nRydberg blockade enables two-qubit entangling gates.",
             "cumulative_sources": [{"url": "https://arxiv.org/abs/2401.12345"}]
         }
 
-        # Mock mindmap extractor chain
         mock_mm_chain = MagicMock()
         mock_mm_chain.invoke.return_value = '{"nodes": [{"id": "root", "label": "Neutral Atoms", "type": "topic", "details": "Core topic", "group": "topic"}, {"id": "sub1", "label": "Rydberg States", "type": "subtopic", "details": "Interactions", "group": "subtopic"}], "edges": [{"from": "root", "to": "sub1", "label": "enables"}]}'
 
@@ -279,29 +243,18 @@ class TestTypedDictsAndConstructors(unittest.TestCase):
         self.assertEqual(len(mm["nodes"]), 2)
         self.assertEqual(len(mm["edges"]), 1)
 
-        # Validate node fields
         node = mm["nodes"][0]
         self.assertEqual(node["id"], "root")
         self.assertEqual(node["label"], "Neutral Atoms")
         self.assertEqual(node["type"], "topic")
 
-        # Validate edge fields
         edge = mm["edges"][0]
         self.assertEqual(edge["from"], "root")
         self.assertEqual(edge["to"], "sub1")
         self.assertEqual(edge["label"], "enables")
 
-
 class TestSchemaConsumersMalformedLLMOutputs(unittest.TestCase):
-    """
-    Tests error handling when raw LLM output is malformed, truncated, has thinking tokens,
-    or contains extra prose across all schema consumer nodes.
-    """
-
     def test_critic_node_handles_thinking_tokens_and_markdown_fences(self):
-        """
-        Confirms critic_node extracts CriticScore cleanly from <think>...</think> and markdown fences.
-        """
         llm_output_with_thinking = """
         <think>
         I will evaluate this report against the 5 criteria:
@@ -333,7 +286,6 @@ class TestSchemaConsumersMalformedLLMOutputs(unittest.TestCase):
         self.assertIn("Faithfulness", update["feedback"])
 
     def test_critic_node_raises_informative_error_on_unparseable_output(self):
-        """Confirms critic_node raises ValueError when output cannot be salvaged."""
         mock_critic = MagicMock()
         mock_critic.invoke.return_value = "I cannot format this as JSON at all."
 
@@ -342,18 +294,13 @@ class TestSchemaConsumersMalformedLLMOutputs(unittest.TestCase):
                 critic_node({"topic": "Quantum Computing", "report": "Report content..."})
 
     def test_verifier_node_handles_malformed_and_unsupported_text(self):
-        """
-        Confirms verifier_node handles unparseable JSON by checking textual contradiction signals.
-        """
         mock_verifier = MagicMock()
 
-        # Test Case 1: Garbled JSON with contradiction keyword in text
         mock_verifier.invoke.return_value = "Error parsing: Claim 1 contradicts the provided arXiv paper."
         with patch("backend.pipeline.verifier_chain", mock_verifier):
             res1 = verifier_node({"cumulative_sources": [], "report": "Report text"})
             self.assertIn("contradicts", res1["verifier_feedback"])
 
-        # Test Case 2: Clean structured JSON
         clean_json = '{"results": [{"claim": "Qubits exist", "is_valid": true, "supporting_source_id": "src-paper", "reason_if_failed": ""}]}'
         mock_verifier.invoke.return_value = clean_json
         with patch("backend.pipeline.verifier_chain", mock_verifier):
@@ -362,9 +309,6 @@ class TestSchemaConsumersMalformedLLMOutputs(unittest.TestCase):
             self.assertEqual(len(res2["verification_results"]), 1)
 
     def test_mindmap_node_fallback_on_garbled_json(self):
-        """
-        Confirms mindmap_node gracefully falls back to default graph topology on malformed output.
-        """
         mock_mm = MagicMock()
         mock_mm.invoke.return_value = "Invalid JSON non-graph response"
 
@@ -377,9 +321,6 @@ class TestSchemaConsumersMalformedLLMOutputs(unittest.TestCase):
         self.assertEqual(res["mindmap"]["nodes"][0]["label"], "Quantum Teleportation")
 
     def test_follow_up_node_fallback_on_garbled_json(self):
-        """
-        Confirms follow_up_node produces default suggested questions when JSON parse fails.
-        """
         mock_fu = MagicMock()
         mock_fu.invoke.return_value = "Not a JSON array"
 
@@ -391,23 +332,168 @@ class TestSchemaConsumersMalformedLLMOutputs(unittest.TestCase):
         self.assertTrue(any("Quantum Annealing" in q for q in res["follow_up_questions"]))
 
     def test_intent_router_fallback_on_garbled_and_truncated_output(self):
-        """
-        Confirms route_followup_intent schema confinement falls back to LOCAL_QA on malformed output.
-        """
         mock_router = MagicMock()
 
-        # Garbled JSON
         mock_router.invoke.return_value = "Broken { route: "
         with patch("backend.pipeline.router_chain", mock_router):
             decision1 = route_followup_intent("Topic", "Mindmap", "Report", "Query")
             self.assertEqual(decision1["route"], "LOCAL_QA")
 
-        # Valid JSON but unrecognized route value
         mock_router.invoke.return_value = '{"route": "EXECUTE_UNKNOWN_SHELL"}'
         with patch("backend.pipeline.router_chain", mock_router):
             decision2 = route_followup_intent("Topic", "Mindmap", "Report", "Query")
             self.assertEqual(decision2["route"], "LOCAL_QA")
 
+    def test_intent_router_chitchat_route_classification(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "CHITCHAT", "reasoning": "Conversational greeting without research inquiry", "search_query": ""}'
+        with patch("backend.pipeline.router_chain", mock_router):
+            decision = route_followup_intent(
+                topic="Fault-Tolerant Quantum Computing",
+                mindmap_summary="5 concepts",
+                report_summary="Report overview",
+                user_query="Hello Thoth, how are you today?"
+            )
+            self.assertEqual(decision["route"], "CHITCHAT")
+            self.assertEqual(decision["reasoning"], "Conversational greeting without research inquiry")
+            self.assertEqual(decision["search_query"], "")
+
+    def test_intent_router_all_permitted_routes(self):
+        test_routes = [
+            ("LOCAL_QA", "Answerable from existing mindmap and report", ""),
+            ("WEB_SEARCH", "Requires fresh external literature probe", "Cat qubit hardware overhead 2026"),
+            ("REPORT_EXPANSION", "User explicitly requests a new section", ""),
+            ("CHITCHAT", "Casual conversational message", "")
+        ]
+        mock_router = MagicMock()
+        with patch("backend.pipeline.router_chain", mock_router):
+            for r_name, r_reason, r_query in test_routes:
+                mock_router.invoke.return_value = json.dumps({
+                    "route": r_name,
+                    "reasoning": r_reason,
+                    "search_query": r_query
+                })
+                decision = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+                self.assertEqual(decision["route"], r_name)
+                self.assertEqual(decision["reasoning"], r_reason)
+                self.assertEqual(decision["search_query"], r_query)
+
+    def test_intent_router_deep_research_branch_preserved(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "DEEP_RESEARCH_BRANCH", "reasoning": "Deep multi-stage probe", "search_query": "Surface codes deep dive"}'
+        with patch("backend.pipeline.router_chain", mock_router):
+            decision = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+            self.assertEqual(decision["route"], "DEEP_RESEARCH_BRANCH")
+            self.assertEqual(decision["search_query"], "Surface codes deep dive")
+
+    def test_intent_router_missing_and_unsupported_route_fallback(self):
+        mock_router = MagicMock()
+        with patch("backend.pipeline.router_chain", mock_router):
+            mock_router.invoke.return_value = '{"reasoning": "Missing route field", "search_query": ""}'
+            decision1 = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+            self.assertEqual(decision1["route"], "LOCAL_QA")
+
+            mock_router.invoke.return_value = '{"route": null, "reasoning": "Null route", "search_query": ""}'
+            decision2 = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+            self.assertEqual(decision2["route"], "LOCAL_QA")
+
+            mock_router.invoke.return_value = '{"route": "ARBITRARY_NONEXISTENT_ROUTE"}'
+            decision3 = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+            self.assertEqual(decision3["route"], "LOCAL_QA")
+
+    def test_intent_router_malformed_json_resilience(self):
+        mock_router = MagicMock()
+        malformed_outputs = [
+            "",
+            "   ",
+            "Not JSON at all",
+            "{\"route\": \"CHITCHAT\", unclosed...",
+            "<think>Thinking process with broken JSON</think> route: CHITCHAT",
+            "{bad_json: 123}"
+        ]
+        with patch("backend.pipeline.router_chain", mock_router):
+            for bad_output in malformed_outputs:
+                mock_router.invoke.return_value = bad_output
+                try:
+                    decision = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+                    self.assertEqual(decision["route"], "LOCAL_QA")
+                    self.assertIsInstance(decision["reasoning"], str)
+                    self.assertIsInstance(decision["search_query"], str)
+                except Exception as e:
+                    self.fail(f"route_followup_intent raised an uncaught exception on malformed output: {e}")
+
+    def test_intent_router_invocation_exception_handling_and_logging(self):
+        mock_router = MagicMock()
+        mock_router.invoke.side_effect = RuntimeError("Simulated API connection failure")
+        with patch("backend.pipeline.router_chain", mock_router):
+            with self.assertLogs("ThothPipeline", level="ERROR") as cm:
+                decision = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+                self.assertEqual(decision["route"], "LOCAL_QA")
+                self.assertIn("RuntimeError", decision["reasoning"])
+                self.assertTrue(any("Router invocation failed" in log for log in cm.output))
+
+    def test_intent_router_json_array_resilience_and_logging(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '["unexpected", "json", "array"]'
+        with patch("backend.pipeline.router_chain", mock_router):
+            with self.assertLogs("ThothPipeline", level="WARNING") as cm:
+                decision = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+                self.assertEqual(decision["route"], "LOCAL_QA")
+                self.assertTrue(any("not a dictionary" in log for log in cm.output))
+
+    def test_intent_router_diagnostic_logging_for_failure_categories(self):
+        mock_router = MagicMock()
+        with patch("backend.pipeline.router_chain", mock_router):
+            mock_router.invoke.return_value = "{completely invalid"
+            with self.assertLogs("ThothPipeline", level="WARNING") as cm1:
+                dec1 = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+                self.assertEqual(dec1["route"], "LOCAL_QA")
+                self.assertTrue(any("could not be parsed into a supported JSON value" in log for log in cm1.output))
+
+            mock_router.invoke.return_value = '{"reasoning": "Missing route"}'
+            with self.assertLogs("ThothPipeline", level="WARNING") as cm2:
+                dec2 = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+                self.assertEqual(dec2["route"], "LOCAL_QA")
+                self.assertTrue(any("missing a usable route" in log for log in cm2.output))
+
+            mock_router.invoke.return_value = '{"route": "INVALID_ACTION_123"}'
+            with self.assertLogs("ThothPipeline", level="WARNING") as cm3:
+                dec3 = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+                self.assertEqual(dec3["route"], "LOCAL_QA")
+                self.assertTrue(any("unsupported route" in log for log in cm3.output))
+
+    def test_intent_router_valid_route_info_logging(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "CHITCHAT", "reasoning": "Conversational greeting", "search_query": ""}'
+        with patch("backend.pipeline.router_chain", mock_router):
+            with self.assertLogs("ThothPipeline", level="INFO") as cm:
+                decision = route_followup_intent("Topic", "Mindmap", "Report", "Hello Thoth")
+                self.assertEqual(decision["route"], "CHITCHAT")
+                self.assertTrue(any("Router returned a valid route: 'CHITCHAT'" in log for log in cm.output))
+
+    def test_intent_router_unclosed_reasoning_fails_safely_to_fallback(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = "<think>Let us pick {\"route\": \"WEB_SEARCH\", \"search_query\": \"misleading\"}\nUnfinished..."
+        with patch("backend.pipeline.router_chain", mock_router):
+            decision = route_followup_intent("Topic", "Mindmap", "Report", "Query")
+            self.assertEqual(decision["route"], "LOCAL_QA")
+            self.assertNotEqual(decision["route"], "WEB_SEARCH")
+
+    def test_router_prompt_distinguishes_greeting_with_substantive_question(self):
+        system_msg = router_prompt.messages[0].prompt.template
+        self.assertIn("CHITCHAT", system_msg)
+        self.assertIn("Critical Instruction", system_msg)
+        self.assertIn("must NOT be classified as CHITCHAT", system_msg)
+        self.assertIn("Hi Thoth, explain fault tolerance in surface codes", system_msg)
+
+        formatted = router_prompt.format_messages(
+            topic="Quantum Computing",
+            mindmap_summary="5 nodes",
+            report_summary="Report content",
+            user_query="Hi Thoth, what is the threshold?"
+        )
+        self.assertEqual(len(formatted), 2)
+        self.assertIn("Hi Thoth, what is the threshold?", formatted[1].content)
 
 if __name__ == "__main__":
     unittest.main()

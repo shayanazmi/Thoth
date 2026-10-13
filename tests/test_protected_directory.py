@@ -1,15 +1,7 @@
-"""
-Integrity verification test suite for Protected Research Material:
-'handling api limit like feynman/'
-"""
-
 import os
 import unittest
 
-
 class TestProtectedFeynmanDirectory(unittest.TestCase):
-    """Verifies that the protected architectural reference material remains intact."""
-
     def setUp(self):
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.protected_dir = os.path.join(
@@ -48,7 +40,6 @@ class TestProtectedFeynmanDirectory(unittest.TestCase):
                 0,
                 f"Protected file {filename} is empty!",
             )
-
 
 if __name__ == "__main__":
     unittest.main()

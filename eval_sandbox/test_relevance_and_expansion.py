@@ -1,10 +1,3 @@
-"""
-eval_sandbox/test_relevance_and_expansion.py
-Evaluates:
-1. Semantic Relevance Pre-Filtering of Source Candidates.
-2. Cross-Session Multi-Turn Report Expansion & Merging.
-"""
-
 import sys
 import os
 import unittest
@@ -13,12 +6,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from backend.scholarly import SourceCandidate, rank_sources_by_relevance
 
-
 class TestRelevanceFilteringAndExpansion(unittest.TestCase):
-
     def test_semantic_relevance_filtering(self):
         topic = "Quantum Error Correction with Surface Codes and Transmon Qubits"
-        
+
         candidates = [
             SourceCandidate(
                 title="Historical Analysis of Roman Aqueducts in Gaul",
@@ -50,16 +41,14 @@ class TestRelevanceFilteringAndExpansion(unittest.TestCase):
                 source_api="arxiv"
             )
         ]
-        
-        # Rank sources by semantic relevance
+
         ranked = rank_sources_by_relevance(topic, candidates, top_k=2, min_similarity=0.20)
-        
+
         self.assertEqual(len(ranked), 2)
-        # The top ranked paper must be the quantum surface code paper
+
         self.assertIn("Surface Code", ranked[0].title)
         self.assertIn("Quantum Memory", ranked[1].title)
-        
-        # Verify off-topic papers (aqueducts, baking) were filtered out
+
         for r in ranked:
             self.assertNotIn("Aqueducts", r.title)
             self.assertNotIn("Baking", r.title)
@@ -75,7 +64,6 @@ class TestRelevanceFilteringAndExpansion(unittest.TestCase):
         self.assertEqual(len(ranked), 1)
         self.assertIn("Prime Editing", ranked[0]["title"])
         print("  ✓ Dictionary source format ranking verified.")
-
 
 if __name__ == "__main__":
     unittest.main()

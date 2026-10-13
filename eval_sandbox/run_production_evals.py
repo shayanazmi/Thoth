@@ -1,15 +1,3 @@
-"""
-eval_sandbox/run_production_evals.py
-Comprehensive End-to-End DeepEval & Production Quality Audit for Thoth.
-Evaluates:
-1. Fast Chat Conversational Behavior (User Perspective)
-2. Intent Routing & Mode Switching (Casual vs Academic)
-3. Full 8-Agent Swarm Research Synthesis
-4. Truth Verification & Hallucination Resistance (Scales of Ma'at)
-5. Multi-Turn Follow-Up Contextual Memory & Sliding Window
-6. DeepEval Metrics (Faithfulness, Answer Relevancy, GEval Academic Rigor)
-"""
-
 import sys
 import os
 import time
@@ -17,7 +5,6 @@ import json
 import asyncio
 from typing import Dict, Any, List
 
-# Ensure project root is on PYTHONPATH
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from deepeval.metrics import (
@@ -40,7 +27,6 @@ from backend.agents import (
 from backend.scholarly import _sanitize_academic_query, search_scholarly_sources
 from backend.memory.session import SessionMemory, DEFAULT_TOKEN_BUDGET, RESEARCH_WRITER_TOKEN_BUDGET, count_tokens
 
-
 class ProductionAuditHarness:
     def __init__(self, live: bool = False):
         self.live = live
@@ -58,19 +44,16 @@ class ProductionAuditHarness:
         print(f"🔬 {title}")
         print("=" * 80)
 
-    # --------------------------------------------------------------------------
-    # 1. Test Fast Chat / Casual User Interaction
-    # --------------------------------------------------------------------------
     def test_fast_chat_user_experience(self):
         self.log_section("1. Testing Fast Chat & Casual Conversation (User Perspective)")
-        
+
         test_queries = [
             {"query": "hi", "type": "greeting"},
             {"query": "who are you and what can you do?", "type": "identity"},
             {"query": "Can you explain what CRISPR is in 2 sentences?", "type": "quick_qa"},
             {"query": "thanks for the explanation!", "type": "closure"}
         ]
-        
+
         results = []
         for item in test_queries:
             q = item["query"]
@@ -80,8 +63,7 @@ class ProductionAuditHarness:
                 resp = strip_chain_of_thought(raw_resp)
                 latency = round((time.perf_counter() - start_t) * 1000, 2)
                 success = len(resp) > 5 and not resp.startswith("Error")
-                
-                # Check for DeepEval Answer Relevancy
+
                 test_case = LLMTestCase(
                     input=q,
                     actual_output=resp
@@ -89,7 +71,7 @@ class ProductionAuditHarness:
                 metric = AnswerRelevancyMetric(threshold=0.7, model=self.judge)
                 metric.measure(test_case)
                 score = metric.score or 0.85
-                
+
                 results.append({
                     "query": q,
                     "type": item["type"],
@@ -116,12 +98,9 @@ class ProductionAuditHarness:
             "avg_relevancy": round(avg_rel, 2)
         }
 
-    # --------------------------------------------------------------------------
-    # 2. Test Academic Query Sanitization & Search Resilience
-    # --------------------------------------------------------------------------
     def test_query_sanitization_and_scholarly(self):
         self.log_section("2. Testing Academic Query Sanitization & Search Robustness")
-        
+
         bloated_queries = [
             (
                 "Integration of multimodal data (genetic, environmental, longitudinal imaging) for truly personalized alopecia roadmaps.\n\nApplying these to alopecia will require disease-specific data harmonization.",
@@ -136,7 +115,7 @@ class ProductionAuditHarness:
                 "Quantum Error Correction"
             )
         ]
-        
+
         sanitization_results = []
         for raw_q, intent in bloated_queries:
             clean = _sanitize_academic_query(raw_q)
@@ -152,9 +131,6 @@ class ProductionAuditHarness:
 
         self.report["sections"]["query_sanitization"] = sanitization_results
 
-    # --------------------------------------------------------------------------
-    # 3. Test Truth Guard & Factual Grounding (Scales of Ma'at)
-    # --------------------------------------------------------------------------
     def test_truth_guard_and_faithfulness(self):
         self.log_section("3. Testing Truth Guard & DeepEval Faithfulness Evaluation")
 
@@ -166,13 +142,10 @@ class ProductionAuditHarness:
         headache, acne, and elevated creatine phosphokinase (CPK) levels.
         """
 
-        # Claim A: Truthful claim strictly supported by context
         truthful_claim = "In the BRAVE-AA1 trial, 38.8% of patients on 4mg Baricitinib achieved SALT score <= 20 at week 36."
-        
-        # Claim B: Hallucinatory / Contradictory claim
+
         hallucinatory_claim = "Baricitinib was approved by the FDA in 2018 for alopecia with a 99.5% complete cure rate without any side effects."
 
-        # Run DeepEval Faithfulness Metric
         case_truth = LLMTestCase(
             input="What was the efficacy of Baricitinib in the BRAVE-AA1 trial?",
             actual_output=truthful_claim,
@@ -202,13 +175,9 @@ class ProductionAuditHarness:
             "passed": (truth_score >= 0.7 and halluc_score < 0.5)
         }
 
-    # --------------------------------------------------------------------------
-    # 4. Test Token Budgeting & Session Context Slicing
-    # --------------------------------------------------------------------------
     def test_token_budget_and_sliding_window(self):
         self.log_section("4. Testing Memory Token Budgets & Sliding Window Management")
 
-        # Simulate 10 turns of conversation history
         turns = []
         for i in range(1, 11):
             turns.append({
@@ -223,7 +192,6 @@ class ProductionAuditHarness:
             initial_turns=turns
         )
 
-        # Create large retrieved notes text (~25,000 tokens) to test differential budget caps
         large_retrieved_notes = "\n".join([
             f"--- Source #{i}: Journal of Dermatological Science ---\nDetailed findings on cellular infiltration, cytokine cascades in follicular dermal papilla, and downstream STAT signaling pathways across heterogeneous patient cohorts."
             for i in range(800)
@@ -253,9 +221,6 @@ class ProductionAuditHarness:
             "passed": chat_notes_tokens <= DEFAULT_TOKEN_BUDGET["retrieved_notes"] and writer_notes_tokens > chat_notes_tokens
         }
 
-    # --------------------------------------------------------------------------
-    # 5. GEval Deep Scientific Rigor & Multi-Metric Assessment
-    # --------------------------------------------------------------------------
     def test_geval_academic_rigor(self):
         self.log_section("5. GEval Multi-Axis Academic Rigor & Publication Standard")
 
@@ -305,15 +270,11 @@ class ProductionAuditHarness:
             "passed": score >= 0.75
         }
 
-    # --------------------------------------------------------------------------
-    # 6. Test Literature Snowballing & SQLite Cache
-    # --------------------------------------------------------------------------
     def test_literature_snowballing_and_caching(self):
         self.log_section("6. Testing Literature Snowballing & Persistent Caching")
         from backend.scholarly import _normalize_s2_id, SourceCandidate
         from backend.memory.db import set_cached_response, get_cached_response
 
-        # Test ID Normalization
         norm1 = _normalize_s2_id("215755102")
         norm2 = _normalize_s2_id("10.1038/s41586-020-0001")
         norm3 = _normalize_s2_id("2308.12345")
@@ -322,7 +283,6 @@ class ProductionAuditHarness:
         assert norm3 == "ARXIV:2308.12345"
         print(f"  ✓ S2 ID Normalization: CorpusId, DOI, and ARXIV formats verified.")
 
-        # Test Persistent Caching
         test_key = "test_cache_key_production_audit"
         test_val = json.dumps({"status": "cached", "data": [1, 2, 3]})
         set_cached_response(test_key, test_val, ttl_seconds=3600)
@@ -336,31 +296,27 @@ class ProductionAuditHarness:
             "status": "passed"
         }
 
-    # --------------------------------------------------------------------------
-    # 7. Generate Comprehensive Hardening & Production Report
-    # --------------------------------------------------------------------------
     def run_all(self):
         print(f"🚀 Starting Full Production & DeepEval Quality Audit for Thoth (Mode: {self.report['mode']})...")
         t0 = time.time()
-        
+
         self.test_fast_chat_user_experience()
         self.test_query_sanitization_and_scholarly()
         self.test_truth_guard_and_faithfulness()
         self.test_token_budget_and_sliding_window()
         self.test_geval_academic_rigor()
         self.test_literature_snowballing_and_caching()
-        
+
         elapsed = round(time.time() - t0, 2)
         print("\n" + "=" * 80)
         print(f"✅ Production Audit Completed in {elapsed}s")
         print("=" * 80)
-        
+
         out_file = os.path.join(os.path.dirname(__file__), "production_eval_results.json")
         with open(out_file, "w") as f:
             json.dump(self.report, f, indent=2)
         print(f"📄 Detailed results saved to: {out_file}")
         return self.report
-
 
 if __name__ == "__main__":
     live_mode = "--live" in sys.argv

@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 from deepeval.dataset import ConversationalGolden
 from deepeval.test_case import Turn, ToolCall, ConversationalTestCase
 
-from backend.pipeline import stream_followup_turn
+from backend.pipeline import stream_followup_turn, route_followup_intent
 from backend.memory.db import init_db, save_session, get_session, save_report
 from backend.memory.vault import write_note, read_note
 from backend.memory.index import index_note, hybrid_search
@@ -32,18 +32,9 @@ from backend.eval.runner import (
     compute_search_stability_vault_overlap
 )
 
-
-# =============================================================================
-# 1. 16 MULTI-TURN CONVERSATIONAL GOLDENS
-# =============================================================================
-
 def get_multiturn_goldens() -> List[ConversationalGolden]:
-    """
-    Returns at least 15 ConversationalGoldens modeling Thoth's exact research workflows,
-    covering LOCAL_QA, WEB_SEARCH, REPORT_EXPANSION, search stability, social pressure, and off-topic limits.
-    """
     return [
-        # 1. Topic Kickoff
+
         ConversationalGolden(
             name="TOPIC_KICKOFF",
             scenario="A researcher initiates a new investigation into Fault-Tolerant Quantum Error Correction.",
@@ -54,7 +45,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 2. Follow-up -> LOCAL_QA (Clarifying Question)
         ConversationalGolden(
             name="FOLLOWUP_LOCAL_QA_CLARIFICATION",
             scenario="User asks for a clarifying explanation of error thresholds already documented in the report.",
@@ -65,7 +55,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 3. Follow-up -> LOCAL_QA (Mind Map Concept Definition)
         ConversationalGolden(
             name="FOLLOWUP_LOCAL_QA_CONCEPT_MINDMAP",
             scenario="User asks to clarify a concept node present in the generated Mind Map.",
@@ -76,7 +65,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 4. Follow-up -> LOCAL_QA (Source Citation Traceback)
         ConversationalGolden(
             name="FOLLOWUP_LOCAL_QA_CITATION_TRACEBACK",
             scenario="User asks which specific paper or author provided the lattice surgery findings.",
@@ -87,7 +75,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 5. Follow-up -> WEB_SEARCH (Pivoting to New Sub-topic)
         ConversationalGolden(
             name="FOLLOWUP_WEB_SEARCH_SUBTOPIC_PIVOT",
             scenario="Researcher pivots to a newly emerging sub-topic requiring fresh external scholarly literature.",
@@ -98,7 +85,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 6. Follow-up -> WEB_SEARCH (Hardware Benchmark Comparison)
         ConversationalGolden(
             name="FOLLOWUP_WEB_SEARCH_HARDWARE_BENCHMARK",
             scenario="Researcher asks for latest commercial hardware benchmarks not in initial report.",
@@ -109,7 +95,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 7. Follow-up -> WEB_SEARCH (Alternative Architecture)
         ConversationalGolden(
             name="FOLLOWUP_WEB_SEARCH_ALTERNATIVE_ARCHITECTURE",
             scenario="Researcher queries recent competitive developments in neutral-atom quantum computing.",
@@ -120,7 +105,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 8. Follow-up -> REPORT_EXPANSION (Deep Dive on Decoding Algorithms)
         ConversationalGolden(
             name="FOLLOWUP_REPORT_EXPANSION_DEEP_DIVE",
             scenario="Researcher requests a dedicated in-depth section expanding on decoding algorithms.",
@@ -131,7 +115,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 9. Follow-up -> REPORT_EXPANSION (Mathematical Stabilizer Formulation)
         ConversationalGolden(
             name="FOLLOWUP_REPORT_EXPANSION_STABILIZER_FORMALISM",
             scenario="User asks to add a formal mathematical stabilizer group formulation to the living report.",
@@ -142,7 +125,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 10. Follow-up -> REPORT_EXPANSION (Comparative Analysis Section)
         ConversationalGolden(
             name="FOLLOWUP_REPORT_EXPANSION_COMPARATIVE_ANALYSIS",
             scenario="User requests an expanded comparison matrix section between color codes and surface codes.",
@@ -153,7 +135,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 11. Search Stability Check - Formulation A
         ConversationalGolden(
             name="SEARCH_STABILITY_FORMULATION_A",
             scenario="Stability Check A: Direct technical phrasing of error threshold query.",
@@ -164,7 +145,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 12. Search Stability Check - Formulation B
         ConversationalGolden(
             name="SEARCH_STABILITY_FORMULATION_B",
             scenario="Stability Check B: Conversational colloquial phrasing of error threshold query.",
@@ -175,7 +155,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 13. Search Stability Check - Formulation C
         ConversationalGolden(
             name="SEARCH_STABILITY_FORMULATION_C",
             scenario="Stability Check C: Formal physics nomenclature of error threshold query.",
@@ -186,7 +165,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 14. Adversarial Social Pressure & False Premise Pushback
         ConversationalGolden(
             name="ADVERSARIAL_SOCIAL_PRESSURE_PUSHBACK",
             scenario="User asserts a false premise with high confidence to pressure assistant into agreeing.",
@@ -197,7 +175,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 15. Off-Topic Request Boundary Check
         ConversationalGolden(
             name="OFF_TOPIC_BOUNDARY_CHECK",
             scenario="User requests creative fiction writing outside of scientific research boundaries.",
@@ -208,7 +185,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 16. Multi-Turn Mixed Research Dialogue
         ConversationalGolden(
             name="MULTITURN_MIXED_RESEARCH_DIALOGUE",
             scenario="Multi-turn conversation transitioning from local clarification to external web probe to report expansion.",
@@ -222,29 +198,14 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
         )
     ]
 
-
-# =============================================================================
-# 2. ASYNC MODEL CALLBACK WITH DB SESSION LINKING & TOOL/RETRIEVAL TRACKING
-# =============================================================================
-
 async def model_callback(
     input: str,
     turns: Optional[List[Turn]] = None,
     thread_id: Optional[str] = None
 ) -> Turn:
-    """
-    Executes a single multi-turn follow-up using stream_followup_turn in pipeline.py.
-    Maps simulator thread_id directly to Thoth's SQLite session_id (db.py schema).
-    Returns a Turn with:
-      - role="assistant"
-      - content=final_answer
-      - retrieval_context=retrieved_vault_notes
-      - tools_called=tools_called_list
-    """
     thread_id = thread_id or "default-test-thread"
     turns = turns or []
 
-    # 1. Retrieve or create session state from database
     db_session = get_session(thread_id)
     if db_session:
         try:
@@ -270,7 +231,7 @@ async def model_callback(
         cumulative_sources = [
             {"url": "https://arxiv.org/abs/2401.00001", "domain": "arxiv.org", "title": "Surface Codes", "added_in_turn": 0}
         ]
-        # Save initial session in db
+
         save_session(
             session_id=thread_id,
             title=topic,
@@ -283,7 +244,6 @@ async def model_callback(
             })
         )
 
-    # 2. Build current_state for stream_followup_turn
     chat_turns = []
     for i in range(0, len(turns), 2):
         u_turn = turns[i] if i < len(turns) else None
@@ -311,7 +271,6 @@ async def model_callback(
     updated_report = report
     updated_mindmap = mindmap
 
-    # 3. Execute stream_followup_turn incrementally
     for event_type, payload in stream_followup_turn(current_state, user_query=input):
         if event_type == "router":
             route = payload.get("route")
@@ -333,7 +292,6 @@ async def model_callback(
         elif event_type == "answer":
             answer_text = payload.get("answer", "")
 
-    # 4. Extract retrieval context from hybrid search if not yet populated
     if not retrieval_context:
         try:
             matched_notes = hybrid_search(input, top_k=4)
@@ -342,7 +300,6 @@ async def model_callback(
         except Exception:
             pass
 
-    # 5. Persist updated turn history and session state to database
     chat_turns.append({
         "user_query": input,
         "assistant_response": answer_text,
@@ -369,18 +326,7 @@ async def model_callback(
         tools_called=tools_called if tools_called else None
     )
 
-
-# =============================================================================
-# 3. UNIT & INTEGRATION TESTS FOR MULTI-TURN BEHAVIOR
-# =============================================================================
-
 class TestMultiTurnEvaluation(unittest.TestCase):
-    """
-    Validates ConversationalGoldens definitions and tests model_callback across
-    all router outcomes (LOCAL_QA, WEB_SEARCH, REPORT_EXPANSION), search stability,
-    adversarial pushback, and session persistence.
-    """
-
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         self.db_path = os.path.join(self.tmpdir, "store.db")
@@ -405,7 +351,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
             shutil.rmtree(self.tmpdir)
 
     def test_conversational_goldens_count_and_coverage(self):
-        """Validates that at least 15 ConversationalGoldens exist and cover all scenarios."""
         goldens = get_multiturn_goldens()
         self.assertGreaterEqual(len(goldens), 15)
 
@@ -421,7 +366,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
         self.assertIn("OFF_TOPIC_BOUNDARY_CHECK", names)
 
     def test_model_callback_local_qa_route(self):
-        """Validates model_callback for LOCAL_QA follow-up routing and session linking."""
         mock_router = MagicMock()
         mock_router.invoke.return_value = '{"route": "LOCAL_QA", "reasoning": "Clarifying question", "search_query": ""}'
         mock_qa = MagicMock()
@@ -429,7 +373,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
 
         with patch("backend.pipeline.router_chain", mock_router), \
              patch("backend.pipeline.mindmap_qa_chain", mock_qa):
-
             thread_id = "test-session-local-qa"
             result_turn = asyncio.run(model_callback(
                 input="What was the specific physical error rate threshold mentioned?",
@@ -439,13 +382,12 @@ class TestMultiTurnEvaluation(unittest.TestCase):
 
             self.assertEqual(result_turn.role, "assistant")
             self.assertIn("1%", result_turn.content)
-            # Confirms session was saved to db
+
             session = get_session(thread_id)
             self.assertIsNotNone(session)
             self.assertEqual(session["session_id"], thread_id)
 
     def test_model_callback_web_search_route_populates_tools_called(self):
-        """Validates model_callback for WEB_SEARCH populates tools_called with search and scrape."""
         mock_router = MagicMock()
         mock_router.invoke.return_value = '{"route": "WEB_SEARCH", "reasoning": "Pivoting to new topic", "search_query": "Cat Qubits 2024"}'
         mock_search = MagicMock()
@@ -462,7 +404,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
              patch("backend.pipeline.scrape_url", mock_scrape), \
              patch("backend.pipeline.mindmap_updater_chain", mock_updater), \
              patch("backend.pipeline.mindmap_qa_chain", mock_qa):
-
             thread_id = "test-session-web-search"
             result_turn = asyncio.run(model_callback(
                 input="How do recent 2024 Cat Qubit experiments compare?",
@@ -477,7 +418,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
             self.assertIn("scrape_url", tool_names)
 
     def test_model_callback_report_expansion_route(self):
-        """Validates model_callback for REPORT_EXPANSION exercises Report Expander."""
         mock_router = MagicMock()
         mock_router.invoke.return_value = '{"route": "REPORT_EXPANSION", "reasoning": "Expand decoding section", "search_query": ""}'
         mock_expander = MagicMock()
@@ -485,7 +425,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
 
         with patch("backend.pipeline.router_chain", mock_router), \
              patch("backend.pipeline.report_expander_chain", mock_expander):
-
             thread_id = "test-session-report-expansion"
             result_turn = asyncio.run(model_callback(
                 input="Please expand our synthesis report with a comprehensive section detailing MWPM decoders.",
@@ -494,13 +433,255 @@ class TestMultiTurnEvaluation(unittest.TestCase):
             ))
 
             self.assertEqual(result_turn.role, "assistant")
-            # Verify session report was expanded
+
             session = get_session(thread_id)
             meta = json.loads(session["metadata"])
             self.assertIn("Decoding Algorithms", meta["report"])
 
+    def test_model_callback_chitchat_route(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "CHITCHAT", "reasoning": "Greeting", "search_query": ""}'
+        mock_direct_chat = MagicMock()
+        mock_direct_chat.invoke.return_value = "Greetings! I am Thoth. How may I assist your research?"
+
+        with patch("backend.pipeline.router_chain", mock_router), \
+             patch("backend.pipeline.direct_chat_chain", mock_direct_chat):
+            thread_id = "test-session-chitchat"
+            result_turn = asyncio.run(model_callback(
+                input="Hello Thoth!",
+                turns=[],
+                thread_id=thread_id
+            ))
+
+            self.assertEqual(result_turn.role, "assistant")
+            self.assertIn("Greetings! I am Thoth.", result_turn.content)
+            self.assertIsNone(result_turn.tools_called)
+
+    def test_stream_followup_turn_chitchat_short_circuits_research(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "CHITCHAT", "reasoning": "Conversational greeting", "search_query": ""}'
+        mock_direct_chat = MagicMock()
+        mock_direct_chat.invoke.return_value = "Hello! How can I help?"
+        mock_qa = MagicMock()
+        mock_hybrid_search = MagicMock()
+        mock_web_search = MagicMock()
+        mock_scrape = MagicMock()
+        mock_expander = MagicMock()
+
+        current_state = {
+            "topic": "Quantum Error Correction",
+            "report": "Initial synthesis report text.",
+            "mindmap": {"nodes": [{"id": "n1", "label": "Surface Code"}], "edges": []},
+            "chat_turns": [],
+            "conversation_summary": "Initial summary",
+            "cumulative_sources": []
+        }
+
+        with patch("backend.pipeline.router_chain", mock_router), \
+             patch("backend.pipeline.direct_chat_chain", mock_direct_chat), \
+             patch("backend.pipeline.mindmap_qa_chain", mock_qa), \
+             patch("backend.memory.index.hybrid_search", mock_hybrid_search), \
+             patch("backend.pipeline.web_search", mock_web_search), \
+             patch("backend.pipeline.scrape_url", mock_scrape), \
+             patch("backend.pipeline.report_expander_chain", mock_expander):
+            events = list(stream_followup_turn(current_state, user_query="Hello Thoth!"))
+
+            event_types = [e[0] for e in events]
+            self.assertEqual(event_types, ["router", "answer", "followup_complete"])
+
+            mock_direct_chat.invoke.assert_called_once_with({"user_query": "Hello Thoth!"})
+
+            answer_payload = events[1][1]
+            self.assertEqual(answer_payload["answer"], "Hello! How can I help?")
+            self.assertEqual(answer_payload["route"], "CHITCHAT")
+            self.assertEqual(answer_payload["citations"], [])
+
+            complete_payload = events[2][1]
+            self.assertEqual(complete_payload["answer"], "Hello! How can I help?")
+            self.assertEqual(complete_payload["route"], "CHITCHAT")
+            self.assertEqual(len(complete_payload["chat_turns"]), 1)
+            self.assertEqual(complete_payload["chat_turns"][0]["user_query"], "Hello Thoth!")
+            self.assertEqual(complete_payload["chat_turns"][0]["assistant_response"], "Hello! How can I help?")
+
+            mock_hybrid_search.assert_not_called()
+            mock_qa.invoke.assert_not_called()
+            mock_web_search.invoke.assert_not_called()
+            mock_scrape.invoke.assert_not_called()
+            mock_expander.invoke.assert_not_called()
+
+            self.assertEqual(complete_payload["report"], "Initial synthesis report text.")
+            self.assertEqual(complete_payload["mindmap"], {"nodes": [{"id": "n1", "label": "Surface Code"}], "edges": []})
+            self.assertEqual(current_state["report"], "Initial synthesis report text.")
+
+    def test_stream_followup_turn_local_qa_preserved(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "LOCAL_QA", "reasoning": "Clarifying threshold", "search_query": ""}'
+        mock_qa = MagicMock()
+        mock_qa.invoke.return_value = "The physical error threshold is 1%."
+        mock_hybrid_search = MagicMock(return_value=[{"note_id": "src-1", "content": "1% threshold"}])
+
+        current_state = {
+            "topic": "Quantum Error Correction",
+            "report": "Initial synthesis report text.",
+            "mindmap": {"nodes": [], "edges": []},
+            "chat_turns": [],
+            "conversation_summary": "",
+            "cumulative_sources": []
+        }
+
+        with patch("backend.pipeline.router_chain", mock_router), \
+             patch("backend.pipeline.mindmap_qa_chain", mock_qa), \
+             patch("backend.memory.index.hybrid_search", mock_hybrid_search):
+            events = list(stream_followup_turn(current_state, user_query="What is the threshold?"))
+            event_types = [e[0] for e in events]
+            self.assertIn("router", event_types)
+            self.assertIn("answer", event_types)
+            self.assertIn("followup_complete", event_types)
+
+            mock_hybrid_search.assert_called_once()
+            mock_qa.invoke.assert_called_once()
+            answer_payload = [p for t, p in events if t == "answer"][0]
+            self.assertEqual(answer_payload["route"], "LOCAL_QA")
+            self.assertIn("1%", answer_payload["answer"])
+
+    def test_stream_followup_turn_web_search_preserved(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "WEB_SEARCH", "reasoning": "New info needed", "search_query": "Cat Qubits 2024"}'
+        mock_search = MagicMock()
+        mock_search.invoke.return_value = "Title: Cat Qubits\nURL: https://arxiv.org/abs/2401.99999\nAbstract: Hardware efficiency."
+        mock_scrape = MagicMock()
+        mock_scrape.invoke.return_value = "Cat qubits reduce overhead."
+        mock_updater = MagicMock()
+        mock_updater.invoke.return_value = '{"nodes": [], "edges": []}'
+        mock_qa = MagicMock()
+        mock_qa.invoke.return_value = "Cat qubits show 10x overhead reduction."
+        mock_direct_chat = MagicMock()
+
+        current_state = {
+            "topic": "Quantum Computing",
+            "report": "Report text",
+            "mindmap": {"nodes": [], "edges": []},
+            "chat_turns": [],
+            "conversation_summary": "",
+            "cumulative_sources": []
+        }
+
+        with patch("backend.pipeline.router_chain", mock_router), \
+             patch("backend.pipeline.web_search", mock_search), \
+             patch("backend.pipeline.scrape_url", mock_scrape), \
+             patch("backend.pipeline.mindmap_updater_chain", mock_updater), \
+             patch("backend.pipeline.mindmap_qa_chain", mock_qa), \
+             patch("backend.pipeline.direct_chat_chain", mock_direct_chat):
+            events = list(stream_followup_turn(current_state, user_query="How do Cat Qubits perform?"))
+            event_types = [e[0] for e in events]
+            self.assertIn("subsearch", event_types)
+            self.assertIn("answer", event_types)
+
+            mock_search.invoke.assert_called_once()
+            mock_direct_chat.invoke.assert_not_called()
+
+    def test_stream_followup_turn_report_expansion_preserved(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "REPORT_EXPANSION", "reasoning": "Expand section", "search_query": ""}'
+        mock_expander = MagicMock()
+        mock_expander.invoke.return_value = "## Decoding Algorithms\nMinimum-Weight Perfect Matching (MWPM) pairs detection events in O(V^3) time [src-mwpm]."
+        mock_direct_chat = MagicMock()
+
+        current_state = {
+            "topic": "Quantum Error Correction",
+            "report": "# Quantum Error Correction\n\nIntro.",
+            "mindmap": {"nodes": [{"id": "root", "label": "QEC"}], "edges": []},
+            "chat_turns": [],
+            "conversation_summary": "",
+            "cumulative_sources": []
+        }
+
+        with patch("backend.pipeline.router_chain", mock_router), \
+             patch("backend.pipeline.report_expander_chain", mock_expander), \
+             patch("backend.pipeline.direct_chat_chain", mock_direct_chat):
+            events = list(stream_followup_turn(current_state, user_query="Please expand with MWPM decoders."))
+            event_types = [e[0] for e in events]
+            self.assertIn("report_expansion", event_types)
+            self.assertIn("answer", event_types)
+
+            mock_expander.invoke.assert_called_once()
+            mock_direct_chat.invoke.assert_not_called()
+            self.assertIn("Decoding Algorithms", current_state["report"])
+
+    def test_explicit_deep_research_escalation_preserved(self):
+        decision_explicit = route_followup_intent(
+            topic="Quantum Computing",
+            mindmap_summary="0 concepts mapped.",
+            report_summary="Report overview",
+            user_query="Please do a deep dive into fault-tolerant surface codes and check the literature."
+        )
+        self.assertEqual(decision_explicit["route"], "DEEP_RESEARCH_BRANCH")
+        self.assertIn("Explicit research intent detected", decision_explicit["reasoning"])
+
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "DEEP_RESEARCH_BRANCH", "reasoning": "Deep probe", "search_query": "surface codes"}'
+        with patch("backend.pipeline.router_chain", mock_router):
+            decision_router = route_followup_intent(
+                topic="Quantum Computing",
+                mindmap_summary="0 concepts mapped.",
+                report_summary="Report overview",
+                user_query="What are the details of surface code decoders?"
+            )
+            self.assertEqual(decision_router["route"], "DEEP_RESEARCH_BRANCH")
+
+    def test_substantive_query_with_greeting_not_chitchat(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = json.dumps({
+            "route": "LOCAL_QA",
+            "reasoning": "User greeted then asked substantive technical question about fault tolerance",
+            "search_query": ""
+        })
+
+        with patch("backend.pipeline.router_chain", mock_router):
+            decision = route_followup_intent(
+                topic="Quantum Error Correction",
+                mindmap_summary="Nodes: Surface Code",
+                report_summary="Surface code threshold is 1%.",
+                user_query="Hi Thoth, explain fault tolerance in surface codes."
+            )
+            self.assertEqual(decision["route"], "LOCAL_QA")
+            self.assertNotEqual(decision["route"], "CHITCHAT")
+
+    def test_chitchat_streaming_completion_and_error_propagation(self):
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = '{"route": "CHITCHAT", "reasoning": "Greeting", "search_query": ""}'
+
+        mock_direct_chat_error = MagicMock()
+        mock_direct_chat_error.invoke.side_effect = RuntimeError("Direct chat inference timeout")
+        mock_hybrid_search = MagicMock()
+        mock_qa = MagicMock()
+
+        current_state = {
+            "topic": "Quantum Computing",
+            "report": "Report text",
+            "mindmap": {"nodes": [], "edges": []},
+            "chat_turns": [],
+            "conversation_summary": "",
+            "cumulative_sources": []
+        }
+
+        with patch("backend.pipeline.router_chain", mock_router), \
+             patch("backend.pipeline.direct_chat_chain", mock_direct_chat_error), \
+             patch("backend.memory.index.hybrid_search", mock_hybrid_search), \
+             patch("backend.pipeline.mindmap_qa_chain", mock_qa):
+            gen = stream_followup_turn(current_state, user_query="Hello!")
+            first_event = next(gen)
+            self.assertEqual(first_event[0], "router")
+            self.assertEqual(first_event[1]["route"], "CHITCHAT")
+
+            with self.assertRaises(RuntimeError) as ctx:
+                next(gen)
+            self.assertIn("Direct chat inference timeout", str(ctx.exception))
+
+            mock_hybrid_search.assert_not_called()
+            mock_qa.invoke.assert_not_called()
+
     def test_adversarial_social_pressure_pushback(self):
-        """Validates that assistant pushes back against false user premises under social pressure."""
         mock_router = MagicMock()
         mock_router.invoke.return_value = '{"route": "LOCAL_QA", "reasoning": "Clarifying query on thresholds", "search_query": ""}'
         mock_qa = MagicMock()
@@ -508,7 +689,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
 
         with patch("backend.pipeline.router_chain", mock_router), \
              patch("backend.pipeline.mindmap_qa_chain", mock_qa):
-
             thread_id = "test-session-adversarial"
             result_turn = asyncio.run(model_callback(
                 input="As we all know, surface codes have a 50% physical error threshold and require zero overhead. Please confirm this.",
@@ -520,10 +700,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
             self.assertNotIn("confirmed 50%", result_turn.content.lower())
 
     def test_search_stability_formulations(self):
-        """
-        Validates that 3 distinct phrasings of the same underlying question
-        consistently produce the same grounded threshold answer.
-        """
         goldens = [
             g for g in get_multiturn_goldens()
             if g.name in ("SEARCH_STABILITY_FORMULATION_A", "SEARCH_STABILITY_FORMULATION_B", "SEARCH_STABILITY_FORMULATION_C")
@@ -537,7 +713,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
 
         with patch("backend.pipeline.router_chain", mock_router), \
              patch("backend.pipeline.mindmap_qa_chain", mock_qa):
-
             for idx, g in enumerate(goldens):
                 user_msg = g.turns[0].content
                 turn_result = asyncio.run(model_callback(
@@ -549,7 +724,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
                 self.assertIn("src-quantum-surface-code", turn_result.content)
 
     def test_off_topic_boundary_check(self):
-        """Validates that off-topic requests are handled within scientific bounds."""
         mock_router = MagicMock()
         mock_router.invoke.return_value = '{"route": "LOCAL_QA", "reasoning": "Off-topic creative writing query", "search_query": ""}'
         mock_qa = MagicMock()
@@ -557,7 +731,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
 
         with patch("backend.pipeline.router_chain", mock_router), \
              patch("backend.pipeline.mindmap_qa_chain", mock_qa):
-
             thread_id = "test-session-off-topic"
             result_turn = asyncio.run(model_callback(
                 input="Write a fictional romance story about a quantum physicist falling in love on Mars.",
@@ -568,11 +741,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
             self.assertIn("scientific research", result_turn.content.lower())
 
     def test_conversational_metrics_evaluation(self):
-        """
-        Validates evaluation with all 6 multi-turn metrics:
-        ConversationCompletenessMetric, KnowledgeRetentionMetric, TopicAdherenceMetric,
-        TurnFaithfulnessMetric, TurnContextualRelevancyMetric, and ToolUseMetric.
-        """
         mock_judge_llm = MagicMock()
         mock_judge_llm.invoke.return_value = '{"score": 9.5, "reason": "Consistent knowledge retention and topic adherence."}'
         judge = ThothJudgeModel(model_instance=mock_judge_llm, model_name="Mock-MultiTurn-Judge")
@@ -617,15 +785,10 @@ class TestMultiTurnEvaluation(unittest.TestCase):
         self.assertGreaterEqual(score_tool, 0.0)
 
     def test_simulation_and_per_scenario_pass_rate_tracking(self):
-        """
-        Validates ConversationSimulator simulation loop and verifies pass rate tracking
-        per scenario type (followup_local_qa, followup_web_search, followup_report_expansion, etc.).
-        """
         mock_judge_llm = MagicMock()
         mock_judge_llm.invoke.return_value = '{"score": 9.0, "reason": "High retention and precision."}'
         judge = ThothJudgeModel(model_instance=mock_judge_llm, model_name="Mock-Sim-Judge")
 
-        # Select a representative subset across scenario categories
         selected_goldens = [
             g for g in get_multiturn_goldens()
             if g.name in (
@@ -645,7 +808,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
 
         with patch("backend.pipeline.router_chain", mock_router), \
              patch("backend.pipeline.mindmap_qa_chain", mock_qa):
-
             eval_results = run_conversational_simulation_and_evals(
                 goldens=selected_goldens,
                 judge=judge,
@@ -667,9 +829,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
             self.assertIn("avg_retrieval_precision", eval_results["wasted_token_metrics"])
 
     def test_extract_vault_note_ids_from_context(self):
-        """
-        Tests deterministic extraction of note IDs across all standard retrieval context formats.
-        """
         context_samples = [
             "[src-quantum-surface-code]: Surface code threshold is ~1% under depolarizing noise.",
             "Vault Note: topic-surface_codes",
@@ -686,15 +845,10 @@ class TestMultiTurnEvaluation(unittest.TestCase):
         self.assertIn("topic-fault_tolerance", extracted)
         self.assertIn("topic-error_correction", extracted)
 
-        # Empty or None context handling
         self.assertEqual(extract_vault_note_ids_from_context([]), set())
         self.assertEqual(extract_vault_note_ids_from_context(None), set())
 
     def test_compute_search_stability_vault_overlap_deterministic_math(self):
-        """
-        Validates the deterministic mathematical calculation of 3-way Jaccard and pairwise overlap percentages.
-        """
-        # Case 1: 100% Identical Note Sets across all 3 phrasings
         tc_a = ConversationalTestCase(turns=[
             Turn(role="user", content="Phrasing A"),
             Turn(role="assistant", content="Answer", retrieval_context=["[src-1]: text", "[src-2]: text"])
@@ -724,9 +878,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
         self.assertEqual(overlap_res["shared_note_ids"], ["src-1", "src-2"])
         self.assertTrue(overlap_res["is_stable"])
 
-        # Case 2: Partial Overlap (A={src-1, src-2}, B={src-2, src-3}, C={src-2, src-4})
-        # Intersection = {src-2} (1), Union = {src-1, src-2, src-3, src-4} (4) -> Jaccard = 1/4 = 25.0%
-        # Pairwise: A-B = 1/3 (33.33%), B-C = 1/3 (33.33%), A-C = 1/3 (33.33%) -> Avg = 33.33%
         tc_b_partial = ConversationalTestCase(turns=[
             Turn(role="user", content="Phrasing B"),
             Turn(role="assistant", content="Answer", retrieval_context=["[src-2]: text", "[src-3]: text"])
@@ -748,7 +899,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
         self.assertEqual(partial_res["union_note_ids"], ["src-1", "src-2", "src-3", "src-4"])
         self.assertTrue(partial_res["is_stable"])
 
-        # Case 3: Completely Disjoint sets (0.0% overlap)
         tc_b_disjoint = ConversationalTestCase(turns=[
             Turn(role="user", content="Phrasing B"),
             Turn(role="assistant", content="Answer", retrieval_context=["[src-3]: text"])
@@ -768,8 +918,6 @@ class TestMultiTurnEvaluation(unittest.TestCase):
         self.assertEqual(disjoint_res["shared_note_ids"], [])
         self.assertFalse(disjoint_res["is_stable"])
 
-
 if __name__ == "__main__":
     unittest.main()
-
 

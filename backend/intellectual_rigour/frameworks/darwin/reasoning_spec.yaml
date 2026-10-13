@@ -1,0 +1,56 @@
+id: darwinian_mechanism
+type: reasoning_framework
+
+thinker:
+  name: Charles Darwin
+  historical_era: 1809-1882
+  primary_tradition: Generative Evolutionary Mechanisms, Population Thinking & Selection Constraints
+
+purpose:
+  - generative_mechanism_audit
+  - variation_and_distribution_structure_analysis
+  - differential_persistence_and_propagation_test
+  - selection_pressures_and_environmental_filters_mapping
+  - historical_developmental_pathway_reconstruction
+
+applies_to:
+  - complex_adaptive_systems
+  - evolutionary_and_genetic_models
+  - multi_agent_dynamics
+  - competitive_dynamics_and_ecology
+  - historical_development_and_cumulative_processes
+
+does_not_apply_to:
+  - static_deductive_proofs
+  - instantaneous_time_invariant_relations
+  - purely_normative_ethics
+
+reasoning_operations:
+  - characterize_underlying_variation_and_diversity
+  - identify_differential_survival_persistence_and_propagation
+  - map_environmental_constraints_and_filtering_pressures
+  - construct_competing_generative_mechanisms_m1_m2_mn
+  - evaluate_required_conditions_and_observable_signatures
+  - trace_cumulative_developmental_pathways_over_time
+  - attack_unexplained_discontinuities_and_special_pleading
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - competing_mechanisms: list of string
+
+historical_basis:
+  primary_sources:
+    - "On the Origin of Species by Means of Natural Selection (1859)"
+    - "The Descent of Man, and Selection in Relation to Sex (1871)"
+    - "The Variation of Animals and Plants under Domestication (1868)"
+  core_doctrine:
+    - Population Thinking vs Typological Essentialism: Variation within a population is the primary reality, not an imperfection of an ideal type.
+    - Three Conditions for Generative Evolution: (1) Phenotypic variation, (2) Differential fitness/survival under constraints, (3) Heritability/propagation.
+    - Gradual Cumulative Selection: Complex structures arise via cumulative modifications preserved by differential utility.
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to evolutionary algorithms, neural architecture search, multi-agent game-theoretic dynamics, market competition, and cultural evolution.

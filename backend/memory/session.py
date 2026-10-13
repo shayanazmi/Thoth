@@ -6,19 +6,17 @@ from backend.agents import conversation_summarizer_chain
 
 logger = logging.getLogger("ThothSessionMemory")
 
-# Default token budget allocation for conversational Q&A turns
 DEFAULT_TOKEN_BUDGET: Dict[str, int] = {
     "system": 1000,
-    "retrieved_notes": 16000,  # Expanded from 2500 to allow rich academic context
+    "retrieved_notes": 16000,
     "summary": 2500,
     "recent_turns": 4000,
     "headroom": 2000,
 }
 
-# Dedicated Token Budget for Full Deep Research Report Writer
 RESEARCH_WRITER_TOKEN_BUDGET: Dict[str, int] = {
     "system": 1500,
-    "retrieved_notes": 12000,  # 12k tokens (~48,000 chars) of curated scraped papers & primary sources
+    "retrieved_notes": 12000,
     "summary": 2000,
     "recent_turns": 2500,
     "headroom": 2000,
@@ -26,9 +24,7 @@ RESEARCH_WRITER_TOKEN_BUDGET: Dict[str, int] = {
 
 _tokenizer = None
 
-
 def get_tokenizer():
-    """Lazy loader for tiktoken encoding."""
     global _tokenizer
     if _tokenizer is None:
         try:
@@ -37,9 +33,7 @@ def get_tokenizer():
             _tokenizer = None
     return _tokenizer
 
-
 def count_tokens(text: str) -> int:
-    """Counts tokens using tiktoken cl100k_base with character heuristic fallback."""
     if not text:
         return 0
     enc = get_tokenizer()
@@ -50,11 +44,7 @@ def count_tokens(text: str) -> int:
             pass
     return max(1, len(text) // 4)
 
-
 def truncate_text_to_tokens(text: str, max_tokens: int) -> str:
-    """
-    Truncates text to fit within max_tokens limit, preserving structural boundaries where practical.
-    """
     if not text or max_tokens <= 0:
         return ""
 
@@ -89,15 +79,7 @@ def truncate_text_to_tokens(text: str, max_tokens: int) -> str:
         return raw_truncated
     return text
 
-
 class SessionMemory:
-    """
-    Manages the short-term side of memory for Thoth conversations:
-    - Maintains a rolling summary of key facts established.
-    - Maintains a FIFO buffer of recent raw conversation turns.
-    - Generates context slices sized strictly according to token budgets.
-    """
-
     def __init__(
         self,
         session_id: str = "default_session",
@@ -117,10 +99,6 @@ class SessionMemory:
         turn_metadata: Optional[Dict[str, Any]] = None,
         auto_summarize: bool = False
     ):
-        """
-        Records a new interaction turn.
-        Optionally triggers rolling summarization if turns exceed threshold.
-        """
         turn_num = len(self.turns) + 1
         turn_data = {
             "turn": turn_num,
@@ -135,13 +113,9 @@ class SessionMemory:
             self.compress_history()
 
     def update_summary(self, new_summary: str):
-        """Manually updates the rolling summary text."""
         self.summary = new_summary.strip()
 
     def compress_history(self, summarizer_chain=conversation_summarizer_chain) -> str:
-        """
-        Runs LLM summarizer over existing summary + recent turns to update rolling summary.
-        """
         if not self.turns:
             return self.summary
 
@@ -171,13 +145,6 @@ class SessionMemory:
         retrieved_notes_text: str = "",
         system_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Assembles budget-bounded slices for:
-        - system: system instructions
-        - retrieved_notes: relevant vault memory notes
-        - summary: rolling conversation summary
-        - recent_turns: recent raw conversation turns (dropping oldest if over budget)
-        """
         budget = dict(DEFAULT_TOKEN_BUDGET)
         if token_budget:
             budget.update(token_budget)
@@ -187,7 +154,6 @@ class SessionMemory:
         notes_slice = truncate_text_to_tokens(retrieved_notes_text, budget["retrieved_notes"])
         summary_slice = truncate_text_to_tokens(self.summary, budget["summary"])
 
-        # Accumulate recent turns from newest to oldest within recent_turns budget
         turns_budget = budget["recent_turns"]
         kept_turns = []
         accumulated_tokens = 0
@@ -210,7 +176,6 @@ class SessionMemory:
 
         recent_turns_slice = "\n".join(kept_turns)
 
-        # Formatted combined context
         formatted_blocks = []
         if sys_slice:
             formatted_blocks.append(f"### SYSTEM INSTRUCTIONS\n{sys_slice}")

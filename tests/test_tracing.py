@@ -37,14 +37,8 @@ from backend.memory.index import hybrid_search, index_note
 from backend.memory.vault import write_note, Note
 from backend.memory.db import init_db
 
-
 @unittest.skipUnless(DEEPEVAL_AVAILABLE, "DeepEval is required for tracing tests")
 class TestDeepEvalTracingIntegration(unittest.TestCase):
-    """
-    Offline local integration test suite verifying DeepEval @observe telemetry instrumentation
-    across Thoth's agent, llm, tool, and retriever spans.
-    """
-
     def setUp(self):
         enable_local_tracing()
         clear_local_traces()
@@ -58,10 +52,6 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_stream_research_pipeline_agent_and_nested_spans(self):
-        """
-        Executes stream_research_pipeline with mocked internal chains/tools
-        and asserts that the parent AgentSpan contains nested LLM and Tool child spans.
-        """
         mock_candidates = [
             SourceCandidate(
                 title="Superconducting Qubits Overview",
@@ -101,7 +91,6 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
              patch("backend.pipeline.mindmap_extractor_chain", mock_mindmap), \
              patch("backend.pipeline.follow_up_chain", mock_followup), \
              patch("backend.orchestrator.scrape_url", mock_scrape):
-
             events = []
             for node_name, update, state in stream_research_pipeline(
                 topic="Superconducting Qubits",
@@ -118,11 +107,9 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
         self.assertIn("mindmap", events)
         self.assertIn("follow_up", events)
 
-        # Retrieve offline in-memory traces
         traces = get_local_traces()
         self.assertGreaterEqual(len(traces), 1, "At least one trace should be captured.")
 
-        # Find the root agent trace
         agent_trace = None
         for t in traces:
             root_spans = t.get("root_spans") if isinstance(t, dict) else getattr(t, "root_spans", [])
@@ -143,7 +130,6 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
             for c in children
         ]
 
-        # Verify child spans are present under the agent span
         self.assertIn("search_node", child_names)
         self.assertIn("concurrent_scrape_urls", child_names)
         self.assertIn("writer_node", child_names)
@@ -153,10 +139,6 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
         self.assertIn("follow_up_node", child_names)
 
     def test_hybrid_search_retriever_span_with_context(self):
-        """
-        Tests that hybrid_search creates a retriever span and populates its retrieval_context.
-        """
-        # Create and index two test notes
         write_note(
             note_id="note_transmon",
             note_type="concept",
@@ -186,7 +168,6 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
         index_note(n1, db_path=self.db_path)
         index_note(n2, db_path=self.db_path)
 
-        # Mock sentence transformer embeddings
         import numpy as np
         dummy_emb = np.array([0.1] * 384, dtype=np.float32)
         with patch("backend.memory.index.get_embedding_model") as mock_emb_fn:
@@ -226,13 +207,8 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
         self.assertTrue(any("Transmon" in c for c in retrieval_ctx))
 
     def test_intent_router_llm_span_and_schema_confinement(self):
-        """
-        Tests that route_followup_intent produces an LLM span and enforces schema confinement
-        against malformed LLM output or unknown route types.
-        """
         mock_router = MagicMock()
 
-        # Test Case 1: Valid WEB_SEARCH route
         mock_router.invoke.return_value = '{"route": "WEB_SEARCH", "reasoning": "Need 2026 update", "search_query": "Quantum chips 2026"}'
         with patch("backend.pipeline.router_chain", mock_router):
             decision = route_followup_intent(
@@ -244,7 +220,6 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
             self.assertEqual(decision["route"], "WEB_SEARCH")
             self.assertEqual(decision["search_query"], "Quantum chips 2026")
 
-        # Test Case 2: Malformed output / unknown route -> Fallback to LOCAL_QA
         mock_router.invoke.return_value = "<think>I should use a weird action</think> {\"route\": \"UNSUPPORTED_BRANCH\"}"
         with patch("backend.pipeline.router_chain", mock_router):
             decision2 = route_followup_intent(
@@ -255,7 +230,6 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
             )
             self.assertEqual(decision2["route"], "LOCAL_QA")
 
-        # Verify LLM spans captured
         traces = get_local_traces()
         router_spans = []
         for t in traces:
@@ -268,16 +242,12 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
         self.assertGreaterEqual(len(router_spans), 2)
 
     def test_scholarly_search_tool_spans(self):
-        """
-        Tests that academic and web search functions generate tool spans.
-        """
         import asyncio
 
         with patch("backend.scholarly._fetch_arxiv_raw", return_value="<xml></xml>"), \
              patch("backend.scholarly._fetch_semantic_scholar_raw", return_value={"data": []}), \
              patch("backend.scholarly._fetch_openalex_raw", return_value={"results": []}), \
              patch("backend.scholarly._fetch_tavily_sync", return_value=[]):
-
             async def run_tools():
                 await search_arxiv("quantum", max_results=1)
                 await search_semantic_scholar("quantum", max_results=1)
@@ -299,7 +269,6 @@ class TestDeepEvalTracingIntegration(unittest.TestCase):
         self.assertIn("search_semantic_scholar", captured_names)
         self.assertIn("search_openalex", captured_names)
         self.assertIn("search_tavily", captured_names)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,8 +8,6 @@ ALLOWED_RELATIONS = {
     "defines", "related", "recommends", "authored_by"
 }
 
-
-
 def add_edge(
     source_note: str,
     relation: str,
@@ -17,9 +15,6 @@ def add_edge(
     confidence: float = 1.0,
     db_path: str = DEFAULT_DB_PATH
 ):
-    """
-    Inserts or updates a directed relationship between two notes in the edges table.
-    """
     clean_relation = relation.lower().strip()
     if clean_relation not in ALLOWED_RELATIONS:
         clean_relation = "related"
@@ -33,17 +28,12 @@ def add_edge(
                 confidence = excluded.confidence;
         """, (source_note, clean_relation, target_note, float(confidence)))
 
-
 def infer_edges_from_note(
     note: Union[Note, Dict[str, Any]],
     default_relation: str = "related",
     confidence: float = 1.0,
     db_path: str = DEFAULT_DB_PATH
 ) -> List[str]:
-    """
-    Automatically extracts [[wikilink]] references from note content and inserts edges.
-    Returns the list of target note IDs linked.
-    """
     if isinstance(note, Note):
         source_note = note.note_id
         content = note.content
@@ -71,18 +61,12 @@ def infer_edges_from_note(
 
     return targets
 
-
 def traverse(
     start_note: str,
     relation: Optional[str] = None,
     max_depth: int = 2,
     db_path: str = DEFAULT_DB_PATH
 ) -> List[str]:
-    """
-    Traverses the knowledge graph up to max_depth hops from start_note using BFS.
-    Optionally filters by relation type.
-    Returns an ordered list of unique connected note IDs.
-    """
     if max_depth <= 0:
         return []
 
@@ -90,7 +74,6 @@ def traverse(
     visited: Set[str] = {start_note}
     result: List[str] = []
 
-    # Queue contains tuples of (current_note_id, current_depth)
     queue = collections.deque([(start_note, 0)])
 
     while queue:
@@ -121,16 +104,12 @@ def traverse(
 
     return result
 
-
 def get_subgraph(
     start_note: str,
     max_depth: int = 2,
     relation: Optional[str] = None,
     db_path: str = DEFAULT_DB_PATH
 ) -> Dict[str, Any]:
-    """
-    Returns the connected subgraph (nodes + edges) up to max_depth hops from start_note.
-    """
     conn = init_db(db_path)
     nodes = {start_note}
     edges_list = []
@@ -174,16 +153,10 @@ def get_subgraph(
         "edges": edges_list
     }
 
-
 def find_contradictions_among_notes(
     note_ids: List[str],
     db_path: str = DEFAULT_DB_PATH
 ) -> List[Dict[str, Any]]:
-    """
-    Checks if any pairs of note IDs in the provided list are connected by a 'contradicts' edge
-    in the knowledge graph in either direction.
-    Returns a list of contradiction dictionaries: [{'source': id_a, 'target': id_b, 'confidence': float}].
-    """
     if not note_ids or len(note_ids) < 2:
         return []
 
@@ -202,13 +175,13 @@ def find_contradictions_among_notes(
     """
     params = clean_ids + clean_ids
     cursor = conn.execute(query, params)
-    
+
     seen_pairs: Set[Tuple[str, str]] = set()
     contradictions = []
 
     for row in cursor.fetchall():
         s, t, conf = row["source_note"], row["target_note"], row["confidence"]
-        # Normalize pair order to prevent duplicate reporting of bidirectional contradictions
+
         pair = (min(s, t), max(s, t))
         if pair not in seen_pairs:
             seen_pairs.add(pair)
@@ -220,22 +193,29 @@ def find_contradictions_among_notes(
 
     return contradictions
 
-
 def format_vault_context_with_contradictions(
-    notes: List[Dict[str, Any]],
+    notes: List[Union[Note, Dict[str, Any]]],
     db_path: str = DEFAULT_DB_PATH,
     max_char_per_note: int = 800
 ) -> Tuple[str, List[Dict[str, Any]]]:
-    """
-    Formats a list of retrieved vault notes into context text for LLM synthesis.
-    If any retrieved notes have 'contradicts' edges in the knowledge graph, injects
-    an explicit contradiction awareness alert to prevent contradiction leakage.
-    Returns (formatted_context_text, contradictions_found).
-    """
     if not notes:
         return "", []
 
-    note_ids = [n.get("note_id") for n in notes if n.get("note_id")]
+    norm_notes: List[Dict[str, Any]] = []
+    for n in notes:
+        if isinstance(n, Note):
+            norm_notes.append(n.to_dict())
+        elif isinstance(n, dict):
+            norm_notes.append(n)
+        elif hasattr(n, "to_dict"):
+            norm_notes.append(n.to_dict())
+        else:
+            norm_notes.append({
+                "note_id": getattr(n, "note_id", getattr(n, "id", "unknown")),
+                "content": getattr(n, "content", ""),
+            })
+
+    note_ids = [n.get("note_id") for n in norm_notes if n.get("note_id")]
     contradictions = find_contradictions_among_notes(note_ids, db_path=db_path)
 
     sections = []
@@ -252,29 +232,23 @@ def format_vault_context_with_contradictions(
         )
         sections.append("\n".join(alert_lines))
 
-    for n in notes:
+    for n in norm_notes:
         nid = n.get("note_id", "unknown")
-        content = n.get("content", "")[:max_char_per_note]
+        content = (n.get("content") or "")[:max_char_per_note]
         sections.append(f"--- Vault Note [{nid}]:\n{content}")
 
     formatted_text = "\n\n".join(sections)
     return formatted_text, contradictions
-
 
 def export_citation_subgraph(
     start_notes: Optional[List[str]] = None,
     max_depth: int = 2,
     db_path: str = DEFAULT_DB_PATH
 ) -> Dict[str, Any]:
-    """
-    Exports nodes and edges from the SQLite knowledge graph formatted for
-    interactive 2D/3D D3 network visualization in the UI.
-    """
     conn = init_db(db_path)
     nodes_dict = {}
     edges_list = []
 
-    # If start_notes provided, traverse around them; otherwise get recent graph
     if start_notes:
         collected_notes = set(start_notes)
         for sn in start_notes:
@@ -301,7 +275,6 @@ def export_citation_subgraph(
             WHERE source_note IN ({placeholders}) OR target_note IN ({placeholders})
         """, list(collected_notes) + list(collected_notes))
     else:
-        # Fetch all or top 50 recent notes
         cursor = conn.execute("""
             SELECT note_id, type, created
             FROM notes
@@ -322,7 +295,6 @@ def export_citation_subgraph(
             LIMIT 120
         """)
 
-
     seen_edges = set()
     for erow in edge_cursor.fetchall():
         s, r, t, conf = erow["source_note"], erow["relation"], erow["target_note"], erow["confidence"]
@@ -335,7 +307,7 @@ def export_citation_subgraph(
                 "relation": r,
                 "confidence": float(conf)
             })
-            # Ensure endpoints exist in nodes_dict
+
             if s not in nodes_dict:
                 nodes_dict[s] = {"id": s, "label": s, "type": "source" if s.startswith("src-") else "concept"}
             if t not in nodes_dict:
@@ -345,5 +317,4 @@ def export_citation_subgraph(
         "nodes": list(nodes_dict.values()),
         "edges": edges_list
     }
-
 

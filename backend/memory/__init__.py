@@ -1,10 +1,3 @@
-"""
-Thoth Memory & Vault Package
-============================
-Provides markdown vault management, SQLite store (FTS5 + Vector BLOBs + Knowledge Graph edges),
-and hybrid Reciprocal Rank Fusion (RRF) search.
-"""
-
 from backend.memory.vault import (
     Note,
     write_note,

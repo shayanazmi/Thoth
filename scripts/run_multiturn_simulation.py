@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-scripts/run_multiturn_simulation.py - Thoth Multi-Turn Conversation Simulation & Evaluation.
-Executes ConversationSimulator across 16 ConversationalGoldens with max_user_simulations=8,
-evaluates using the 6 DeepEval multi-turn metrics, and outputs granular pass rates per scenario.
-"""
 import sys
 import os
 import argparse
@@ -11,7 +5,6 @@ import json
 from typing import Dict, Any
 from unittest.mock import MagicMock, patch
 
-# Add project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from backend.eval import (
@@ -21,7 +14,6 @@ from backend.eval import (
     run_conversational_simulation_and_evals
 )
 from backend.telemetry import enable_local_tracing, clear_local_traces
-
 
 def main():
     parser = argparse.ArgumentParser(description="Thoth Multi-Turn Simulation & DeepEval Evaluation")
@@ -105,7 +97,6 @@ def main():
     goldens = get_multiturn_goldens()
     print(f"[INFO] Loaded {len(goldens)} ConversationalGoldens spanning 8 scenario categories.\n")
 
-    # Run simulation and evaluation
     if not args.live:
         mock_router = MagicMock()
         mock_router.invoke.side_effect = lambda inp: (
@@ -138,7 +129,6 @@ def main():
             max_user_simulations=args.max_simulations
         )
 
-    # Output detailed evaluation results
     print("\n" + "=" * 90)
     print("DETAILED SIMULATION RUN RESULTS (Per ConversationalGolden)")
     print("=" * 90)
@@ -159,7 +149,6 @@ def main():
         s_tool = f"{m.get('tool_use', {}).get('score', 0.0):.1f}"
         print(f"{name:<42} | {cat:<22} | {turns:<5} | {s_comp:<5} | {s_ret:<5} | {s_top:<5} | {s_fth:<5} | {s_rel:<5} | {s_tool:<5}")
 
-    # Output Aggregate Pass Rates
     print("\n" + "=" * 90)
     print("AGGREGATE PASS RATES (Score >= 0.70 Threshold)")
     print("=" * 90)
@@ -167,7 +156,6 @@ def main():
         status = "PASSED" if rate >= 0.70 else "FLAGGED"
         print(f"  • {m_name:<30}: {rate * 100:>5.1f}% | Status: {status}")
 
-    # Output Granular Pass Rates by Scenario Type
     print("\n" + "=" * 90)
     print("GRANULAR PASS RATES BY SCENARIO TYPE")
     print("=" * 90)
@@ -176,7 +164,6 @@ def main():
         for m_name, rate in m_rates.items():
             print(f"    - {m_name:<28}: {rate * 100:>5.1f}%")
 
-    # Output Deterministic Search Stability Vault Note ID Overlap
     overlap_info = results.get("search_stability_overlap", {})
     if overlap_info:
         print("\n" + "=" * 90)
@@ -198,7 +185,6 @@ def main():
         print(f"  • Shared Vault Note IDs (3-Way ∩)  : {shared_ids if shared_ids else '(none / all formulations empty)'}")
         print(f"  • Total Unique Note IDs (3-Way ∪)  : {union_ids if union_ids else '(none)'}")
 
-    # Output Wasted-Token Tracking & Retrieval Precision
     wasted_info = results.get("wasted_token_metrics", {})
     if wasted_info:
         print("\n" + "=" * 90)
@@ -210,7 +196,6 @@ def main():
         print(f"  • Wasted Token Volume Ratio   : {wasted_info.get('wasted_token_ratio', 0.0)*100:>5.1f}% of total retrieved vault tokens")
         print(f"  • Dialogue Turns Analyzed     : {wasted_info.get('turns_analyzed', 0):>5} turns")
 
-    # Diagnostic Summary
     print("\n" + "=" * 90)
     print("DIAGNOSTIC ANALYSIS & ROOT-CAUSE MAPPING")
     print("=" * 90)
@@ -236,7 +221,6 @@ def main():
         with open(args.save_json, "w") as f:
             json.dump(results, f, indent=2)
         print(f"[INFO] Saved complete evaluation results to {args.save_json}\n")
-
 
 if __name__ == "__main__":
     main()

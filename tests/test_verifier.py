@@ -9,11 +9,9 @@ from backend.orchestrator import extract_atomic_claims
 from backend.memory.vault import write_note, audit_vault_notes_citations
 from langchain_core.runnables import RunnableSequence
 
-
 class TestVerifierChain(unittest.TestCase):
     @patch.object(RunnableSequence, "invoke")
     def test_verifier_chain_mocked(self, mock_invoke):
-        # Fake JSON response from LLM matching FactVerificationReport schema with supporting_source_id
         fake_json_response = """{
   "results": [
     {
@@ -35,7 +33,6 @@ class TestVerifierChain(unittest.TestCase):
         fake_sources = "Source material: Quantum computing developed in late 20th century."
         fake_report = "Report: Quantum computing utilizes superposition. Quantum computers were invented in 1820."
 
-        # Execute chain with fake inputs
         raw_output = verifier_chain.invoke({
             "sources": fake_sources,
             "report": fake_report,
@@ -57,16 +54,8 @@ class TestVerifierChain(unittest.TestCase):
         self.assertEqual(report_obj.results[1].supporting_source_id, "")
 
     def test_extract_atomic_claims_direct_attribution_no_round_robin(self):
-        """
-        Verify that claims are mapped strictly to their verified supporting_source_id,
-        and not assigned via index rotation. Unattributed or invalid claims are dropped.
-        """
         source_ids = ["src-neutral_atom_tweezer", "src-superconducting_transmon"]
 
-        # Claim 1 is supported by Source 2 (transmon), NOT Source 1
-        # Claim 2 is supported by Source 1 (neutral atom), NOT Source 2
-        # Claim 3 is valid but has no supporting_source_id (should be dropped)
-        # Claim 4 is invalid (should be dropped)
         verification_results = [
             {
                 "claim": "Transmon qubits utilize superconducting Josephson junctions.",
@@ -84,7 +73,7 @@ class TestVerifierChain(unittest.TestCase):
                 "claim": "Silicon spin qubits operate at cryogenic temperatures.",
                 "is_valid": True,
                 "reason_if_failed": "",
-                "supporting_source_id": ""  # Missing attribution
+                "supporting_source_id": ""
             },
             {
                 "claim": "Quantum computers were invented in 1820.",
@@ -101,29 +90,21 @@ class TestVerifierChain(unittest.TestCase):
             verification_results=verification_results
         )
 
-        # 1. Exactly 2 claims should be written (Claim 1 and Claim 2)
         self.assertEqual(len(claims), 2)
 
-        # 2. Claim 1 points to Source 2 (superconducting_transmon), NOT Source 1
         self.assertIn("[[src-superconducting_transmon]]", claims[0])
         self.assertNotIn("[[src-neutral_atom_tweezer]]", claims[0])
 
-        # 3. Claim 2 points to Source 1 (neutral_atom_tweezer), NOT Source 2
         self.assertIn("[[src-neutral_atom_tweezer]]", claims[1])
         self.assertNotIn("[[src-superconducting_transmon]]", claims[1])
 
-        # 4. Unattributed Claim 3 and Invalid Claim 4 are completely omitted
         joined = " ".join(claims)
         self.assertNotIn("Silicon spin qubits", joined)
         self.assertNotIn("1820", joined)
 
     def test_audit_vault_notes_flags_legacy_notes(self):
-        """
-        Verify that audit_vault_notes_citations flags notes created before the fix timestamp.
-        """
         temp_dir = tempfile.mkdtemp(prefix="thoth_test_audit_vault_")
         try:
-            # 1. Write a legacy note created in the past with round-robin claims
             old_time = "2026-08-17T12:00:00.000000+00:00"
             legacy_content = """# Topic: Old Legacy Topic
 
@@ -141,7 +122,6 @@ Old report text
                 vault_dir=temp_dir
             )
 
-            # 2. Write a new note created after the cutoff
             new_time = "2026-08-17T20:00:00.000000+00:00"
             new_content = """# Topic: New Verified Topic
 
@@ -159,7 +139,6 @@ New report text
                 vault_dir=temp_dir
             )
 
-            # Audit with cutoff set to 2026-08-17T19:22:00
             flagged = audit_vault_notes_citations(cutoff_iso="2026-08-17T19:22:00", vault_dir=temp_dir)
 
             flagged_ids = [f["note_id"] for f in flagged]
@@ -169,7 +148,6 @@ New report text
         finally:
             import shutil
             shutil.rmtree(temp_dir, ignore_errors=True)
-
 
 if __name__ == "__main__":
     unittest.main()

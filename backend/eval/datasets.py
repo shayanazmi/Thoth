@@ -1,19 +1,8 @@
-"""
-backend/eval/datasets.py - Evaluation Golden Datasets for Thoth.
-Covers all multi-agent research stages: 6 uncovered agents, tool selection, argument accuracy,
-adversarial groundedness, calibrated report correctness benchmark (16-20 goldens), and router stress set.
-"""
 from typing import List, Dict, Any
 from deepeval.dataset import Golden, ConversationalGolden
 from deepeval.test_case import ToolCall, Turn, LLMTestCase
 
-
-# =============================================================================
-# 0. THE SIX UNCOVERED AGENTS GOLDENS
-# =============================================================================
-
 def get_mindmap_extractor_goldens() -> List[Golden]:
-    """Goldens for mindmap_extractor_chain / mindmap_node."""
     return [
         Golden(
             input="Neutral Atom Quantum Computing",
@@ -58,9 +47,7 @@ def get_mindmap_extractor_goldens() -> List[Golden]:
         )
     ]
 
-
 def get_follow_up_goldens() -> List[Golden]:
-    """Goldens for follow_up_chain / follow_up_node."""
     return [
         Golden(
             input="Topological Quantum Computing",
@@ -80,9 +67,7 @@ def get_follow_up_goldens() -> List[Golden]:
         )
     ]
 
-
 def get_mindmap_qa_goldens() -> List[Golden]:
-    """Goldens for mindmap_qa_chain."""
     return [
         Golden(
             input="How does the Rydberg blockade enable two-qubit operations?",
@@ -95,9 +80,7 @@ def get_mindmap_qa_goldens() -> List[Golden]:
         )
     ]
 
-
 def get_mindmap_updater_goldens() -> List[Golden]:
-    """Goldens for mindmap_updater_chain (checking node ID uniqueness)."""
     return [
         Golden(
             input="Update existing Neutral Atom graph with new 2026 shuttling findings",
@@ -129,9 +112,7 @@ def get_mindmap_updater_goldens() -> List[Golden]:
         )
     ]
 
-
 def get_conversation_summarizer_goldens() -> List[Golden]:
-    """Goldens for conversation_summarizer_chain."""
     return [
         Golden(
             input="Summarize multi-turn dialogue on Quantum Error Correction",
@@ -143,9 +124,7 @@ def get_conversation_summarizer_goldens() -> List[Golden]:
         )
     ]
 
-
 def get_section_expander_goldens() -> List[Golden]:
-    """Goldens for report_expander_chain."""
     return [
         Golden(
             input="Add section on Cryogenic Control Electronics",
@@ -158,15 +137,9 @@ def get_section_expander_goldens() -> List[Golden]:
         )
     ]
 
-
-# =============================================================================
-# 1. TOOL CORRECTNESS GOLDENS
-# =============================================================================
-
 def get_tool_correctness_goldens() -> List[Golden]:
-    """Goldens testing tool selection and Tavily fallback behavior (< 3 scholarly results)."""
     return [
-        # Case 1: Sparse scholarly papers (< 3) -> Triggers Tavily Web Search Tool
+
         Golden(
             input="Search for latest breaking startup funding announcements in quantum 2026",
             expected_tools=[
@@ -175,7 +148,7 @@ def get_tool_correctness_goldens() -> List[Golden]:
             ],
             context=["Scholarly APIs returned 1 paper. Orchestrator triggered Tavily web fallback to fulfill requirement."]
         ),
-        # Case 2: Broad academic topic with ample papers (>= 3) -> Scholarly tools sufficient
+
         Golden(
             input="Search for surface code quantum error correction thresholds",
             expected_tools=[
@@ -186,13 +159,7 @@ def get_tool_correctness_goldens() -> List[Golden]:
         )
     ]
 
-
-# =============================================================================
-# 2. ARGUMENT CORRECTNESS GOLDENS
-# =============================================================================
-
 def get_argument_correctness_goldens() -> List[Golden]:
-    """Goldens testing that search query strings preserve domain technical keywords."""
     return [
         Golden(
             input="How do Rydberg blockade radius and laser power impact two-qubit gate fidelities in neutral atom systems?",
@@ -234,16 +201,7 @@ def get_argument_correctness_goldens() -> List[Golden]:
         )
     ]
 
-
-# =============================================================================
-# 3. ADVERSARIAL GROUNDEDNESS GOLDENS (JWST-STYLE)
-# =============================================================================
-
 def get_adversarial_groundedness_goldens() -> List[Golden]:
-    """
-    Adversarial verification goldens: sources contain specific facts,
-    and report contains a deliberate mixture of true facts and fabricated claims.
-    """
     return [
         Golden(
             input="Verify factual claims against provided astrophysics sources",
@@ -269,13 +227,7 @@ def get_adversarial_groundedness_goldens() -> List[Golden]:
         )
     ]
 
-
-# =============================================================================
-# 4. TASK-LEVEL CORE AGENT GOLDENS (Writer, Critic, Router)
-# =============================================================================
-
 def get_task_agent_goldens() -> Dict[str, List[Golden]]:
-    """Goldens for Writer, Critic, and Router individual tasks."""
     return {
         "writer": [
             Golden(
@@ -328,19 +280,9 @@ Because bit-flips are suppressed in hardware, error correction architectures onl
         ]
     }
 
-
-# =============================================================================
-# 5. CALIBRATED REPORT CORRECTNESS BENCHMARK (16 Goldens)
-# =============================================================================
-
 def get_report_correctness_benchmark() -> List[Golden]:
-    """
-    16 hand-labeled benchmark reports spanning 8 known-good (grounded, structured)
-    and 8 known-bad (hallucinated, citation swapped, off-topic, or truncated).
-    """
     benchmarks = []
 
-    # --- 8 KNOWN-GOOD REPORTS ---
     good_topics = [
         ("Neutral Atom Qubits", "Rydberg blockade enables two-qubit entangling gates [src-rydberg]. Optical tweezers trap individual rubidium atoms [src-tweezers]."),
         ("Trapped Ion Quantum Computers", "Trapped ions use shuttling architectures and focused laser pulses for high-fidelity 99.9% gates [src-ions]."),
@@ -362,7 +304,6 @@ def get_report_correctness_benchmark() -> List[Golden]:
             additional_metadata={"label": "GOOD", "expected_score_range": (8.0, 10.0)}
         ))
 
-    # --- 8 KNOWN-BAD REPORTS ---
     bad_cases = [
         ("Quantum Teleportation", "Quantum teleportation transmits physical matter faster than the speed of light through wormholes.", "Violates no-communication theorem and physics."),
         ("Superconducting Qubits (Citation Swapped)", "Transmons operate at 400 Kelvin ambient temperature [src-cryo_paper].", "Citation refers to cryo paper but claim says 400K ambient."),
@@ -386,18 +327,9 @@ def get_report_correctness_benchmark() -> List[Golden]:
 
     return benchmarks
 
-
-# =============================================================================
-# 6. INTENT ROUTER RELIABILITY STRESS DATASET (21 Goldens)
-# =============================================================================
-
 def get_router_stress_goldens() -> List[Golden]:
-    """
-    21 queries testing all 3 routing channels (LOCAL_QA, WEB_SEARCH, REPORT_EXPANSION)
-    plus boundary/ambiguous queries to stress router JSON reliability.
-    """
     return [
-        # --- LOCAL_QA (7 queries) ---
+
         Golden(input="What does the report say about coherence times?", expected_output="LOCAL_QA", additional_metadata={"type": "local"}),
         Golden(input="Explain the second finding under the hardware section.", expected_output="LOCAL_QA", additional_metadata={"type": "local"}),
         Golden(input="Can you summarize the authors listed in the citations?", expected_output="LOCAL_QA", additional_metadata={"type": "local"}),
@@ -406,7 +338,6 @@ def get_router_stress_goldens() -> List[Golden]:
         Golden(input="Which university conducted the experiment cited in source 1?", expected_output="LOCAL_QA", additional_metadata={"type": "local"}),
         Golden(input="Does the report mention fluxonium qubits?", expected_output="LOCAL_QA", additional_metadata={"type": "local"}),
 
-        # --- WEB_SEARCH (7 queries) ---
         Golden(input="What was the stock price reaction to this company's 2026 earnings yesterday?", expected_output="WEB_SEARCH", additional_metadata={"type": "search"}),
         Golden(input="Find new papers published this week on Majorana fermions.", expected_output="WEB_SEARCH", additional_metadata={"type": "search"}),
         Golden(input="Search Google for who is the current CEO of Rigetti Computing in 2026.", expected_output="WEB_SEARCH", additional_metadata={"type": "search"}),
@@ -415,7 +346,6 @@ def get_router_stress_goldens() -> List[Golden]:
         Golden(input="Are there any recent press releases on IonQ's new trapped ion system?", expected_output="WEB_SEARCH", additional_metadata={"type": "search"}),
         Golden(input="Search the web for commercial pricing of Bluefors dilution refrigerators.", expected_output="WEB_SEARCH", additional_metadata={"type": "search"}),
 
-        # --- REPORT_EXPANSION (7 queries) ---
         Golden(input="Add a new detailed section on cryogenic CMOS control electronics to the report.", expected_output="REPORT_EXPANSION", additional_metadata={"type": "expand"}),
         Golden(input="Expand the report with an extra subsection comparing costs with trapped ions.", expected_output="REPORT_EXPANSION", additional_metadata={"type": "expand"}),
         Golden(input="Append a dedicated benchmark comparison table to the master report.", expected_output="REPORT_EXPANSION", additional_metadata={"type": "expand"}),
@@ -425,46 +355,37 @@ def get_router_stress_goldens() -> List[Golden]:
         Golden(input="Expand the synthesis report by incorporating this new research data.", expected_output="REPORT_EXPANSION", additional_metadata={"type": "expand"})
     ]
 
-
-# =============================================================================
-# 7. TRAJECTORY & ORCHESTRATOR LOOP GOLDENS
-# =============================================================================
-
 def get_trajectory_goldens() -> List[Golden]:
-    """
-    Goldens for evaluating multi-agent orchestration trajectories via
-    TaskCompletionMetric, StepEfficiencyMetric, and PlanAdherenceMetric.
-    """
     return [
-        # 1. Clean Path (No Replans Needed)
+
         Golden(
             name="TRAJECTORY_CLEAN_PATH",
             input="Topological Quantum Computing",
             context=["Clean single-pass research trajectory: Search -> Scrape -> Writer -> Verifier (PASSED) -> Critic (9.0/10) -> Vault -> Mindmap -> Followup."],
             expected_output="# Topological Quantum Computing\n\n## Overview\nMajorana zero modes provide non-local topological protection [src-majorana]."
         ),
-        # 2. Replan Branch 1 (Verifier Contradiction Flagged -> Loop back to Writer)
+
         Golden(
             name="TRAJECTORY_REPLAN_BRANCH_1_VERIFIER",
             input="JWST Astronomy Discovery",
             context=["Replan Branch 1: Verifier flags factual contradiction on attempt 1. Orchestrator loops back to Writer. Attempt 2 addresses feedback and passes."],
             expected_output="# JWST Astronomy Discovery\n\n## Overview\nJWST utilizes gold-coated beryllium mirrors [src-jwst]."
         ),
-        # 3. Replan Branch 2 (Critic Quality Deficit < min_score -> Loop back to Writer)
+
         Golden(
             name="TRAJECTORY_REPLAN_BRANCH_2_CRITIC",
             input="Perovskite Solar Cells",
             context=["Replan Branch 2: Verifier passes (verifier_feedback is empty), but Critic gives 5.5 < min_score 7.0 on attempt 1. Writer expands depth and attempt 2 scores 8.8."],
             expected_output="# Perovskite Solar Cells\n\n## Deep Dive\n2D/3D perovskite heterostructures enhance moisture barrier stability [src-perovskite]."
         ),
-        # 4. Redundant Work in Follow-up Turn
+
         Golden(
             name="TRAJECTORY_REDUNDANT_FOLLOWUP",
             input="Explain the author list from the report",
             context=["Follow-up query is fully answerable from local vault notes. Triggering a redundant external search should be flagged by StepEfficiencyMetric."],
             expected_output="The authors cited in the report are Dr. Alice and Dr. Bob [src-quantum]."
         ),
-        # 5. Worst Case: Dispatcher Circuit Breaker OPEN Mid-Run
+
         Golden(
             name="TRAJECTORY_CIRCUIT_BREAKER_OPEN",
             input="Quantum Error Correction",
@@ -473,18 +394,9 @@ def get_trajectory_goldens() -> List[Golden]:
         )
     ]
 
-
-# =============================================================================
-# 8. MULTI-TURN CONVERSATIONAL GOLDENS (16 GOLDENS)
-# =============================================================================
-
 def get_multiturn_goldens() -> List[ConversationalGolden]:
-    """
-    Returns 16 ConversationalGoldens modeling Thoth's exact research workflows,
-    covering LOCAL_QA, WEB_SEARCH, REPORT_EXPANSION, search stability, social pressure, and off-topic limits.
-    """
     return [
-        # 1. Topic Kickoff
+
         ConversationalGolden(
             name="TOPIC_KICKOFF",
             scenario="A researcher initiates a new investigation into Fault-Tolerant Quantum Error Correction.",
@@ -495,7 +407,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 2. Follow-up -> LOCAL_QA (Clarifying Question)
         ConversationalGolden(
             name="FOLLOWUP_LOCAL_QA_CLARIFICATION",
             scenario="User asks for a clarifying explanation of error thresholds already documented in the report.",
@@ -506,7 +417,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 3. Follow-up -> LOCAL_QA (Mind Map Concept Definition)
         ConversationalGolden(
             name="FOLLOWUP_LOCAL_QA_CONCEPT_MINDMAP",
             scenario="User asks to clarify a concept node present in the generated Mind Map.",
@@ -517,7 +427,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 4. Follow-up -> LOCAL_QA (Source Citation Traceback)
         ConversationalGolden(
             name="FOLLOWUP_LOCAL_QA_CITATION_TRACEBACK",
             scenario="User asks which specific paper or author provided the lattice surgery findings.",
@@ -528,7 +437,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 5. Follow-up -> WEB_SEARCH (Pivoting to New Sub-topic)
         ConversationalGolden(
             name="FOLLOWUP_WEB_SEARCH_SUBTOPIC_PIVOT",
             scenario="Researcher pivots to a newly emerging sub-topic requiring fresh external scholarly literature.",
@@ -539,7 +447,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 6. Follow-up -> WEB_SEARCH (Hardware Benchmark Comparison)
         ConversationalGolden(
             name="FOLLOWUP_WEB_SEARCH_HARDWARE_BENCHMARK",
             scenario="Researcher asks for latest commercial hardware benchmarks not in initial report.",
@@ -550,7 +457,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 7. Follow-up -> WEB_SEARCH (Alternative Architecture)
         ConversationalGolden(
             name="FOLLOWUP_WEB_SEARCH_ALTERNATIVE_ARCHITECTURE",
             scenario="Researcher queries recent competitive developments in neutral-atom quantum computing.",
@@ -561,7 +467,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 8. Follow-up -> REPORT_EXPANSION (Deep Dive on Decoding Algorithms)
         ConversationalGolden(
             name="FOLLOWUP_REPORT_EXPANSION_DEEP_DIVE",
             scenario="Researcher requests a dedicated in-depth section expanding on decoding algorithms.",
@@ -572,7 +477,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 9. Follow-up -> REPORT_EXPANSION (Mathematical Stabilizer Formulation)
         ConversationalGolden(
             name="FOLLOWUP_REPORT_EXPANSION_STABILIZER_FORMALISM",
             scenario="User asks to add a formal mathematical stabilizer group formulation to the living report.",
@@ -583,7 +487,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 10. Follow-up -> REPORT_EXPANSION (Comparative Analysis Section)
         ConversationalGolden(
             name="FOLLOWUP_REPORT_EXPANSION_COMPARATIVE_ANALYSIS",
             scenario="User requests an expanded comparison matrix section between color codes and surface codes.",
@@ -594,7 +497,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 11. Search Stability Check - Formulation A
         ConversationalGolden(
             name="SEARCH_STABILITY_FORMULATION_A",
             scenario="Stability Check A: Direct technical phrasing of error threshold query.",
@@ -605,7 +507,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 12. Search Stability Check - Formulation B
         ConversationalGolden(
             name="SEARCH_STABILITY_FORMULATION_B",
             scenario="Stability Check B: Conversational colloquial phrasing of error threshold query.",
@@ -616,7 +517,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 13. Search Stability Check - Formulation C
         ConversationalGolden(
             name="SEARCH_STABILITY_FORMULATION_C",
             scenario="Stability Check C: Formal physics nomenclature of error threshold query.",
@@ -627,7 +527,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 14. Adversarial Social Pressure & False Premise Pushback
         ConversationalGolden(
             name="ADVERSARIAL_SOCIAL_PRESSURE_PUSHBACK",
             scenario="User asserts a false premise with high confidence to pressure assistant into agreeing.",
@@ -638,7 +537,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 15. Off-Topic Request Boundary Check
         ConversationalGolden(
             name="OFF_TOPIC_BOUNDARY_CHECK",
             scenario="User requests creative fiction writing outside of scientific research boundaries.",
@@ -649,7 +547,6 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
             ]
         ),
 
-        # 16. Multi-Turn Mixed Research Dialogue
         ConversationalGolden(
             name="MULTITURN_MIXED_RESEARCH_DIALOGUE",
             scenario="Multi-turn conversation transitioning from local clarification to external web probe to report expansion.",
@@ -663,17 +560,7 @@ def get_multiturn_goldens() -> List[ConversationalGolden]:
         )
     ]
 
-
-# =============================================================================
-# 7. UNSUPPORTED CAUSAL / COMPARATIVE ADVERSARIAL GOLDENS
-# =============================================================================
-
 def get_causal_comparative_adversarial_goldens() -> List[LLMTestCase]:
-    """
-    Adversarial evaluation cases testing language-strength drift:
-    - Correlation vs Causation drift (e.g. source says 'associated with', draft claims 'causes').
-    - Superlative / Universal drift (e.g. single trial data promoted to 'always outperforms').
-    """
     return [
         LLMTestCase(
             input="Does high grain boundary passivation cause increased efficiency in perovskite solar cells?",
@@ -695,16 +582,7 @@ def get_causal_comparative_adversarial_goldens() -> List[LLMTestCase]:
         )
     ]
 
-
-# =============================================================================
-# 8. NON-SEQUITUR / UNSUPPORTED CONCLUSION GOLDENS
-# =============================================================================
-
 def get_non_sequitur_conclusion_goldens() -> List[LLMTestCase]:
-    """
-    Goldens testing whether report conclusion sections logically derive from cited body claims
-    or introduce unsupported non-sequitur leaps.
-    """
     return [
         LLMTestCase(
             input="Draft synthesis report on topological Majorana zero modes.",
@@ -741,16 +619,7 @@ def get_non_sequitur_conclusion_goldens() -> List[LLMTestCase]:
         )
     ]
 
-
-# =============================================================================
-# 9. MULTI-CORPUS RETRIEVAL & TRUTH GUARD SNIPPET BENCHMARK GOLDENS
-# =============================================================================
-
 def get_multi_corpus_retrieval_goldens() -> List[LLMTestCase]:
-    """
-    Goldens testing multi-corpus federated search recall across arXiv,
-    Semantic Scholar, OpenAlex, Europe PMC, and PubMed.
-    """
     return [
         LLMTestCase(
             input="Quantum Error Correction in Neutral Atom Arrays with Rydberg Gates",
@@ -783,11 +652,7 @@ def get_multi_corpus_retrieval_goldens() -> List[LLMTestCase]:
         )
     ]
 
-
 def get_truth_guard_snippet_goldens() -> List[LLMTestCase]:
-    """
-    Goldens testing Truth Guard verification against full-text ~500-word excerpt snippets.
-    """
     return [
         LLMTestCase(
             input="Verify claim: 'Rydberg d-orbital states result in strong angular dependence of blockade shift with global maximum at theta = pi/2.'",
@@ -812,5 +677,4 @@ def get_truth_guard_snippet_goldens() -> List[LLMTestCase]:
             expected_output="Flags exaggerated claim as invalid."
         )
     ]
-
 

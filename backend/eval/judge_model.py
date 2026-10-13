@@ -1,8 +1,3 @@
-"""
-backend/eval/judge_model.py - Custom DeepEval Judge Model for Thoth.
-Wraps Thoth's high-capacity LLM client and provides schema-aware structured generation
-with bulletproof JSON confinement and default repair fallback.
-"""
 import json
 import logging
 import asyncio
@@ -12,15 +7,9 @@ from pydantic import BaseModel, Field
 from deepeval.models import DeepEvalBaseLLM
 from backend.agents import get_llm, safe_extract_json, strip_chain_of_thought
 
-
 logger = logging.getLogger("ThothJudgeModel")
 
-
 def _construct_default_schema_instance(schema: Type[BaseModel]) -> BaseModel:
-    """
-    Constructs a valid default instance of any Pydantic BaseModel to guarantee
-    schema-confinement safety when LLM responses are missing or corrupted.
-    """
     data: Dict[str, Any] = {}
     if hasattr(schema, "model_fields"):
         for name, field in schema.model_fields.items():
@@ -83,19 +72,14 @@ def _construct_default_schema_instance(schema: Type[BaseModel]) -> BaseModel:
         return schema.parse_obj(data)
     except Exception as e:
         logger.warning(f"[JUDGE MODEL] Default instance construction error for {schema.__name__}: {e}")
-        # Return bare unvalidated instance as absolute last resort
+
         if hasattr(schema, "model_construct"):
             return schema.model_construct(**data)
         if hasattr(schema, "construct"):
             return schema.construct(**data)
         return schema()
 
-
 def _repair_dict_for_schema(schema: Type[BaseModel], raw_dict: Dict[str, Any]) -> BaseModel:
-    """
-    Attempts to validate a dictionary against a Pydantic schema, filling in
-    missing fields with valid defaults to prevent validation crashes on partial outputs.
-    """
     try:
         if hasattr(schema, "model_validate"):
             return schema.model_validate(raw_dict)
@@ -103,7 +87,6 @@ def _repair_dict_for_schema(schema: Type[BaseModel], raw_dict: Dict[str, Any]) -
     except Exception as direct_err:
         logger.warning(f"[JUDGE MODEL] Direct validation failed ({direct_err}). Attempting field repair...")
 
-    # Fill in missing fields with defaults from a blank instance
     default_inst = _construct_default_schema_instance(schema)
     default_dict = default_inst.model_dump() if hasattr(default_inst, "model_dump") else default_inst.dict()
 
@@ -120,23 +103,14 @@ def _repair_dict_for_schema(schema: Type[BaseModel], raw_dict: Dict[str, Any]) -
         logger.warning(f"[JUDGE MODEL] Repaired dictionary validation failed ({repair_err}). Falling back to default instance.")
         return default_inst
 
-
 def _extract_text_from_response(raw_response: Any) -> str:
-    """Safely extracts text content from LLM responses, AIMessage objects, and mocks."""
     if isinstance(raw_response, str):
         return raw_response
     if hasattr(raw_response, "content") and isinstance(raw_response.content, str):
         return raw_response.content
     return str(raw_response)
 
-
 class ThothJudgeModel(DeepEvalBaseLLM):
-    """
-    Custom DeepEval Judge Model wrapping Thoth's large primary/fallback LLM client.
-    Guarantees robust schema confinement, structured JSON parsing, and fallback repair
-    so that downstream DeepEval metrics never crash on malformed LLM responses.
-    """
-
     def __init__(self, model_instance: Optional[Any] = None, model_name: str = "Thoth-Judge-LLM", *args: Any, **kwargs: Any):
         self._custom_model = model_instance
         self.name = model_name
@@ -146,26 +120,17 @@ class ThothJudgeModel(DeepEvalBaseLLM):
         return self.name
 
     def load_model(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Loads the high-capacity reasoning model client from clients/llm.py.
-        Uses Thoth's large fallback-wrapped provider (Nemotron-30B / Llama-70B / GPT-4o-mini).
-        """
         if self._custom_model is not None:
             return self._custom_model
         return get_llm()
 
     def generate(self, prompt: str, schema: Optional[Type[BaseModel]] = None, *args: Any, **kwargs: Any) -> Union[str, BaseModel]:
-        """
-        Synchronous prompt generation with strict schema-awareness.
-        When schema is provided, guarantees returning a valid instance of the schema (never None).
-        """
         model = self.load_model()
         if schema is None:
             raw_response = model.invoke(prompt)
             text = _extract_text_from_response(raw_response)
             return strip_chain_of_thought(text).strip()
 
-        # Schema-aware structured path
         try:
             schema_json = schema.model_json_schema() if hasattr(schema, "model_json_schema") else schema.schema()
             formatted_prompt = (
@@ -189,9 +154,6 @@ class ThothJudgeModel(DeepEvalBaseLLM):
             return _construct_default_schema_instance(schema)
 
     async def a_generate(self, prompt: str, schema: Optional[Type[BaseModel]] = None, *args: Any, **kwargs: Any) -> Union[str, BaseModel]:
-        """
-        Asynchronous prompt generation with strict schema-awareness.
-        """
         model = self.load_model()
         if hasattr(model, "ainvoke"):
             try:
@@ -226,24 +188,16 @@ class ThothJudgeModel(DeepEvalBaseLLM):
             return await asyncio.to_thread(self.generate, prompt, schema=schema, *args, **kwargs)
 
 class OfflineDeterministicModel:
-    """
-    Deterministic offline evaluator for testing and benchmark runs without API keys.
-    Inspects evaluation prompts and generates distinct, realistic scores and reasons
-    differentiating known-good from known-bad cases and role-specific agent behaviors.
-    """
-
     def invoke(self, prompt: Any) -> str:
         prompt_str = str(prompt)
         prompt_lower = prompt_str.lower()
 
-        # Isolate actual output block to avoid matching evaluation instructions / steps
         actual_output_block = prompt_lower
         if "actual output:" in prompt_lower:
             actual_output_block = prompt_lower.split("actual output:", 1)[1]
         elif "actual_output:" in prompt_lower:
             actual_output_block = prompt_lower.split("actual_output:", 1)[1]
 
-        # 1. Detect known-bad benchmark reports, hallucinations, and citation mismatches strictly in candidate output
         is_bad = any(bad_kw in actual_output_block for bad_kw in [
             "label: bad", "[bad]", "300 k without", "300k without", "99.999% fidelity at room",
             "room-temperature transmon", "arxiv:9999", "superconducting at 300k",
@@ -322,9 +276,7 @@ class OfflineDeterministicModel:
     async def ainvoke(self, prompt: Any) -> str:
         return self.invoke(prompt)
 
-
 def get_offline_judge_model() -> ThothJudgeModel:
-    """Returns a ThothJudgeModel configured with OfflineDeterministicModel."""
     return ThothJudgeModel(
         model_instance=OfflineDeterministicModel(),
         model_name="Thoth-Offline-Deterministic-Judge"

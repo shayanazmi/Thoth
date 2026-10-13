@@ -16,14 +16,7 @@ from backend.orchestrator import run_research_pipeline, stream_research_pipeline
 from backend.scholarly import SourceCandidate
 from backend.dispatcher import Dispatcher, CircuitBreakerOpenError
 
-
 class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
-    """
-    Trajectory and multi-agent loop evaluation suite.
-    Uses TaskCompletionMetric, StepEfficiencyMetric, and PlanAdherenceMetric
-    against ambient @observe traces.
-    """
-
     def setUp(self):
         enable_local_tracing()
         clear_local_traces()
@@ -36,10 +29,6 @@ class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
         self.plan_adherence = get_plan_adherence_metric(self.judge)
 
     def test_trajectory_evals_iterator_clean_path(self):
-        """
-        Scenario 1: Clean Path (no replans needed).
-        Confirms TaskCompletionMetric and StepEfficiencyMetric score the trajectory well.
-        """
         clean_goldens = [g for g in get_trajectory_goldens() if g.name == "TRAJECTORY_CLEAN_PATH"]
         self.assertEqual(len(clean_goldens), 1)
         dataset = EvaluationDataset(goldens=clean_goldens)
@@ -74,17 +63,12 @@ class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
              patch("backend.pipeline.mindmap_extractor_chain", mock_mm), \
              patch("backend.pipeline.follow_up_chain", mock_fu), \
              patch("backend.orchestrator.scrape_url", mock_scrape):
-
             for golden in dataset.evals_iterator(metrics=[self.task_completion, self.step_efficiency, self.plan_adherence]):
                 result_state = run_research_pipeline(golden.input)
                 self.assertIn("report", result_state)
                 self.assertEqual(result_state["attempt"], 1)
 
     def test_trajectory_replan_branch_1_verifier_contradiction(self):
-        """
-        Scenario 2: Replan Branch 1 (Verifier flags contradiction on attempt 1 -> loops back to Writer).
-        Confirms PlanAdherenceMetric reflects loopback and attempt 2 addresses feedback.
-        """
         goldens = [g for g in get_trajectory_goldens() if g.name == "TRAJECTORY_REPLAN_BRANCH_1_VERIFIER"]
         self.assertEqual(len(goldens), 1)
         dataset = EvaluationDataset(goldens=goldens)
@@ -99,7 +83,6 @@ class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
             )
         ]
 
-        # Writer generates flawed draft on attempt 1, corrected draft on attempt 2
         writer_calls = [
             "# JWST Optics\nJWST primary mirror is made of solid gold.",
             "# JWST Optics\nJWST primary mirror is made of gold-coated beryllium segments [src-jwst_optics_overview]."
@@ -107,7 +90,6 @@ class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
         mock_writer = MagicMock()
         mock_writer.invoke.side_effect = writer_calls
 
-        # Verifier flags contradiction on attempt 1, passes on attempt 2
         verifier_calls = [
             '{"results": [{"claim": "JWST primary mirror is made of solid gold", "is_valid": false, "supporting_source_id": "", "reason_if_failed": "Mirror is beryllium, not solid gold."}]}',
             '{"results": [{"claim": "JWST primary mirror is made of gold-coated beryllium segments", "is_valid": true, "supporting_source_id": "src-jwst_optics_overview", "reason_if_failed": ""}]}'
@@ -132,19 +114,14 @@ class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
              patch("backend.pipeline.mindmap_extractor_chain", mock_mm), \
              patch("backend.pipeline.follow_up_chain", mock_fu), \
              patch("backend.orchestrator.scrape_url", mock_scrape):
-
             for golden in dataset.evals_iterator(metrics=[self.plan_adherence, self.task_completion]):
                 result_state = run_research_pipeline(golden.input, max_retries=2)
-                # Confirm orchestrator completed attempt 2
+
                 self.assertEqual(result_state["attempt"], 2)
                 self.assertIn("beryllium", result_state["report"])
                 self.assertEqual(result_state["verifier_feedback"], "")
 
     def test_trajectory_replan_branch_2_critic_quality_deficit(self):
-        """
-        Scenario 3: Replan Branch 2 (Verifier passes with no contradictions, but Critic score < min_score).
-        Confirms Branch 2 is distinguished in trace from Branch 1.
-        """
         goldens = [g for g in get_trajectory_goldens() if g.name == "TRAJECTORY_REPLAN_BRANCH_2_CRITIC"]
         self.assertEqual(len(goldens), 1)
         dataset = EvaluationDataset(goldens=goldens)
@@ -165,11 +142,9 @@ class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
             "# Perovskite Solar Cells\nComprehensive breakdown with deep stability metrics [src-perovskite_solar_stability]."
         ]
 
-        # Verifier passes both attempts (verifier_feedback is empty)
         mock_verifier = MagicMock()
         mock_verifier.invoke.return_value = '{"results": [{"claim": "2D/3D perovskite enhances stability", "is_valid": true, "supporting_source_id": "src-perovskite_solar_stability", "reason_if_failed": ""}]}'
 
-        # Critic returns 5.0 (below min_score 7.0) on attempt 1, 8.5 on attempt 2
         mock_critic = MagicMock()
         mock_critic.invoke.side_effect = [
             '{"faithfulness": 8.0, "relevance": 6.0, "completeness": 4.0, "evidence_quality": 5.0, "clarity_and_coherence": 5.0, "overall_score": 5.0, "strengths": [], "areas_to_improve": ["Add depth"], "verdict": "Too shallow", "reasoning": "Need more sections"}',
@@ -191,21 +166,15 @@ class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
              patch("backend.pipeline.mindmap_extractor_chain", mock_mm), \
              patch("backend.pipeline.follow_up_chain", mock_fu), \
              patch("backend.orchestrator.scrape_url", mock_scrape):
-
             for golden in dataset.evals_iterator(metrics=[self.plan_adherence, self.task_completion]):
                 result_state = run_research_pipeline(golden.input, min_score=7.0, max_retries=2)
-                # Confirm orchestrator looped to attempt 2 because of Critic score < min_score
+
                 self.assertEqual(result_state["attempt"], 2)
                 self.assertGreaterEqual(result_state["score"], 7.0)
 
     def test_trajectory_circuit_breaker_open_graceful_handling(self):
-        """
-        Scenario 5: Dispatcher Circuit Breaker OPEN mid-run.
-        Confirms orchestrator surfaces partial-result/safe state without hanging or crashing.
-        """
-        # Create a custom dispatcher whose circuit breaker is in OPEN state
         failing_dispatcher = Dispatcher(max_consecutive_failures=1, cooloff_seconds=600.0)
-        # Force breaker into OPEN state
+
         asyncio.run(failing_dispatcher._record_failure())
         self.assertEqual(failing_dispatcher.state, "OPEN")
 
@@ -229,19 +198,15 @@ class TestOrchestratorTrajectoryEvaluations(unittest.TestCase):
              patch("backend.pipeline.writer_chain", mock_writer), \
              patch("backend.pipeline.mindmap_extractor_chain", mock_mm), \
              patch("backend.pipeline.follow_up_chain", mock_fu):
-
-            # Run research pipeline with the OPEN circuit breaker dispatcher
             result_state = run_research_pipeline(
                 topic="Quantum Error Correction",
                 scrape_top_n=1,
                 dispatcher=failing_dispatcher
             )
 
-            # Confirm pipeline completed gracefully, surfaced partial report and verification status
             self.assertIn("report", result_state)
             self.assertIn("verification_status", result_state)
             self.assertIn("UNAVAILABLE", result_state["verification_status"])
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,8 +1,3 @@
-"""
-Unit tests for Conversational Research Escalation, Mandate Synthesis,
-and Pre-Flight Clarification Gate.
-"""
-
 import unittest
 from backend.conversation.escalation import (
     EscalationState,
@@ -17,10 +12,7 @@ from backend.conversation.clarification import (
     ClarificationResult,
 )
 
-
 class TestConversationEscalation(unittest.TestCase):
-    """Tests 3-state escalation model and intent detection."""
-
     def test_casual_chat_stays_in_chat_state(self):
         res = detect_escalation_intent("Hi there, how are you doing today?")
         self.assertEqual(res["state"], EscalationState.CHAT)
@@ -45,14 +37,12 @@ class TestConversationEscalation(unittest.TestCase):
             self.assertGreaterEqual(res["confidence"], 0.85)
 
     def test_technical_conversation_without_evidence_need_stays_chat(self):
-        # A technical question explaining a known concept should not trigger deep research
         res = detect_escalation_intent(
             "What is the difference between a mutex and a semaphore?"
         )
         self.assertEqual(res["state"], EscalationState.CHAT)
 
     def test_multi_turn_implicit_research_candidate(self):
-        # Multi-turn conversation where user asks for empirical literature proof
         chat_turns = [
             {"user": "Solid state batteries have dendrite issues.", "assistant": "Yes, lithium dendrites short-circuit the cell."},
             {"user": "What if we use a polymer interlayer with LLZO?", "assistant": "That can reduce interfacial resistance."},
@@ -65,10 +55,7 @@ class TestConversationEscalation(unittest.TestCase):
         self.assertTrue(res["prompt_user"])
         self.assertIn("suggestion", res)
 
-
 class TestResearchMandateSynthesis(unittest.TestCase):
-    """Tests synthesis of conversation history into structured ResearchMandate."""
-
     def test_mandate_inherits_constraints_and_hypotheses(self):
         chat_turns = [
             {"user": "Focus on solid-state batteries published since 2024.", "assistant": "Understood."},
@@ -100,10 +87,7 @@ class TestResearchMandateSynthesis(unittest.TestCase):
         self.assertEqual(d["objective"], "Investigate quantum error correction")
         self.assertEqual(len(d["constraints"]), 1)
 
-
 class TestPreFlightClarification(unittest.TestCase):
-    """Tests pre-flight clarification gating."""
-
     def test_broad_keyword_triggers_clarification(self):
         mandate = ResearchMandate(
             objective="Conduct research",
@@ -133,7 +117,6 @@ class TestPreFlightClarification(unittest.TestCase):
         )
         res = evaluate_clarification_need(mandate)
         self.assertFalse(res.needs_clarification)
-
 
 if __name__ == "__main__":
     unittest.main()

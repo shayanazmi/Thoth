@@ -14,7 +14,6 @@ from backend.scholarly import (
 )
 from backend.dispatcher import Dispatcher
 
-
 SAMPLE_ARXIV_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
   <title type="html">arXiv Query</title>
@@ -80,9 +79,7 @@ SAMPLE_OPENALEX_JSON = {
     ]
 }
 
-
 class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
-
     def test_source_candidate_methods(self):
         candidate = SourceCandidate(
             title="Sample Title",
@@ -209,7 +206,6 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
              patch("backend.scholarly.search_europepmc", new_callable=AsyncMock) as mock_epmc, \
              patch("backend.scholarly.search_pubmed", new_callable=AsyncMock) as mock_pubmed, \
              patch("backend.scholarly.search_tavily", new_callable=AsyncMock) as mock_tavily:
-
             mock_arxiv.return_value = [cand_arxiv]
             mock_s2.return_value = [cand_s2]
             mock_oa.return_value = [cand_openalex]
@@ -218,8 +214,7 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
             mock_tavily.return_value = []
 
             results = await search_scholarly_sources("Agentic AI", max_results=5, min_scholarly_results=2, dispatcher=disp)
-            # cand_arxiv and cand_s2 share DOI / title, so they deduplicate to 1
-            # plus cand_openalex = 2 unique candidates
+
             self.assertEqual(len(results), 2)
             titles = [r.title for r in results]
             self.assertIn("Shared Paper Title", titles)
@@ -242,7 +237,6 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
              patch("backend.scholarly.search_europepmc", new_callable=AsyncMock) as mock_epmc, \
              patch("backend.scholarly.search_pubmed", new_callable=AsyncMock) as mock_pubmed, \
              patch("backend.scholarly.search_tavily", new_callable=AsyncMock) as mock_tavily:
-
             mock_arxiv.return_value = []
             mock_s2.return_value = []
             mock_oa.return_value = []
@@ -255,7 +249,6 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(results[0].title, "Fallback Web Title")
             self.assertEqual(results[0].source_api, "tavily")
             mock_tavily.assert_called_once()
-
 
     def test_search_node_scholarly_primary(self):
         from backend.pipeline import search_node
@@ -303,8 +296,6 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
 
         with patch("backend.pipeline.search_scholarly_sources", new_callable=AsyncMock) as mock_scholarly, \
              patch("backend.pipeline.build_search_agent", return_value=mock_agent):
-
-            # Scholarly returns empty list -> triggers fallback to search_agent
             mock_scholarly.return_value = []
 
             state = {"topic": "Latest Silicon Valley Venture Capital Funding"}
@@ -314,7 +305,6 @@ class TestScholarlyModule(unittest.IsolatedAsyncioTestCase):
             self.assertIn("techcrunch.com", update["search_results"])
             self.assertTrue(any("techcrunch.com" in s["url"] for s in update["cumulative_sources"]))
             mock_agent.invoke.assert_called_once()
-
 
 if __name__ == "__main__":
     unittest.main()

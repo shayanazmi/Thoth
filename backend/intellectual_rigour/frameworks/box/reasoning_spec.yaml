@@ -1,0 +1,55 @@
+id: box_model_criticism
+type: reasoning_framework
+
+thinker:
+  name: George Box
+  historical_era: 1919-2013
+  primary_tradition: Iterative Statistical Model Building, Residual Diagnostics & Robustness
+
+purpose:
+  - model_criticism_and_diagnostic_loop
+  - residual_and_error_structure_analysis
+  - parameter_perturbation_and_sensitivity_stress_test
+  - failure_boundary_and_domain_mapping
+  - fitness_for_purpose_and_parsimony_evaluation
+
+applies_to:
+  - statistical_models
+  - machine_learning_architectures
+  - quantitative_simulations
+  - predictive_algorithms
+  - parametric_approximations
+
+does_not_apply_to:
+  - pure_deductive_logic
+  - conceptual_normative_ethics
+  - qualitative_historical_narratives
+
+reasoning_operations:
+  - expose_model_assumptions_parameters_simplifications
+  - analyze_prediction_errors_residuals_and_systematic_deviations
+  - classify_failure_random_vs_structured_vs_regime_specific
+  - stress_model_under_distribution_perturbations_and_parameter_jitter
+  - map_boundary_conditions_where_usefulness_degrades
+  - compare_competing_models_for_parsimony_and_robustness
+  - evaluate_fitness_for_intended_purpose
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - model_stress_diagnostics: list of string
+
+historical_basis:
+  primary_sources:
+    - "Science and Statistics (Journal of the American Statistical Association, 1976)"
+    - "An Analysis of Transformations (Box & Cox, 1964)"
+    - "Time Series Analysis: Forecasting and Control (Box & Jenkins, 1970)"
+  core_doctrine:
+    - All Models Are Wrong, Some Are Useful: Models are intentional approximations; the pertinent question is not whether the model is true, but whether its errors undermine its intended practical utility.
+    - Iterative Cycle of Model Building: Alternating between deduction (making predictions from tentative model) and induction (criticizing model based on residual deviations).
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to AI neural network calibration, cross-validation residual checks, sensitivity analysis, dataset shift boundaries, and parsimony vs overfitting trade-offs.

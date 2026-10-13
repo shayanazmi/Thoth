@@ -1,0 +1,141 @@
+thinkers:
+  aristotle:
+    id: aristotle
+    name: Aristotle
+    tradition: Classical Logic & Essentialist Categorization
+    epistemic_role: Conceptual & Logical Structure Critic
+    aliases:
+      - "/aristotle"
+      - "/logic"
+      - "/categories"
+    class_module: backend.intellectual_rigour.frameworks.aristotle.framework
+    class_name: AristotleFramework
+    status: active
+    description: Audits conceptual definitions (genus/differentia), category errors, and Four Causes explanatory completeness.
+
+  bacon:
+    id: bacon
+    name: Francis Bacon
+    tradition: Systematic Eliminative Induction & Empiricism
+    epistemic_role: Empirical Evidence & Eliminative Induction Critic
+    aliases:
+      - "/bacon"
+      - "/induction"
+      - "/idols"
+    class_module: backend.intellectual_rigour.frameworks.bacon.framework
+    class_name: BaconFramework
+    status: active
+    description: Inspects negative cases, audits Four Idols cognitive bias, and designs crucial discriminating experiments.
+
+  descartes:
+    id: descartes
+    name: René Descartes
+    tradition: Rationalist Foundationalism & Methodological Decomposition
+    epistemic_role: First-Principles & Structural Decomposition Critic
+    aliases:
+      - "/descartes"
+      - "/first-principles"
+      - "/decompose"
+    class_module: backend.intellectual_rigour.frameworks.descartes.framework
+    class_name: DescartesFramework
+    status: active
+    description: Decomposes complex claims into primitives, maps dependency cascades, and stress-tests assumption removal.
+
+  hume:
+    id: hume
+    name: David Hume
+    tradition: Radical Empiricism & Causal Skepticism
+    epistemic_role: Causal Inference & Epistemic Calibration Critic
+    aliases:
+      - "/hume"
+      - "/causality"
+      - "/skepticism"
+    class_module: backend.intellectual_rigour.frameworks.hume.framework
+    class_name: HumeFramework
+    status: active
+    description: Audits inferential jumps, constant conjunction vs causation, confounders, and calibrates certainty.
+
+  darwin:
+    id: darwin
+    name: Charles Darwin
+    tradition: Generative Evolutionary Mechanisms & Selection Constraints
+    epistemic_role: Generative Mechanism & Population Dynamics Critic
+    aliases:
+      - "/darwin"
+      - "/mechanism"
+      - "/evolution"
+    class_module: backend.intellectual_rigour.frameworks.darwin.framework
+    class_name: DarwinFramework
+    status: active
+    description: Audits generative population mechanisms, differential selection pressures, and developmental pathways.
+
+  popper:
+    id: popper
+    name: Karl Popper
+    tradition: Critical Rationalism
+    epistemic_role: Adversarial Falsification Critic
+    aliases:
+      - "/popper"
+      - "/karl-popper"
+      - "/falsification"
+      - "/refutation"
+    class_module: backend.intellectual_rigour.frameworks.popper.framework
+    class_name: PopperFramework
+    status: active
+    description: Conducts falsifiability audits, identifies risky predictions, and tests for ad-hoc protective immunization.
+
+  kuhn:
+    id: kuhn
+    name: Thomas Kuhn
+    tradition: Historiography of Science & Paradigm Analysis
+    epistemic_role: Paradigm Analysis & Contribution Novelty Critic
+    aliases:
+      - "/kuhn"
+      - "/paradigm"
+      - "/anomalies"
+    class_module: backend.intellectual_rigour.frameworks.kuhn.framework
+    class_name: KuhnFramework
+    status: active
+    description: Analyzes normal science vs paradigm shifts, tracks persistent anomalies, and assesses true conceptual displacement.
+
+  box:
+    id: box
+    name: George Box
+    tradition: Iterative Statistical Model Building & Residual Diagnostics
+    epistemic_role: Model Criticism & Boundary Diagnostic Critic
+    aliases:
+      - "/box"
+      - "/model-criticism"
+      - "/residuals"
+    class_module: backend.intellectual_rigour.frameworks.box.framework
+    class_name: BoxFramework
+    status: active
+    description: Analyzes residual structures, stress-tests parameter sensitivity, and delineates model utility boundaries.
+
+  turing:
+    id: turing
+    name: Alan Turing
+    tradition: Computability Theory & Formal Operationalization
+    epistemic_role: Formal Operationalization & Computability Critic
+    aliases:
+      - "/turing"
+      - "/operationalize"
+      - "/computability"
+    class_module: backend.intellectual_rigour.frameworks.turing.framework
+    class_name: TuringFramework
+    status: active
+    description: Enforces discrete state transitions, eliminates vague procedural steps, and checks halting/complexity limits.
+
+  simon:
+    id: simon
+    name: Herbert Simon
+    tradition: Bounded Rationality & Heuristic Search
+    epistemic_role: Bounded Rationality & Search Strategy Critic
+    aliases:
+      - "/simon"
+      - "/bounded-rationality"
+      - "/satisficing"
+    class_module: backend.intellectual_rigour.frameworks.simon.framework
+    class_name: SimonFramework
+    status: active
+    description: Audits search space combinatorial explosion, satisficing aspiration stopping rules, and search cost economics.

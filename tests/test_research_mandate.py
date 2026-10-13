@@ -1,8 +1,3 @@
-"""
-Comprehensive unit test suite for Research Mandate synthesis,
-pronoun/reference resolution, and context constraint inheritance.
-"""
-
 import unittest
 from backend.conversation.mandate import (
     ResearchMandate,
@@ -10,13 +5,8 @@ from backend.conversation.mandate import (
     _extract_constraints_and_hypotheses,
 )
 
-
 class TestResearchMandateFidelity(unittest.TestCase):
-    """Tests accuracy and information fidelity of ResearchMandate."""
-
     def test_pronoun_reference_resolution_from_prior_turn(self):
-        # When user says "Can you research this?", topic must resolve to the
-        # actual problem discussed rather than the literal pronoun string.
         chat_turns = [
             {
                 "user": (
@@ -45,7 +35,7 @@ class TestResearchMandateFidelity(unittest.TestCase):
         )
 
         self.assertIsInstance(mandate, ResearchMandate)
-        # Topic should resolve to the substantive problem from the dialogue
+
         self.assertNotEqual(mandate.topic, "Can you research this?")
         self.assertIn("longer contexts", mandate.topic.lower())
         self.assertTrue(len(mandate.known_facts) >= 1)
@@ -101,7 +91,6 @@ class TestResearchMandateFidelity(unittest.TestCase):
         self.assertIn("ald alumina", mandate.objective.lower())
 
     def test_five_turn_conversation_referential_resolution(self):
-        # 5-turn conversation testing subject evolution
         chat_turns = [
             {
                 "user": "We are investigating why answer quality dropped.",
@@ -122,7 +111,6 @@ class TestResearchMandateFidelity(unittest.TestCase):
         ]
         summary = "Grounding degrades in large contexts despite high recall."
 
-        # User gives meta-research command
         query = "Can we investigate this properly using the literature?"
         mandate = synthesize_research_mandate(
             user_query=query,
@@ -130,7 +118,6 @@ class TestResearchMandateFidelity(unittest.TestCase):
             conversation_summary=summary,
         )
 
-        # Topic must not be the meta command
         self.assertNotEqual(mandate.topic, query)
         self.assertIn("evidence selection", mandate.topic.lower())
         self.assertEqual(mandate.scope, "peer-reviewed academic literature")
@@ -138,10 +125,8 @@ class TestResearchMandateFidelity(unittest.TestCase):
         self.assertIn("evidence selection", mandate.hypotheses[0].lower())
 
     def test_cold_start_referential_query_marked_unresolved(self):
-        # When a user gives a pronoun command with 0 context, mark as unresolved
         mandate = synthesize_research_mandate("Research this deeply")
         self.assertIn("unresolved", mandate.topic.lower())
-
 
 if __name__ == "__main__":
     unittest.main()

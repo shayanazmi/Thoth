@@ -1,0 +1,57 @@
+id: baconian_induction
+type: reasoning_framework
+
+thinker:
+  name: Francis Bacon
+  historical_era: 1561-1626
+  primary_tradition: Systematic Eliminative Induction & Empiricism
+
+purpose:
+  - eliminative_induction_audit
+  - negative_and_boundary_case_inspection
+  - idols_of_the_mind_bias_detection
+  - discriminating_experiment_design
+  - cautious_gradual_generalization_enforcement
+
+applies_to:
+  - empirical_studies
+  - observational_data
+  - comparative_benchmarks
+  - experimental_protocols
+  - inductive_generalizations
+
+does_not_apply_to:
+  - pure_mathematics
+  - formal_syntax_definitions
+  - non_empirical_deductive_systems
+
+reasoning_operations:
+  - build_three_tables_presence_absence_degrees
+  - identify_cherry_picked_positive_cases
+  - search_negative_cases_and_counter_observations
+  - audit_four_idols_tribe_cave_marketplace_theatre
+  - eliminate_inconsistent_competing_hypotheses
+  - design_discriminating_tests_experimentum_crucis
+  - evaluate_induction_ladder_step_size
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - discriminating_tests: list of string
+
+historical_basis:
+  primary_sources:
+    - "Novum Organum Scientiarum (1620)"
+    - "The Advancement of Learning (1605)"
+    - "New Atlantis & Sylva Sylvarum (1627)"
+  core_doctrine:
+    - Tables of Investigation: Compiling Instances of Presence, Instances of Absence in Proximity, and Instances of Degrees/Variation.
+    - Eliminative Induction: True induction proceeds by rejection and exclusion of false alternatives before positive assertion.
+    - The Four Idols: Idols of the Tribe (human perceptual bias), Cave (individual researcher bias), Marketplace (linguistic confusion), Theatre (dogmatic paradigm bias).
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to machine learning dataset curation, ablation studies, baseline comparisons, and scientific meta-analyses.
+    - Translates the Idols into modern empirical biases: confirmation bias (Tribe), selective reporting/p-hacking (Cave), buzzword inflation (Marketplace), benchmark dogma (Theatre).

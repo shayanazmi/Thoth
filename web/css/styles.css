@@ -1,55 +1,48 @@
-/* ==============================================================================
-   THOTH · THE DIVINE SCRIBE (3D SHADCN/UI DESIGN SYSTEM)
-   Zero-AI-Slop, High-Density Academic & Architectural Aesthetics
-   ============================================================================== */
-
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* shadcn/ui Dark System Tokens */
-  --background: 224 71% 4%;     /* #030712 / #08090d */
-  --foreground: 210 40% 98%;    /* #f8fafc */
-  
-  --card: 224 50% 7%;           /* #0e121b */
+
+  --background: 224 71% 4%;
+  --foreground: 210 40% 98%;
+
+  --card: 224 50% 7%;
   --card-foreground: 210 40% 98%;
-  
+
   --popover: 224 50% 7%;
   --popover-foreground: 210 40% 98%;
-  
-  --primary: 38 72% 56%;        /* Antique Bronze Gold #c99a6b */
-  --primary-glow: 38 90% 65%;   /* #dfb285 */
+
+  --primary: 38 72% 56%;
+  --primary-glow: 38 90% 65%;
   --primary-foreground: 224 71% 4%;
-  
-  --secondary: 217 33% 14%;     /* #171f2e */
+
+  --secondary: 217 33% 14%;
   --secondary-foreground: 210 40% 98%;
-  
-  --muted: 217 33% 12%;         /* #121824 */
-  --muted-foreground: 215 20% 65%; /* #94a3b8 */
-  
-  --accent: 217 33% 18%;        /* #1e293b */
+
+  --muted: 217 33% 12%;
+  --muted-foreground: 215 20% 65%;
+
+  --accent: 217 33% 18%;
   --accent-foreground: 210 40% 98%;
-  
-  --destructive: 0 72% 51%;     /* #ef4444 */
+
+  --destructive: 0 72% 51%;
   --destructive-foreground: 210 40% 98%;
-  
-  --success: 160 84% 39%;       /* Truth Guard Emerald #10b981 */
-  --warning: 38 92% 50%;        /* #f59e0b */
-  
-  --border: 217 25% 15%;        /* rgba(255,255,255,0.08) */
+
+  --success: 160 84% 39%;
+  --warning: 38 92% 50%;
+
+  --border: 217 25% 15%;
   --input: 217 25% 15%;
   --ring: 38 72% 56%;
-  
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-full: 9999px;
 
-  /* Typography */
   --font-serif: 'Cinzel', Georgia, serif;
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  
-  /* Layout Dimensions */
+
   --header-height: 64px;
   --sidebar-width: 320px;
   --artifacts-width: 480px;
@@ -73,9 +66,6 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ==============================================================================
-   SCROLLBAR & UTILITIES
-   ============================================================================== */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -105,9 +95,6 @@ html, body {
 .gap-4 { gap: 16px; }
 .gap-6 { gap: 24px; }
 
-/* ==============================================================================
-   3D PERSPECTIVE & LIGHTING ENGINE
-   ============================================================================== */
 .perspective-container {
   perspective: 1400px;
   transform-style: preserve-3d;
@@ -134,9 +121,6 @@ html, body {
   opacity: 1;
 }
 
-/* ==============================================================================
-   HEADER & NAVIGATION BAR (shadcn styled)
-   ============================================================================== */
 .app-header {
   height: var(--header-height);
   border-bottom: 1px solid hsl(var(--border));
@@ -248,9 +232,6 @@ html, body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
-/* ==============================================================================
-   MAIN APPLICATION CONTAINER & VIEWS
-   ============================================================================== */
 .app-container {
   height: calc(100vh - var(--header-height));
   position: relative;
@@ -272,9 +253,6 @@ html, body {
   transform: scale(0.98);
 }
 
-/* ==============================================================================
-   VIEW 1: 3D HERO LANDING PAGE
-   ============================================================================== */
 .landing-view {
   display: flex;
   flex-direction: column;
@@ -365,7 +343,6 @@ html, body {
   margin-top: 2px;
 }
 
-/* Quick Prompt Launcher */
 .prompt-launcher-box {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
@@ -448,7 +425,6 @@ html, body {
   border-color: hsl(var(--primary));
 }
 
-/* 3D Visual Cards Column */
 .hero-visual-col {
   display: flex;
   flex-direction: column;
@@ -506,7 +482,6 @@ html, body {
   color: hsl(var(--muted-foreground));
 }
 
-/* Agent Swarm Architecture Cards */
 .architecture-section {
   width: 100%;
   margin-top: 60px;
@@ -583,9 +558,6 @@ html, body {
   line-height: 1.5;
 }
 
-/* ==============================================================================
-   VIEW 2: CONVERSATIONAL CHATBOT & ARTIFACTS STUDIO (3-COLUMN STUDIO)
-   ============================================================================== */
 .studio-view {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr var(--artifacts-width);
@@ -593,7 +565,6 @@ html, body {
   overflow: hidden;
 }
 
-/* 1. Left Sidebar: Vault & Sessions */
 .studio-sidebar {
   border-right: 1px solid hsl(var(--border));
   background: hsl(var(--card));
@@ -676,7 +647,6 @@ html, body {
 .note-type-badge.topic { color: hsl(var(--primary)); }
 .note-type-badge.source { color: hsl(var(--success)); }
 
-/* 2. Center Column: Conversational Chat Cockpit */
 .studio-center {
   display: flex;
   flex-direction: column;
@@ -744,7 +714,6 @@ html, body {
   color: hsl(var(--success));
 }
 
-/* Chat Scroll Feed */
 .chat-scroll-feed {
   flex: 1;
   overflow-y: auto;
@@ -803,7 +772,6 @@ html, body {
   border-color: rgba(201, 154, 107, 0.3);
 }
 
-/* Expandable Chain-of-Thought Accordion (shadcn style) */
 .cot-accordion {
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
@@ -844,7 +812,6 @@ html, body {
   display: none;
 }
 
-/* Markdown Prose Styling */
 .prose {
   color: hsl(var(--foreground));
 }
@@ -888,7 +855,6 @@ html, body {
   color: hsl(var(--foreground));
 }
 
-/* Citations & Pills */
 .citations-footer {
   display: flex;
   flex-wrap: wrap;
@@ -943,7 +909,6 @@ html, body {
   transform: translateY(-1px);
 }
 
-/* Contextual Assistant Message Actions Bar */
 .message-actions-bar {
   display: flex;
   align-items: center;
@@ -987,7 +952,6 @@ html, body {
   border-color: hsl(var(--primary));
 }
 
-/* Jump to Latest Message Floating Button */
 .jump-to-latest-btn {
   position: absolute;
   bottom: 84px;
@@ -1025,7 +989,6 @@ html, body {
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* Stop Generation Button State */
 .btn-stop-generating {
   background: rgba(239, 68, 68, 0.15) !important;
   border: 1px solid rgba(239, 68, 68, 0.4) !important;
@@ -1046,7 +1009,6 @@ html, body {
   border-color: #ef4444 !important;
 }
 
-/* Chat Input Bar (Modern ChatGPT / Gemini / SciSpace style) */
 .chat-input-bar {
   padding: 12px 20px 16px;
   border-top: 1px solid hsl(var(--border));
@@ -1149,7 +1111,6 @@ html, body {
   border-color: hsl(var(--primary));
 }
 
-/* Floating Tool / Action Menu (ChatGPT / Gemini style) */
 .floating-tool-menu {
   position: absolute;
   bottom: calc(100% + 10px);
@@ -1262,7 +1223,6 @@ html, body {
   50% { box-shadow: 0 0 0 4px hsl(var(--primary) / 0.1), 0 0 20px hsl(var(--primary) / 0.35); }
 }
 
-/* Literature Volume Selectors & Badges */
 .prompt-volume-row {
   display: flex;
   align-items: center;
@@ -1376,8 +1336,6 @@ html, body {
   font-weight: 600;
 }
 
-
-/* 3. Right Column: Slide-in Artifacts & Knowledge Radar */
 .studio-artifacts {
   border-left: 1px solid hsl(var(--border));
   background: hsl(var(--card));
@@ -1428,7 +1386,6 @@ html, body {
   display: none;
 }
 
-/* Truth Guard Fact Table */
 .truth-guard-table {
   width: 100%;
   border-collapse: collapse;
@@ -1467,7 +1424,6 @@ html, body {
   color: hsl(var(--destructive));
 }
 
-/* Mind Map SVG Canvas */
 .mindmap-canvas-container {
   width: 100%;
   height: 380px;
@@ -1501,7 +1457,6 @@ html, body {
   stroke-dasharray: 4 2;
 }
 
-/* Modal Dialog (shadcn Dialog) */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1544,7 +1499,6 @@ html, body {
   flex: 1;
 }
 
-/* Report Export Toolbar */
 .report-export-toolbar {
   display: flex;
   align-items: center;
@@ -1593,7 +1547,6 @@ html, body {
   border-color: hsl(var(--primary));
 }
 
-/* Source Citation Buttons */
 .source-card {
   background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
@@ -1637,7 +1590,6 @@ html, body {
   border-color: hsl(var(--primary));
 }
 
-/* Floating Toast Notifications */
 .thoth-toast-container {
   position: fixed;
   bottom: 24px;
@@ -1677,7 +1629,6 @@ html, body {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Interactive Wikilink Badges */
 .wikilink-badge {
   display: inline-flex;
   align-items: center;
@@ -1702,7 +1653,6 @@ html, body {
   transform: translateY(-1px);
 }
 
-/* Print Styles for PDF Export */
 @media print {
   body * {
     visibility: hidden;
@@ -1724,7 +1674,6 @@ html, body {
   }
 }
 
-/* Responsive Breakpoints */
 @media (max-width: 1024px) {
   .hero-grid { grid-template-columns: 1fr; }
   .agents-grid { grid-template-columns: repeat(2, 1fr); }

@@ -1,9 +1,3 @@
-"""
-Thoth · Autonomous Research Intelligence Server
-===============================================
-Authoritative entrypoint launching the Starlette SSE Web Server and REST API.
-"""
-
 import os
 import sys
 import uvicorn

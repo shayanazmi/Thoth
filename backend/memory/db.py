@@ -4,11 +4,7 @@ from typing import Optional
 
 DEFAULT_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "store.db"))
 
-
 def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
-    """
-    Creates and returns a sqlite3 connection with WAL mode enabled.
-    """
     os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -16,15 +12,9 @@ def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
-
 def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
-    """
-    Initializes or migrates the SQLite schema. Safe to call repeatedly.
-    Creates notes, notes_fts (FTS5), embeddings, edges, sessions, and reports tables.
-    """
     conn = get_connection(db_path)
     with conn:
-        # 1. Notes Metadata Table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS notes (
                 note_id TEXT PRIMARY KEY,
@@ -34,7 +24,6 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             );
         """)
 
-        # 2. FTS5 Virtual Table for Keyword BM25 Search
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
                 note_id UNINDEXED,
@@ -42,7 +31,6 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             );
         """)
 
-        # 3. Vector Embeddings Table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS embeddings (
                 note_id TEXT PRIMARY KEY,
@@ -51,7 +39,6 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             );
         """)
 
-        # 4. Knowledge Graph Edges Table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS edges (
                 source_note TEXT NOT NULL,
@@ -62,7 +49,6 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             );
         """)
 
-        # 5. Sessions Table (for application session history)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
@@ -74,7 +60,6 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             );
         """)
 
-        # 6. Reports Table (for persisted research reports)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS reports (
                 report_id TEXT PRIMARY KEY,
@@ -89,7 +74,6 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             );
         """)
 
-        # 7. HTTP Cache Table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS http_cache (
                 cache_key TEXT PRIMARY KEY,
@@ -101,7 +85,6 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
     return conn
 
-
 def save_session(
     session_id: str,
     title: str,
@@ -109,13 +92,12 @@ def save_session(
     metadata: Optional[dict] = None,
     db_path: str = DEFAULT_DB_PATH
 ) -> dict:
-    """Inserts or updates a session in the database."""
     import datetime
     import json
     init_db(db_path)
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     meta_json = json.dumps(metadata or {})
-    
+
     conn = get_connection(db_path)
     with conn:
         conn.execute("""
@@ -127,12 +109,10 @@ def save_session(
                 summary=excluded.summary,
                 metadata=excluded.metadata;
         """, (session_id, title, now_iso, now_iso, summary, meta_json))
-    
+
     return get_session(session_id, db_path=db_path)
 
-
 def get_session(session_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]:
-    """Retrieves a session by ID."""
     import json
     init_db(db_path)
     conn = get_connection(db_path)
@@ -148,9 +128,7 @@ def get_session(session_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dic
         data["metadata"] = {}
     return data
 
-
 def list_sessions(limit: Optional[int] = None, db_path: str = DEFAULT_DB_PATH) -> list:
-    """Lists all sessions ordered by updated_at descending, optionally limited."""
     import json
     init_db(db_path)
     conn = get_connection(db_path)
@@ -172,15 +150,12 @@ def list_sessions(limit: Optional[int] = None, db_path: str = DEFAULT_DB_PATH) -
         results.append(d)
     return results
 
-
 def delete_session(session_id: str, db_path: str = DEFAULT_DB_PATH) -> bool:
-    """Deletes a session and associated reports."""
     init_db(db_path)
     conn = get_connection(db_path)
     with conn:
         cur = conn.execute("DELETE FROM sessions WHERE session_id = ?;", (session_id,))
         return cur.rowcount > 0
-
 
 def save_report(
     report_id: str,
@@ -192,17 +167,15 @@ def save_report(
     mindmap: Optional[dict] = None,
     db_path: str = DEFAULT_DB_PATH
 ) -> dict:
-    """Inserts or updates a report in the database."""
     import datetime
     import json
     init_db(db_path)
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     mm_json = json.dumps(mindmap or {})
-    
-    # Ensure session exists
+
     if not get_session(session_id, db_path=db_path):
         save_session(session_id=session_id, title=topic, summary=content[:200], db_path=db_path)
-        
+
     conn = get_connection(db_path)
     with conn:
         conn.execute("""
@@ -217,12 +190,10 @@ def save_report(
                 mindmap=excluded.mindmap,
                 created_at=excluded.created_at;
         """, (report_id, session_id, topic, content, score, verifier_feedback, mm_json, now_iso))
-        
+
     return get_report(report_id, db_path=db_path)
 
-
 def get_report(report_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]:
-    """Retrieves a report by ID."""
     import json
     init_db(db_path)
     conn = get_connection(db_path)
@@ -238,9 +209,7 @@ def get_report(report_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]
         data["mindmap"] = {}
     return data
 
-
 def list_reports(session_id: Optional[str] = None, limit: Optional[int] = None, db_path: str = DEFAULT_DB_PATH) -> list:
-    """Lists reports, optionally filtered by session_id and limited by count."""
     import json
     init_db(db_path)
     conn = get_connection(db_path)
@@ -266,19 +235,11 @@ def list_reports(session_id: Optional[str] = None, limit: Optional[int] = None, 
         results.append(d)
     return results
 
-
 def get_latest_report(session_id: Optional[str] = None, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]:
-    """Retrieves the most recent report."""
     reps = list_reports(session_id=session_id, db_path=db_path)
     return reps[0] if reps else None
 
-
-# ==============================================================================
-# 7. Persistent HTTP Query & Scraped Content Cache
-# ==============================================================================
-
 def get_cached_response(cache_key: str, db_path: str = DEFAULT_DB_PATH) -> Optional[str]:
-    """Retrieves cached response string if valid and not expired."""
     try:
         conn = get_connection(db_path)
         cursor = conn.cursor()
@@ -292,9 +253,7 @@ def get_cached_response(cache_key: str, db_path: str = DEFAULT_DB_PATH) -> Optio
     except Exception:
         return None
 
-
 def set_cached_response(cache_key: str, response_json: str, ttl_seconds: int = 86400, db_path: str = DEFAULT_DB_PATH):
-    """Saves API / Scraped response to SQLite cache with TTL."""
     try:
         init_db(db_path)
         conn = get_connection(db_path)

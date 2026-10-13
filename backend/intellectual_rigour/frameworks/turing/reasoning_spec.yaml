@@ -1,0 +1,56 @@
+id: turing_operationalization
+type: reasoning_framework
+
+thinker:
+  name: Alan Turing
+  historical_era: 1912-1954
+  primary_tradition: Computability Theory, Formal Operationalization & State Machines
+
+purpose:
+  - formal_operational_specification_audit
+  - discrete_state_and_transition_explicitness_check
+  - executability_and_computability_limits_testing
+  - termination_and_halting_behavior_audit
+  - algorithmic_complexity_and_resource_bounds_analysis
+
+applies_to:
+  - algorithms_and_pseudocode
+  - computational_pipelines
+  - state_machines_and_agent_protocols
+  - formal_decision_procedures
+  - complexity_and_scaling_claims
+
+does_not_apply_to:
+  - purely_normative_ethics
+  - unformalized_poetic_metaphors
+  - subjective_phenomenological_experiences
+
+reasoning_operations:
+  - specify_exact_inputs_data_types_and_alphabets
+  - define_discrete_internal_state_space_and_memory
+  - trace_deterministic_or_probabilistic_transition_table
+  - eliminate_vague_handwaving_and_implicit_human_judgment
+  - test_effective_computability_and_representability
+  - evaluate_termination_conditions_and_halting_bounds
+  - identify_computational_complexity_bottlenecks
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - formal_state_specifications: list of string
+
+historical_basis:
+  primary_sources:
+    - "On Computable Numbers, with an Application to the Entscheidungsproblem (1936)"
+    - "Computing Machinery and Intelligence (Mind, 1950)"
+    - "The Chemical Basis of Morphogenesis (1952)"
+  core_doctrine:
+    - Universal Computation & Effective Calculability: An operation is computational if and only if it can be broken down into discrete, unambiguous mechanical steps on a formal machine.
+    - The Halting Problem & Undecidability: Certain general decision problems cannot be decided by any finite algorithmic procedure.
+    - Operational Behavior as Benchmark (The Imitation Game): Replace vague metaphysical questions ("can machines think?") with precise, testable operational criteria.
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to AI agent loops, prompt chaining protocols, distributed consensus systems, transformer context limits, and computational complexity bounds.

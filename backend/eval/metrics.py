@@ -1,7 +1,3 @@
-"""
-backend/eval/metrics.py - Configured DeepEval metrics for all Thoth agents and evaluation workflows.
-Uses ThothJudgeModel as the default scoring model.
-"""
 from typing import List, Optional, Dict, Any
 import numpy as np
 
@@ -23,18 +19,10 @@ from deepeval.metrics import (
 
 from backend.eval.judge_model import ThothJudgeModel
 
-
 def get_thoth_judge_model() -> ThothJudgeModel:
-    """Returns an instance of ThothJudgeModel wrapping the high-capacity LLM client."""
     return ThothJudgeModel(model_name="Thoth-Judge-LLM")
 
-
-# =============================================================================
-# 0. THE SIX UNCOVERED AGENT METRICS (Hand-Written GEval Steps)
-# =============================================================================
-
 def get_mindmap_extractor_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates mindmap_extractor_chain / mindmap_node hierarchical graph extraction."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="MindMapGraphCorrectness",
@@ -51,9 +39,7 @@ def get_mindmap_extractor_metric(model: Optional[ThothJudgeModel] = None) -> GEv
         async_mode=False
     )
 
-
 def get_follow_up_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates follow_up_chain / follow_up_node question generation."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="FollowUpQuestionQuality",
@@ -68,9 +54,7 @@ def get_follow_up_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
         async_mode=False
     )
 
-
 def get_mindmap_qa_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates mindmap_qa_chain grounded conversational answers."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="MindMapQAGrounding",
@@ -85,9 +69,7 @@ def get_mindmap_qa_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
         async_mode=False
     )
 
-
 def get_mindmap_updater_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates mindmap_updater_chain graph merging and node ID collision prevention."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="MindMapUpdaterIntegrity",
@@ -103,9 +85,7 @@ def get_mindmap_updater_metric(model: Optional[ThothJudgeModel] = None) -> GEval
         async_mode=False
     )
 
-
 def get_conversation_summarizer_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates conversation_summarizer_chain compression."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="ConversationSummarizerCompression",
@@ -120,9 +100,7 @@ def get_conversation_summarizer_metric(model: Optional[ThothJudgeModel] = None) 
         async_mode=False
     )
 
-
 def get_section_expander_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates report_expander_chain targeted section expansion."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="ReportSectionExpanderQuality",
@@ -138,13 +116,7 @@ def get_section_expander_metric(model: Optional[ThothJudgeModel] = None) -> GEva
         async_mode=False
     )
 
-
-# =============================================================================
-# 1. TOOL & ARGUMENT CORRECTNESS METRICS
-# =============================================================================
-
 def get_default_available_tools() -> List[ToolCall]:
-    """Returns the full suite of available Thoth research tools."""
     return [
         ToolCall(name="search_scholarly_sources", description="Academic discovery across arXiv, Semantic Scholar, OpenAlex"),
         ToolCall(name="search_tavily", description="Web search fallback when scholarly sources < 3"),
@@ -156,13 +128,11 @@ def get_default_available_tools() -> List[ToolCall]:
         ToolCall(name="follow_up_node", description="Generates dynamic follow-up research questions")
     ]
 
-
 def get_tool_correctness_metric(
     model: Optional[ThothJudgeModel] = None,
     available_tools: Optional[List[ToolCall]] = None,
     threshold: float = 0.8
 ) -> ToolCorrectnessMetric:
-    """Tool selection correctness metric passing ThothJudgeModel and full available tools."""
     judge = model or get_thoth_judge_model()
     tools = available_tools if available_tools is not None else get_default_available_tools()
     return ToolCorrectnessMetric(
@@ -173,12 +143,10 @@ def get_tool_correctness_metric(
         async_mode=False
     )
 
-
 def get_argument_correctness_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> ArgumentCorrectnessMetric:
-    """Argument correctness metric verifying search query terms preserve user intention."""
     judge = model or get_thoth_judge_model()
     return ArgumentCorrectnessMetric(
         threshold=threshold,
@@ -187,13 +155,7 @@ def get_argument_correctness_metric(
         async_mode=False
     )
 
-
-# =============================================================================
-# 2. ADVERSARIAL GROUNDEDNESS METRIC
-# =============================================================================
-
 def get_adversarial_groundedness_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Adversarial fact-checking and source-ID verification metric."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="ThothAdversarialGroundedness",
@@ -209,13 +171,7 @@ def get_adversarial_groundedness_metric(model: Optional[ThothJudgeModel] = None)
         async_mode=False
     )
 
-
-# =============================================================================
-# 3. TASK-LEVEL CORE AGENT METRICS (Writer, Critic, Router)
-# =============================================================================
-
 def get_writer_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates Writer agent report synthesis."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="WriterSynthesisQuality",
@@ -230,9 +186,7 @@ def get_writer_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
         async_mode=False
     )
 
-
 def get_critic_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates Critic agent scoring and feedback."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="CriticEvaluationQuality",
@@ -247,9 +201,7 @@ def get_critic_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
         async_mode=False
     )
 
-
 def get_router_accuracy_metric(model: Optional[ThothJudgeModel] = None) -> GEval:
-    """Evaluates Intent Router choice quality."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="IntentRouterDecisionQuality",
@@ -265,13 +217,7 @@ def get_router_accuracy_metric(model: Optional[ThothJudgeModel] = None) -> GEval
         async_mode=False
     )
 
-
-# =============================================================================
-# 4. CALIBRATED REPORT CORRECTNESS METRIC & THRESHOLD CALIBRATION
-# =============================================================================
-
 def get_report_correctness_metric(model: Optional[ThothJudgeModel] = None, threshold: float = 0.7) -> GEval:
-    """Calibrated custom report correctness metric with hand-written steps."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="ThothReportCorrectness",
@@ -287,31 +233,20 @@ def get_report_correctness_metric(model: Optional[ThothJudgeModel] = None, thres
         async_mode=False
     )
 
-
 def calibrate_percentile_threshold(scores: List[float], percentile: float = 75.0) -> float:
-    """
-    Computes empirical pass threshold using the percentile-threshold method from the calibration guide.
-    e.g. targeting top 75% score distribution across the benchmark.
-    """
     if not scores:
         return 0.7
     arr = np.array(scores)
-    # 75th percentile of known-good scores or separating boundary
+
     val = float(np.percentile(arr, 100.0 - percentile))
-    # Bound between 0.50 and 0.95
+
     return max(0.50, min(0.95, round(val, 2)))
-
-
-# =============================================================================
-# 5. TRAJECTORY & AGENTIC EVALUATION METRICS
-# =============================================================================
 
 def get_task_completion_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7,
     task: Optional[str] = None
 ) -> TaskCompletionMetric:
-    """Evaluates task completion across the agent's end-to-end trace."""
     judge = model or get_thoth_judge_model()
     return TaskCompletionMetric(
         model=judge,
@@ -321,12 +256,10 @@ def get_task_completion_metric(
         async_mode=False
     )
 
-
 def get_step_efficiency_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> StepEfficiencyMetric:
-    """Evaluates whether agent completed task with minimal redundant tool/LLM steps."""
     judge = model or get_thoth_judge_model()
     return StepEfficiencyMetric(
         model=judge,
@@ -335,12 +268,10 @@ def get_step_efficiency_metric(
         async_mode=False
     )
 
-
 def get_plan_adherence_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> PlanAdherenceMetric:
-    """Evaluates whether agent executed its planned steps and replanning loops."""
     judge = model or get_thoth_judge_model()
     return PlanAdherenceMetric(
         model=judge,
@@ -349,16 +280,10 @@ def get_plan_adherence_metric(
         async_mode=False
     )
 
-
-# =============================================================================
-# 6. MULTI-TURN CONVERSATIONAL METRICS
-# =============================================================================
-
 def get_conversation_completeness_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> ConversationCompletenessMetric:
-    """Evaluates whether the multi-turn conversation completely resolved the user's research goal."""
     judge = model or get_thoth_judge_model()
     return ConversationCompletenessMetric(
         model=judge,
@@ -367,12 +292,10 @@ def get_conversation_completeness_metric(
         async_mode=False
     )
 
-
 def get_knowledge_retention_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> KnowledgeRetentionMetric:
-    """Evaluates whether the assistant retains entities, definitions, and claims across turns without forgetting/contradicting."""
     judge = model or get_thoth_judge_model()
     return KnowledgeRetentionMetric(
         model=judge,
@@ -381,13 +304,11 @@ def get_knowledge_retention_metric(
         async_mode=False
     )
 
-
 def get_topic_adherence_metric(
     relevant_topics: Optional[List[str]] = None,
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> TopicAdherenceMetric:
-    """Evaluates whether the conversation adheres to academic research and scientific literature topics."""
     judge = model or get_thoth_judge_model()
     topics = relevant_topics or ["academic research", "the topic under discussion", "quantum physics", "scientific literature"]
     return TopicAdherenceMetric(
@@ -398,12 +319,10 @@ def get_topic_adherence_metric(
         async_mode=False
     )
 
-
 def get_turn_faithfulness_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> TurnFaithfulnessMetric:
-    """Evaluates per-turn faithfulness: verifies response claims are grounded in that turn's retrieval_context."""
     judge = model or get_thoth_judge_model()
     return TurnFaithfulnessMetric(
         model=judge,
@@ -412,12 +331,10 @@ def get_turn_faithfulness_metric(
         async_mode=False
     )
 
-
 def get_turn_contextual_relevancy_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> TurnContextualRelevancyMetric:
-    """Evaluates per-turn contextual relevancy: verifies retrieved context was relevant to the turn query."""
     judge = model or get_thoth_judge_model()
     return TurnContextualRelevancyMetric(
         model=judge,
@@ -426,13 +343,11 @@ def get_turn_contextual_relevancy_metric(
         async_mode=False
     )
 
-
 def get_multiturn_tool_use_metric(
     available_tools: Optional[List[ToolCall]] = None,
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.7
 ) -> ToolUseMetric:
-    """Evaluates whether tool selection across multi-turn interactions was appropriate."""
     judge = model or get_thoth_judge_model()
     tools = available_tools or [
         ToolCall(name="web_search", input_parameters={"query": "str"}),
@@ -446,19 +361,10 @@ def get_multiturn_tool_use_metric(
         async_mode=False
     )
 
-
-# =============================================================================
-# 7. LOGICAL INTEGRITY GEVAL METRICS
-# =============================================================================
-
 def get_causal_comparative_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.70
 ) -> GEval:
-    """
-    Evaluates whether the output avoids language-strength drift (e.g. promoting correlation
-    to causation, or promoting single-trial results to universal superlatives).
-    """
     judge = model or get_thoth_judge_model()
     return GEval(
         name="Causal & Comparative Modality Integrity",
@@ -479,15 +385,10 @@ def get_causal_comparative_metric(
         async_mode=False
     )
 
-
 def get_non_sequitur_conclusion_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.70
 ) -> GEval:
-    """
-    Evaluates whether the final report conclusion/summary strictly follows from the cited body claims
-    or introduces unsupported leaps without evidence.
-    """
     judge = model or get_thoth_judge_model()
     return GEval(
         name="Non-Sequitur & Conclusion Groundedness",
@@ -508,16 +409,10 @@ def get_non_sequitur_conclusion_metric(
         async_mode=False
     )
 
-
-# =============================================================================
-# 8. MULTI-CORPUS RETRIEVAL & TRUTH GUARD BENCHMARK METRICS
-# =============================================================================
-
 def get_truth_guard_faithfulness_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.80
 ) -> GEval:
-    """Evaluates whether every factual claim in the drafted report is directly entailed by cited source snippets."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="TruthGuardFaithfulness",
@@ -538,12 +433,10 @@ def get_truth_guard_faithfulness_metric(
         async_mode=False
     )
 
-
 def get_multi_corpus_retrieval_metric(
     model: Optional[ThothJudgeModel] = None,
     threshold: float = 0.75
 ) -> GEval:
-    """Evaluates multi-corpus search coverage across arXiv, Semantic Scholar, OpenAlex, Europe PMC, and PubMed."""
     judge = model or get_thoth_judge_model()
     return GEval(
         name="MultiCorpusRetrievalDiversity",
@@ -563,16 +456,11 @@ def get_multi_corpus_retrieval_metric(
         async_mode=False
     )
 
-
 def calculate_mrr_and_hit_rate(
     retrieved_candidates: List[Any],
     relevant_keys: List[str],
     k: int = 5
 ) -> Dict[str, float]:
-    """
-    Computes Mean Reciprocal Rank (MRR@K) and HitRate@K for retrieval benchmarks.
-    relevant_keys can be DOIs, arXiv IDs, or normalized titles.
-    """
     if not relevant_keys:
         return {"mrr@k": 0.0, "hit_rate@k": 0.0}
 
@@ -604,5 +492,4 @@ def calculate_mrr_and_hit_rate(
         f"mrr@{k}": round(reciprocal_rank, 4),
         f"hit_rate@{k}": round(hit, 4)
     }
-
 

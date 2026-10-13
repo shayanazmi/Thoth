@@ -1,9 +1,3 @@
-"""
-Thoth Backend Package
-====================
-Exposes the multi-agent research graph engine, agent chains, and live search/scrape tools.
-"""
-
 from backend.tools import web_search, scrape_url
 from backend.agents import (
     build_search_agent,
@@ -27,7 +21,14 @@ from backend.pipeline import (
     stream_followup_turn,
 )
 from backend.orchestrator import create_initial_state
-from backend.dispatcher import Dispatcher, CircuitBreakerOpenError
+from backend.dispatcher import (
+    Dispatcher,
+    CircuitBreakerOpenError,
+    CircuitState,
+    default_dispatcher,
+    scholarly_dispatcher,
+    s2_dispatcher,
+)
 from backend.scholarly import (
     SourceCandidate,
     search_arxiv,
@@ -60,6 +61,10 @@ __all__ = [
     "create_initial_state",
     "Dispatcher",
     "CircuitBreakerOpenError",
+    "CircuitState",
+    "default_dispatcher",
+    "scholarly_dispatcher",
+    "s2_dispatcher",
     "SourceCandidate",
     "search_arxiv",
     "search_semantic_scholar",

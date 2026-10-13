@@ -22,11 +22,10 @@ from backend.memory.graph import (
     infer_edges_from_note,
     traverse,
     get_subgraph,
+    format_vault_context_with_contradictions,
 )
 
-
 class TestVaultAndMemory(unittest.TestCase):
-
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.vault_dir = os.path.join(self.test_dir, "vault")
@@ -34,10 +33,6 @@ class TestVaultAndMemory(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
-
-    # -------------------------------------------------------------------------
-    # 1. Vault Unit Tests
-    # -------------------------------------------------------------------------
 
     def test_extract_links(self):
         content = "Here is a claim referencing [[source-arxiv-2401]] and [[topic-agentic-ai]] and another [[source-arxiv-2401]]."
@@ -64,7 +59,6 @@ Autonomous agents are transforming clinical imaging.
 
         self.assertTrue(os.path.isfile(note_path))
 
-        # Read the note back
         note = read_note("topic-agentic-radiology", vault_dir=self.vault_dir)
         self.assertEqual(note.note_id, "topic-agentic-radiology")
         self.assertEqual(note.note_type, "topics")
@@ -106,10 +100,6 @@ Autonomous agents are transforming clinical imaging.
         self.assertIn("topic-two", topic_notes)
         self.assertNotIn("entity-dr-smith", topic_notes)
 
-    # -------------------------------------------------------------------------
-    # 2. Database Schema Tests
-    # -------------------------------------------------------------------------
-
     def test_init_db_idempotency_and_tables(self):
         conn = init_db(self.db_path)
         tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()]
@@ -118,16 +108,10 @@ Autonomous agents are transforming clinical imaging.
         self.assertIn("embeddings", tables)
         self.assertIn("edges", tables)
 
-        # Call again to confirm idempotency
         conn2 = init_db(self.db_path)
         self.assertIsNotNone(conn2)
 
-    # -------------------------------------------------------------------------
-    # 3. Indexing & Hybrid Search Tests
-    # -------------------------------------------------------------------------
-
     def test_index_and_hybrid_search(self):
-        # 1. Populate vault with 6 distinct domain notes
         notes_data = [
             ("topic-quantum", "topics", "Quantum Computing advances using superconducting qubits and quantum error correction [[src-q1]]"),
             ("topic-crispr", "topics", "CRISPR-Cas9 gene editing mechanisms for targeted genomic modifications [[src-c1]]"),
@@ -142,38 +126,23 @@ Autonomous agents are transforming clinical imaging.
             note_obj = read_note(nid, vault_dir=self.vault_dir)
             index_note(note_obj, db_path=self.db_path)
 
-        # 2. Test exact keyword search
         kw_hits = search_keyword("CRISPR", top_k=3, db_path=self.db_path)
         self.assertIn("topic-crispr", kw_hits)
 
-        # 3. Test semantic paraphrased search (query without exact match words)
         sem_hits = search_semantic("self-governing robotic decision systems", top_k=3, db_path=self.db_path)
         self.assertIn("topic-agentic-ai", sem_hits)
 
-        # 4. Test hybrid search with reciprocal rank fusion
         hybrid_hits = hybrid_search("quantum error correction qubits", top_k=3, db_path=self.db_path, vault_dir=self.vault_dir)
         self.assertTrue(len(hybrid_hits) > 0)
         self.assertEqual(hybrid_hits[0]["note_id"], "topic-quantum")
         self.assertIn("rrf_score", hybrid_hits[0])
         self.assertIn("superconducting qubits", hybrid_hits[0]["content"])
 
-        # 5. Semantic search for genetic modification
         gene_hits = hybrid_search("molecular DNA sequence alterations in genome", top_k=3, db_path=self.db_path, vault_dir=self.vault_dir)
         self.assertEqual(gene_hits[0]["note_id"], "topic-crispr")
 
-    # -------------------------------------------------------------------------
-    # 4. Knowledge Graph Traversal Tests
-    # -------------------------------------------------------------------------
-
     def test_graph_add_edge_and_traverse(self):
         init_db(self.db_path)
-
-        # Graph topology:
-        # A --cites--> B
-        # A --cites--> C
-        # B --contradicts--> D
-        # C --supports--> E
-        # D --part_of--> F (depth 3 from A)
 
         add_edge("note-A", "cites", "note-B", confidence=0.9, db_path=self.db_path)
         add_edge("note-A", "cites", "note-C", confidence=0.85, db_path=self.db_path)
@@ -181,24 +150,19 @@ Autonomous agents are transforming clinical imaging.
         add_edge("note-C", "supports", "note-E", confidence=0.95, db_path=self.db_path)
         add_edge("note-D", "part_of", "note-F", confidence=0.6, db_path=self.db_path)
 
-        # Depth 1 from note-A
         depth_1_all = traverse("note-A", max_depth=1, db_path=self.db_path)
         self.assertEqual(sorted(depth_1_all), ["note-B", "note-C"])
 
-        # Depth 2 from note-A
         depth_2_all = traverse("note-A", max_depth=2, db_path=self.db_path)
         self.assertEqual(sorted(depth_2_all), ["note-B", "note-C", "note-D", "note-E"])
         self.assertNotIn("note-F", depth_2_all)
 
-        # Depth 3 from note-A
         depth_3_all = traverse("note-A", max_depth=3, db_path=self.db_path)
         self.assertIn("note-F", depth_3_all)
 
-        # Filtered traversal: only follows "contradicts"
         depth_2_contra = traverse("note-B", relation="contradicts", max_depth=2, db_path=self.db_path)
         self.assertEqual(depth_2_contra, ["note-D"])
 
-        # Test infer_edges_from_note
         test_note = Note(
             note_id="note-origin",
             note_type="topics",
@@ -209,13 +173,97 @@ Autonomous agents are transforming clinical imaging.
         traversed = traverse("note-origin", max_depth=1, db_path=self.db_path)
         self.assertEqual(sorted(traversed), ["target-x", "target-y"])
 
-        # Test get_subgraph
         subgraph = get_subgraph("note-A", max_depth=2, db_path=self.db_path)
         self.assertIn("note-A", subgraph["nodes"])
         self.assertIn("note-B", subgraph["nodes"])
         self.assertIn("note-D", subgraph["nodes"])
         self.assertTrue(len(subgraph["edges"]) >= 4)
 
+    def test_note_dataclass_contract_and_attributes(self):
+        note = Note(
+            note_id="topic-quantum-error-correction",
+            note_type="topics",
+            content="# Quantum Error Correction\nSurface codes suppress physical errors.",
+            frontmatter={"confidence": 0.98, "created": "2026-10-13T00:00:00Z"},
+            file_path="/vault/topics/topic-quantum-error-correction.md"
+        )
+        self.assertEqual(note.note_id, "topic-quantum-error-correction")
+        self.assertEqual(note.note_type, "topics")
+        self.assertIn("Surface codes", note.content)
+        self.assertEqual(note.frontmatter["confidence"], 0.98)
+        self.assertEqual(note.file_path, "/vault/topics/topic-quantum-error-correction.md")
+
+        self.assertFalse(hasattr(note, "get"))
+
+        d = note.to_dict()
+        self.assertEqual(d["note_id"], "topic-quantum-error-correction")
+        self.assertEqual(d["type"], "topics")
+        self.assertEqual(d["content"], note.content)
+        self.assertEqual(d["frontmatter"], note.frontmatter)
+
+    def test_format_vault_context_with_typed_note_instances(self):
+        note1 = Note(
+            note_id="note-theory",
+            note_type="topics",
+            content="Theoretical analysis of fault tolerance thresholds.",
+            frontmatter={"confidence": 0.9}
+        )
+        note2 = Note(
+            note_id="note-experiment",
+            note_type="topics",
+            content="Experimental validation on superconducting transmon processors.",
+            frontmatter={"confidence": 0.95}
+        )
+        context_text, contradictions = format_vault_context_with_contradictions(
+            [note1, note2],
+            db_path=self.db_path
+        )
+        self.assertIn("--- Vault Note [note-theory]:", context_text)
+        self.assertIn("Theoretical analysis of fault tolerance", context_text)
+        self.assertIn("--- Vault Note [note-experiment]:", context_text)
+        self.assertIn("Experimental validation on superconducting", context_text)
+        self.assertEqual(contradictions, [])
+
+    def test_format_vault_context_with_dictionaries_and_mixed_list(self):
+        dict_note = {
+            "note_id": "note-dict-only",
+            "content": "Grounded findings from semantic hybrid search.",
+            "type": "topics"
+        }
+        typed_note = Note(
+            note_id="note-typed-only",
+            note_type="topics",
+            content="Grounded findings from direct vault retrieval.",
+            frontmatter={"confidence": 1.0}
+        )
+
+        context_text, _ = format_vault_context_with_contradictions(
+            [dict_note, typed_note],
+            db_path=self.db_path
+        )
+        self.assertIn("--- Vault Note [note-dict-only]:", context_text)
+        self.assertIn("--- Vault Note [note-typed-only]:", context_text)
+
+        partial_dict = {"note_id": "note-partial", "content": None}
+        context_text_partial, _ = format_vault_context_with_contradictions(
+            [partial_dict],
+            db_path=self.db_path
+        )
+        self.assertIn("--- Vault Note [note-partial]:", context_text_partial)
+
+    def test_format_vault_context_contradiction_detection_with_typed_notes(self):
+        note_alpha = Note(note_id="note-alpha", note_type="topics", content="Alpha assertion.")
+        note_beta = Note(note_id="note-beta", note_type="topics", content="Beta assertion.")
+
+        add_edge("note-alpha", "contradicts", "note-beta", confidence=0.88, db_path=self.db_path)
+
+        context_text, contradictions = format_vault_context_with_contradictions(
+            [note_alpha, note_beta],
+            db_path=self.db_path
+        )
+        self.assertTrue(len(contradictions) >= 1)
+        self.assertIn("[KNOWLEDGE GRAPH CONTRADICTION ALERT]", context_text)
+        self.assertIn("Note [note-alpha] CONTRADICTS Note [note-beta]", context_text)
 
 if __name__ == "__main__":
     unittest.main()

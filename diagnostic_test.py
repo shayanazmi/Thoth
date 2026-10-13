@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 from typing import Dict, Any, List, Optional
 from openai import OpenAI
 
-# Suppress harmless warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 logging.basicConfig(
@@ -38,7 +37,6 @@ def format_sublayer(name: str, status: str, details: str = "") -> str:
     detail_str = f" - {details}" if details else ""
     return f"  {badge} {_BOLD}{name}{_RESET}{detail_str}"
 
-# Telemetry collector for GLM 5.2 Judge
 telemetry_data: Dict[str, Any] = {
     "layers": {},
     "latencies": {},
@@ -53,21 +51,16 @@ def run_deep_diagnostics():
     start_total_time = time.time()
     print(format_header("THOTH DEEP 7-LAYER AGENTIC DIAGNOSTICS & AUDIT"))
     load_dotenv()
-    
-    # =========================================================================
-    # LAYER 1: ENVIRONMENT & CREDENTIAL DIAGNOSTICS
-    # =========================================================================
+
     print(format_header("LAYER 1: ENVIRONMENT & CREDENTIAL DIAGNOSTICS"))
     nvidia_key = os.getenv("NVIDIA_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     tavily_key = os.getenv("TAVILY_API_KEY")
-    
-    # Sub-layer 1.1: .env check
+
     env_exists = os.path.exists(".env")
     print(format_sublayer("Sub-layer 1.1: .env File Check", "PASS" if env_exists else "WARN", f"Path: {os.path.abspath('.env')}"))
     telemetry_data["layers"]["1.1_env_file"] = "PASS" if env_exists else "WARN"
-    
-    # Sub-layer 1.2: Endpoint Connectivity Ping (NVIDIA or OpenAI)
+
     t0 = time.time()
     api_ping = False
     active_provider = "None"
@@ -93,20 +86,19 @@ def run_deep_diagnostics():
     except Exception as e:
         logger.error(f"API Ping Error: {e}")
         api_ping = False
-        
+
     lat_api = round(time.time() - t0, 3)
     telemetry_data["latencies"]["primary_llm_ping"] = lat_api
     status_1_2 = "PASS" if api_ping else "FAIL"
     print(format_sublayer("Sub-layer 1.2: Primary LLM Endpoint Ping", status_1_2, f"Latency: {lat_api}s | Provider: {active_provider}"))
     telemetry_data["layers"]["1.2_llm_endpoint"] = status_1_2
-    
-    # Sub-layer 1.3: Scholarly & Web Search Subsystem Ping
+
     t0 = time.time()
     from backend.tools import web_search
     from backend.scholarly import search_scholarly_sources
     import asyncio
     search_test_res = web_search.invoke({"query": "AI agents 2026"})
-    
+
     try:
         scholarly_res = asyncio.run(search_scholarly_sources("transformers"))
         scholarly_count = len(scholarly_res)
@@ -121,27 +113,23 @@ def run_deep_diagnostics():
     print(format_sublayer("Sub-layer 1.3: Scholarly & Web Search Subsystems", status_1_3, f"Latency: {lat_search}s | Scholarly results: {scholarly_count}"))
     telemetry_data["layers"]["1.3_search_api"] = status_1_3
 
-    # =========================================================================
-    # LAYER 2: MEMORY VAULT & HYBRID RRF VECTOR RETRIEVAL DIAGNOSTICS
-    # =========================================================================
     print(format_header("LAYER 2: MEMORY VAULT & HYBRID RRF RETRIEVAL DIAGNOSTICS"))
     temp_dir = tempfile.mkdtemp(prefix="thoth_diag_vault_")
     diag_db_path = os.path.join(temp_dir, "diag_store.db")
-    
+
     from backend.memory.vault import write_note, read_note, list_notes
     from backend.memory.db import init_db, save_session, save_report, get_session, get_report
     from backend.memory.index import index_note, hybrid_search
     from backend.memory.graph import add_edge, traverse
-    
+
     t0 = time.time()
     init_db(diag_db_path)
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    
-    # Sub-layer 2.1: Vault Note Write & Claim Citation Validation
+
     src_note_id = "src-diag-neural-architectures"
     src_content = "# Source: Neural Scaling Laws\n\nDiscussion on modern parameter scaling and compute budgets."
     write_note(note_id=src_note_id, note_type="sources", content=src_content, frontmatter={"type": "sources", "created": now_iso, "confidence": 1.0, "sources": []}, vault_dir=temp_dir)
-    
+
     topic_note_id = "topic-diag-scaling-hypotheses"
     topic_content = f"""# Topic: Scaling Laws
 
@@ -152,24 +140,22 @@ def run_deep_diagnostics():
 Detailed analysis of Chinchilla scaling vs Kaplan scaling laws.
 """
     write_note(note_id=topic_note_id, note_type="topics", content=topic_content, frontmatter={"type": "topics", "created": now_iso, "confidence": 0.95, "sources": [src_note_id]}, vault_dir=temp_dir)
-    
-    # Verify uncited claim raises ValueError
+
     uncited_caught = False
     try:
         write_note(note_id="topic-uncited", note_type="topics", content="# Claims\n- Uncited claim line without brackets\n", vault_dir=temp_dir)
     except ValueError:
         uncited_caught = True
-        
+
     status_2_1 = "PASS" if uncited_caught and os.path.exists(os.path.join(temp_dir, "topics", f"{topic_note_id}.md")) else "FAIL"
     print(format_sublayer("Sub-layer 2.1: Vault Markdown & Strict Claim Citations", status_2_1, f"Claim validator enforced: {uncited_caught}"))
     telemetry_data["layers"]["2.1_vault_claim_validation"] = status_2_1
-    
-    # Sub-layer 2.2: SQLite Vector Index & Hybrid RRF Search Round-Trip
+
     src_note_obj = read_note(src_note_id, vault_dir=temp_dir)
     topic_note_obj = read_note(topic_note_id, vault_dir=temp_dir)
     index_note(src_note_obj, db_path=diag_db_path)
     index_note(topic_note_obj, db_path=diag_db_path)
-    
+
     search_res = hybrid_search("compute optimal parameter scaling", top_k=2, db_path=diag_db_path, vault_dir=temp_dir)
     found_ids = [n.get("note_id") if isinstance(n, dict) else getattr(n, "note_id", "") for n in search_res]
     status_2_2 = "PASS" if topic_note_id in found_ids else "FAIL"
@@ -178,15 +164,13 @@ Detailed analysis of Chinchilla scaling vs Kaplan scaling laws.
     telemetry_data["vault_metrics"] = {"indexed_notes": 2, "retrieved": found_ids}
     print(format_sublayer("Sub-layer 2.2: Vault Index -> Hybrid RRF Retrieval Round-Trip", status_2_2, f"Retrieved: {found_ids} (Latency: {lat_vault}s)"))
     telemetry_data["layers"]["2.2_vault_hybrid_search"] = status_2_2
-    
-    # Sub-layer 2.3: Knowledge Graph Edge Traversal & Schema
+
     add_edge(source_note=topic_note_id, relation="cites", target_note=src_note_id, confidence=1.0, db_path=diag_db_path)
     connected_notes = traverse(start_note=topic_note_id, max_depth=1, db_path=diag_db_path)
     status_2_3 = "PASS" if src_note_id in connected_notes else "FAIL"
     print(format_sublayer("Sub-layer 2.3: Knowledge Graph BFS Traversal", status_2_3, f"Hops from {topic_note_id}: {connected_notes}"))
     telemetry_data["layers"]["2.3_knowledge_graph"] = status_2_3
-    
-    # Sub-layer 2.4: Sessions and Reports Table CRUD
+
     sess = save_session(session_id="sess_diag_01", title="Scaling Diagnostic", summary="Diag session", db_path=diag_db_path)
     rep = save_report(report_id="rep_diag_01", session_id="sess_diag_01", topic="Scaling Diagnostic", content="Report content", score=9.2, db_path=diag_db_path)
     sess_fetched = get_session("sess_diag_01", db_path=diag_db_path)
@@ -195,16 +179,11 @@ Detailed analysis of Chinchilla scaling vs Kaplan scaling laws.
     print(format_sublayer("Sub-layer 2.4: SQLite Sessions & Reports Store", status_2_4, f"Session & Report persisted successfully"))
     telemetry_data["layers"]["2.4_app_db_store"] = status_2_4
 
-    # Clean up temp directory
     shutil.rmtree(temp_dir, ignore_errors=True)
 
-    # =========================================================================
-    # LAYER 3: DISPATCHER RESILIENCE & CIRCUIT BREAKER DIAGNOSTICS
-    # =========================================================================
     print(format_header("LAYER 3: DISPATCHER RESILIENCE & CIRCUIT BREAKER DIAGNOSTICS"))
     from backend.dispatcher import Dispatcher, CircuitBreakerOpenError
-    
-    # Sub-layer 3.1: Exponential Backoff Retry Recovery
+
     t0 = time.time()
     call_attempts = 0
     def flaky_func():
@@ -213,7 +192,7 @@ Detailed analysis of Chinchilla scaling vs Kaplan scaling laws.
         if call_attempts < 3:
             raise RuntimeError(f"Simulated network drop attempt #{call_attempts}")
         return "Success on Attempt 3"
-        
+
     disp_flaky = Dispatcher(max_attempts=4, base_delay=0.01, max_consecutive_failures=5, cooloff_seconds=0.1)
     res_backoff = asyncio.run(disp_flaky.call(flaky_func))
     lat_backoff = round(time.time() - t0, 3)
@@ -221,24 +200,22 @@ Detailed analysis of Chinchilla scaling vs Kaplan scaling laws.
     print(format_sublayer("Sub-layer 3.1: Exponential Backoff & Jitter Recovery", status_3_1, f"Recovered after {call_attempts} attempts (Latency: {lat_backoff}s)"))
     telemetry_data["layers"]["3.1_dispatcher_backoff"] = status_3_1
 
-    # Sub-layer 3.2: Circuit Breaker Trip to OPEN
     disp_trip = Dispatcher(max_attempts=1, base_delay=0.01, max_consecutive_failures=2, cooloff_seconds=0.05)
     def always_fails():
         raise ConnectionResetError("500 Upstream Service Unavailable")
-        
+
     for _ in range(2):
         try:
             asyncio.run(disp_trip.call(always_fails))
         except Exception:
             pass
-            
+
     is_open = disp_trip.state == "OPEN"
     status_3_2 = "PASS" if is_open else "FAIL"
     print(format_sublayer("Sub-layer 3.2: Circuit Breaker Trip to OPEN", status_3_2, f"State: {disp_trip.state} (Failures: {disp_trip.consecutive_failures})"))
     telemetry_data["layers"]["3.2_circuit_breaker_open"] = status_3_2
-    
-    # Sub-layer 3.3: Circuit Breaker Cooldown & Recovery
-    time.sleep(0.06)  # Wait past recovery time
+
+    time.sleep(0.06)
     def now_succeeds():
         return "Recovered OK"
     res_recovery = asyncio.run(disp_trip.call(now_succeeds))
@@ -247,15 +224,12 @@ Detailed analysis of Chinchilla scaling vs Kaplan scaling laws.
     print(format_sublayer("Sub-layer 3.3: Circuit Breaker Half-Open Recovery -> CLOSED", status_3_3, f"Final State: {disp_trip.state}"))
     telemetry_data["layers"]["3.3_circuit_breaker_recovery"] = status_3_3
 
-    # =========================================================================
-    # LAYER 4: ORCHESTRATOR END-TO-END EXECUTION (MOCKED PIPELINE RUN)
-    # =========================================================================
     print(format_header("LAYER 4: ORCHESTRATOR END-TO-END EXECUTION (PLAN-ACT-REPLAN)"))
     from backend.orchestrator import run_research_pipeline
-    
+
     test_topic = "Agentic AI in Medical Imaging 2026"
     print(f"  Running Orchestrator End-to-End against Mocked Model & Scraper responses...")
-    
+
     mock_search_data = "Search results citing https://arxiv.org/abs/2601.0001 and https://nih.gov/med-ai"
     mock_scraped_dict = {
         "https://arxiv.org/abs/2601.0001": "Medical imaging multi-agent models achieve 98% accuracy on MRI anomaly detection.",
@@ -294,17 +268,16 @@ Furthermore, FDA has cleared 40 new agentic imaging frameworks in 2026 [[https:/
          patch("backend.orchestrator.critic_node", return_value={"score": 8.5, "feedback": "Excellent report."}), \
          patch("backend.orchestrator.mindmap_node", return_value={"mindmap": mock_mindmap}), \
          patch("backend.orchestrator.follow_up_node", return_value={"follow_up_questions": ["What are FDA regulatory steps?"]}):
-         
         orch_result = run_research_pipeline(
             topic=test_topic,
             scrape_top_n=2,
             min_score=6.5,
             max_retries=1
         )
-        
+
     lat_orch = round(time.time() - t0, 3)
     telemetry_data["latencies"]["orchestrator_mocked_run"] = lat_orch
-    
+
     orch_rep = orch_result.get("report", "")
     orch_score = orch_result.get("score", 0.0)
     orch_mm_nodes = len(orch_result.get("mindmap", {}).get("nodes", []))
@@ -312,25 +285,20 @@ Furthermore, FDA has cleared 40 new agentic imaging frameworks in 2026 [[https:/
     print(format_sublayer("Sub-layer 4.1: Orchestrator Plan-Act-Observe-Replan Execution", status_4, f"Score: {orch_score}/10 | Report Chars: {len(orch_rep)} | Nodes: {orch_mm_nodes} (Latency: {lat_orch}s)"))
     telemetry_data["layers"]["4_orchestrator_execution"] = status_4
 
-    # =========================================================================
-    # LAYER 5: MULTI-TURN CONVERSATIONAL & SESSION MEMORY BUDGETING
-    # =========================================================================
     print(format_header("LAYER 5: MULTI-TURN CONVERSATIONAL & MEMORY BUDGETING"))
     from backend.memory.session import SessionMemory, DEFAULT_TOKEN_BUDGET
     from backend.pipeline import stream_followup_turn
-    
-    # Sub-layer 5.1: SessionMemory Token Budgeting & Turn FIFO Slicing
+
     session_mem = SessionMemory(session_id="diag_session")
     for i in range(1, 6):
         session_mem.add_turn(f"User Query {i}", f"Assistant detailed response {i} " * 40)
     session_mem.summary = "Rolling compression of earlier turns."
-    
+
     budget_ctx = session_mem.get_context(DEFAULT_TOKEN_BUDGET, retrieved_notes_text="Retrieved note content " * 30)
     status_5_1 = "PASS" if budget_ctx["summary"] and budget_ctx["retrieved_notes"] and budget_ctx["recent_turns"] else "FAIL"
     print(format_sublayer("Sub-layer 5.1: Session Memory Context Allocation & Slicing", status_5_1, f"Budget limits respected across System, Retrieved Notes, Summary & Turns"))
     telemetry_data["layers"]["5.1_session_memory_budget"] = status_5_1
-    
-    # Sub-layer 5.2: Multi-Turn LOCAL_QA Route Execution
+
     from langchain_core.runnables import RunnableSequence
     t0 = time.time()
     turn1_events = {}
@@ -342,21 +310,19 @@ Furthermore, FDA has cleared 40 new agentic imaging frameworks in 2026 [[https:/
         ]
         for ev_name, ev_payload in stream_followup_turn(orch_result, "What are the primary findings mentioned in this research?"):
             turn1_events[ev_name] = ev_payload
-            
+
     lat_turn1 = round(time.time() - t0, 3)
     t1_ans = turn1_events.get("answer", {}).get("answer", "")
     t1_route = turn1_events.get("answer", {}).get("route", "")
     status_5_2 = "PASS" if len(t1_ans) > 20 and t1_route == "LOCAL_QA" else "FAIL"
     print(format_sublayer("Sub-layer 5.2: Multi-Turn Fast Context QA (LOCAL_QA)", status_5_2, f"Latency: {lat_turn1}s | Route: {t1_route}"))
     telemetry_data["layers"]["5.2_turn1_local_qa"] = status_5_2
-    
-    # Sub-layer 5.3: Multi-Turn WEB_SEARCH Route with Vault Persistence
+
     t0 = time.time()
     turn2_events = {}
     with patch.object(RunnableSequence, "invoke") as mock_run, \
          patch("backend.pipeline.web_search") as mock_ws, \
          patch("backend.pipeline.scrape_url") as mock_sc:
-         
         mock_ws.invoke.return_value = "Search result https://fda.gov/ai-clearances-2026"
         mock_sc.invoke.return_value = "FDA published new clearances for imaging AI models."
         mock_run.side_effect = [
@@ -367,20 +333,17 @@ Furthermore, FDA has cleared 40 new agentic imaging frameworks in 2026 [[https:/
         ]
         for ev_name, ev_payload in stream_followup_turn(orch_result, "What are the latest regulatory FDA approvals in 2026?"):
             turn2_events[ev_name] = ev_payload
-            
+
     lat_turn2 = round(time.time() - t0, 3)
     t2_vault = turn2_events.get("vault_update", {}).get("vault_notes", [])
     status_5_3 = "PASS" if len(t2_vault) >= 1 and turn2_events.get("answer", {}).get("route") == "WEB_SEARCH" else "FAIL"
     print(format_sublayer("Sub-layer 5.3: Targeted Web Probe & Follow-Up Vault Persistence", status_5_3, f"Vault Notes Written: {len(t2_vault)} | Latency: {lat_turn2}s"))
     telemetry_data["layers"]["5.3_turn2_web_probe"] = status_5_3
 
-    # =========================================================================
-    # LAYER 6: TELEMETRY & SYSTEM HEALTH SCORECARD
-    # =========================================================================
     print(format_header("LAYER 6: TELEMETRY & SYSTEM HEALTH SCORECARD"))
     total_elapsed = round(time.time() - start_total_time, 2)
     telemetry_data["total_elapsed_time"] = total_elapsed
-    
+
     print(f"  {_BOLD}Total Diagnostics Run Time:{_RESET} {total_elapsed}s")
     print(f"  {_BOLD}Component Latency Profile:{_RESET}")
     for k, v in telemetry_data["latencies"].items():
@@ -388,12 +351,9 @@ Furthermore, FDA has cleared 40 new agentic imaging frameworks in 2026 [[https:/
     print(f"  {_BOLD}Orchestrator Mind Map Scale:{_RESET} {orch_mm_nodes} nodes, {len(orch_result.get('mindmap', {}).get('edges', []))} edges")
     print(f"  {_BOLD}Cumulative Sources Evaluated:{_RESET} {len(orch_result.get('cumulative_sources', []))} sources")
 
-    # =========================================================================
-    # LAYER 7: AI REVIEWER & OPTIMIZATION EVALUATOR (GLM-5.2 JUDGE)
-    # =========================================================================
     print(format_header("LAYER 7: GLM 5.2 AI REVIEWER & OPTIMIZATION JUDGE"))
     print("  Initializing GLM 5.2 (z-ai/glm-5.2 - 753B MoE Frontier Model) via NVIDIA NIM...")
-    
+
     telemetry_json = json.dumps(telemetry_data, indent=2)
     judge_prompt = f"""You are the Lead Systems Architect & AI Judge evaluating the Thoth Autonomous Agentic Research Platform.
 Review the following complete diagnostic telemetry collected across all 6 layers of the system:
@@ -421,7 +381,7 @@ Format your response cleanly in structured Markdown."""
                 max_tokens=4096,
                 stream=True
             )
-            
+
             print(f"\n{_MAGENTA}{_BOLD}[GLM 5.2 ARCHITECTURAL REVIEW & JUDGMENT]{_RESET}\n")
             judge_output = ""
             for chunk in completion:
@@ -434,18 +394,15 @@ Format your response cleanly in structured Markdown."""
                     content_chunk = delta.content
                     judge_output += content_chunk
                     print(content_chunk, end="", flush=True)
-                    
+
             print(f"\n\n{_GREEN}{_BOLD}✓ GLM 5.2 Diagnostic Review Completed Successfully!{_RESET}")
             judge_executed = True
         except Exception as e:
             logger.warning(f"GLM 5.2 Review failed: {e}")
-            
+
     if not judge_executed:
         print(f"  {_YELLOW}[INFO] Live GLM 5.2 Judge skipped or in offline mode. Telemetry summary verified.{_RESET}")
 
-    # =========================================================================
-    # LAYER 8: CONVERSATION ESCALATION & INTENT DIAGNOSTICS
-    # =========================================================================
     print(format_header("LAYER 8: CONVERSATION ESCALATION & INTENT DIAGNOSTICS"))
     from backend.conversation import (
         EscalationState,
@@ -460,13 +417,12 @@ Format your response cleanly in structured Markdown."""
     )
 
     t0 = time.time()
-    # 8.1 Explicit Research Trigger
+
     esc_exp = detect_escalation_intent("Research this deeply with recent papers")
     status_8_1 = "PASS" if esc_exp["state"] == EscalationState.RESEARCH_READY else "FAIL"
     print(format_sublayer("Sub-layer 8.1: Explicit Research Trigger Detection", status_8_1, f"State: {esc_exp['state']} | Confidence: {esc_exp['confidence']}"))
     telemetry_data["layers"]["8.1_explicit_escalation"] = status_8_1
 
-    # 8.2 Implicit Hypothesis Candidate Trigger
     diag_turns = [
         {"user": "Solid state batteries suffer from dendrite growth.", "assistant": "Yes, interfacial resistance is high."},
         {"user": "What if ALD alumina coating protects the LLZO interface?", "assistant": "ALD alumina can suppress dendrites."}
@@ -476,15 +432,11 @@ Format your response cleanly in structured Markdown."""
     print(format_sublayer("Sub-layer 8.2: Implicit Hypothesis Signal Detection", status_8_2, f"State: {esc_cand['state']} | Prompt User: {esc_cand['prompt_user']}"))
     telemetry_data["layers"]["8.2_implicit_escalation"] = status_8_2
 
-    # 8.3 Casual Inquiry Isolation
     esc_chat = detect_escalation_intent("Why are transformers called transformers?")
     status_8_3 = "PASS" if esc_chat["state"] == EscalationState.CHAT and not esc_chat["prompt_user"] else "FAIL"
     print(format_sublayer("Sub-layer 8.3: Casual Inquiry Isolation", status_8_3, f"State: {esc_chat['state']}"))
     telemetry_data["layers"]["8.3_casual_isolation"] = status_8_3
 
-    # =========================================================================
-    # LAYER 9: RESEARCH MANDATE SYNTHESIS & CONTEXT INHERITANCE DIAGNOSTICS
-    # =========================================================================
     print(format_header("LAYER 9: RESEARCH MANDATE & CONTEXT INHERITANCE DIAGNOSTICS"))
     mandate_sample = synthesize_research_mandate(
         user_query="Can you research this?",
@@ -499,33 +451,25 @@ Format your response cleanly in structured Markdown."""
     print(format_sublayer("Sub-layer 9.2: Substantive Pronoun Reference Resolution", status_9_2, f"Resolved Topic: '{mandate_sample.topic[:40]}...'"))
     telemetry_data["layers"]["9.2_pronoun_resolution"] = status_9_2
 
-    # =========================================================================
-    # LAYER 10: PRE-FLIGHT CLARIFICATION GATE DIAGNOSTICS
-    # =========================================================================
     print(format_header("LAYER 10: PRE-FLIGHT CLARIFICATION GATE DIAGNOSTICS"))
-    # Broad query
+
     broad_mandate = synthesize_research_mandate("Batteries")
     clar_broad = evaluate_clarification_need(broad_mandate)
     status_10_1 = "PASS" if clar_broad.needs_clarification and len(clar_broad.options) >= 2 else "FAIL"
     print(format_sublayer("Sub-layer 10.1: Broad Topic Ambiguity Detection", status_10_1, f"Options Generated: {len(clar_broad.options)}"))
     telemetry_data["layers"]["10.1_broad_clarification"] = status_10_1
 
-    # Specific query bypass
     spec_mandate = synthesize_research_mandate("2026 CRISPR Prime Editing Off-Target Fidelity in Human T-Cells")
     clar_spec = evaluate_clarification_need(spec_mandate)
     status_10_2 = "PASS" if not clar_spec.needs_clarification else "FAIL"
     print(format_sublayer("Sub-layer 10.2: Specific Query Immediate Bypass", status_10_2, f"Needs Clarification: {clar_spec.needs_clarification}"))
     telemetry_data["layers"]["10.2_specific_bypass"] = status_10_2
 
-    # Inherited chat constraints bypass
     clar_inherited = evaluate_clarification_need(mandate_sample)
     status_10_3 = "PASS" if not clar_inherited.needs_clarification else "FAIL"
     print(format_sublayer("Sub-layer 10.3: Inherited Chat Constraints Bypass", status_10_3, f"Needs Clarification: {clar_inherited.needs_clarification}"))
     telemetry_data["layers"]["10.3_inherited_bypass"] = status_10_3
 
-    # =========================================================================
-    # LAYER 11: LIVING REPORT SECTION PATCHING & INTEGRITY DIAGNOSTICS
-    # =========================================================================
     print(format_header("LAYER 11: LIVING REPORT SECTION PATCHING DIAGNOSTICS"))
     test_md = """# Research Synthesis
 ## Section 1: Intro
@@ -549,9 +493,6 @@ Updated 2026 findings with verified claims [[src-paper_1]]."""
     print(format_sublayer("Sub-layer 11.2: Markdown Structural Integrity Validation", status_11_2, f"Valid: {valid_md} | Broken Rejected: {not broken_md}"))
     telemetry_data["layers"]["11.2_structure_validation"] = status_11_2
 
-    # =========================================================================
-    # LAYER 12: PROTECTED MATERIAL & CONTINUOUS RESEARCH ORCHESTRATION
-    # =========================================================================
     print(format_header("LAYER 12: PROTECTED MATERIAL & END-TO-END WORKFLOW DIAGNOSTICS"))
     feynman_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "handling api limit like feynman")
     feynman_intact = os.path.exists(feynman_dir) and len(os.listdir(feynman_dir)) >= 5
@@ -559,14 +500,11 @@ Updated 2026 findings with verified claims [[src-paper_1]]."""
     print(format_sublayer("Sub-layer 12.1: Protected Research Directory (Feynman) Integrity", status_12_1, f"Path: {feynman_dir} | Files: {len(os.listdir(feynman_dir)) if os.path.exists(feynman_dir) else 0}"))
     telemetry_data["layers"]["12.1_protected_feynman_dir"] = status_12_1
 
-    # End-to-end Chat -> Mandate -> Research readiness
     status_12_2 = "PASS" if status_8_1 == "PASS" and status_9_1 == "PASS" and status_10_3 == "PASS" and status_11_1 == "PASS" else "FAIL"
     print(format_sublayer("Sub-layer 12.2: Continuous Chat -> Mandate -> Research Transition", status_12_2, f"Workflow Status: {'OPERATIONAL' if status_12_2 == 'PASS' else 'DEGRADED'}"))
     telemetry_data["layers"]["12.2_continuous_workflow"] = status_12_2
 
     print(format_header("ALL 12 DIAGNOSTIC LAYERS COMPLETED"))
-
-
 
 if __name__ == "__main__":
     run_deep_diagnostics()

@@ -1,0 +1,57 @@
+id: popperian_falsification
+type: reasoning_framework
+
+thinker:
+  name: Karl Popper
+  historical_era: 1902-1994
+  primary_tradition: Critical Rationalism
+
+purpose:
+  - falsifiability_audit
+  - adversarial_stress_testing
+  - risky_predictions_identification
+  - ad_hoc_immunization_detection
+  - demarcation_evaluation
+
+applies_to:
+  - empirical_hypotheses
+  - scientific_theories
+  - causal_claims
+  - quantitative_models
+  - experimental_methodologies
+
+does_not_apply_to:
+  - purely_normative_ethics
+  - tautological_definitions
+  - mathematical_axioms
+
+reasoning_operations:
+  - extract_strongest_empirical_claims
+  - formalize_risky_predictions
+  - identify_potential_falsifiers
+  - search_literature_for_counterexamples
+  - inspect_ad_hoc_protective_immunizations
+  - test_exposure_to_failure
+  - distinguish_survival_from_verification
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - potential_falsifying_experiments: list of string
+
+historical_basis:
+  primary_sources:
+    - "Logik der Forschung (1934) / The Logic of Scientific Discovery (1959)"
+    - "Conjectures and Refutations: The Growth of Scientific Knowledge (1963)"
+    - "Objective Knowledge: An Evolutionary Approach (1972)"
+  core_doctrine:
+    - Asymmetry between verification and falsification: No number of white swans can prove all swans white, but one black swan refutes it.
+    - Demarcation criterion: A statement or theory is scientific if and only if it is falsifiable.
+    - Corroboration vs Truth: Theories that survive severe tests are corroborated, never established as final certain truths.
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to machine learning generalization bounds, statistical significance tests, and bioinformatics empirical benchmarks.
+    - Identifies data snooping, p-hacking, and post-hoc rationalizations as modern ad-hoc immunization shields.

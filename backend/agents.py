@@ -17,13 +17,22 @@ import logging
 
 logger = logging.getLogger("ThothLLM")
 
-# Suppress harmless model-type and tool-binding UserWarnings from NVIDIA endpoints library
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_nvidia_ai_endpoints")
 
 load_dotenv()
 
+def sanitize_log_message(msg: Any) -> str:
+    if msg is None:
+        return ""
+    text = str(msg)
+    text = re.sub(r"(nvapi-[A-Za-z0-9_-]{8,})", r"nvapi-***REDACTED***", text)
+    text = re.sub(r"(gsk_[A-Za-z0-9_-]{8,})", r"gsk_***REDACTED***", text)
+    text = re.sub(r"(sk-[A-Za-z0-9_-]{8,})", r"sk-***REDACTED***", text)
+    text = re.sub(r"(Bearer\s+)[A-Za-z0-9._~+/-]{8,}", r"\g<1>***REDACTED***", text, flags=re.IGNORECASE)
+    text = re.sub(r"((?:api[_-]?key|token|secret)[\"\'\s:=]+)[A-Za-z0-9._~+/-]{8,}", r"\g<1>***REDACTED***", text, flags=re.IGNORECASE)
+    return text
+
 class FallbackLLMWrapper(Runnable):
-    """Wrapper that invokes primary LLM and falls back to secondary LLM on network/5xx errors."""
     primary_llm: Any
     fallback_llm: Optional[Any]
     primary_name: str
@@ -37,7 +46,6 @@ class FallbackLLMWrapper(Runnable):
         self.fallback_name = fallback_name
 
     def _adapt_input_for_fallback(self, input_val: Any, max_chars: int = 24000) -> Any:
-        """Compresses oversized prompt inputs so fallback tier rate limits (e.g. Groq TPM) are never exceeded."""
         if isinstance(input_val, str):
             if len(input_val) > max_chars:
                 return input_val[:max_chars] + "\n\n[Context truncated for fallback provider capacity]"
@@ -65,7 +73,7 @@ class FallbackLLMWrapper(Runnable):
                     new_msgs.append(msg_copy)
                 else:
                     new_msgs.append(msg)
-            # Create shallow copy of prompt with adapted messages
+
             try:
                 adapted_prompt = type(input_val)(messages=new_msgs)
                 return adapted_prompt
@@ -81,8 +89,8 @@ class FallbackLLMWrapper(Runnable):
         except Exception as primary_err:
             if self.fallback_llm is not None:
                 msg_warn = f"[LLM Call] Primary provider ({self.primary_name}) failed: {primary_err}. Retrying with fallback ({self.fallback_name})..."
-                logger.warning(msg_warn)
-                print(f"\n[WARNING] {msg_warn}")
+                logger.warning(sanitize_log_message(msg_warn))
+                print(f"\n[WARNING] {sanitize_log_message(msg_warn)}")
                 try:
                     adapted_input = self._adapt_input_for_fallback(input)
                     res = self.fallback_llm.invoke(adapted_input, config=config, **kwargs)
@@ -92,10 +100,10 @@ class FallbackLLMWrapper(Runnable):
                     return res
                 except Exception as fallback_err:
                     msg_err = f"[LLM Call] Fallback provider ({self.fallback_name}) also failed: {fallback_err}"
-                    logger.error(msg_err)
+                    logger.error(sanitize_log_message(msg_err))
                     raise fallback_err from primary_err
             else:
-                logger.error(f"[LLM Call] Primary provider ({self.primary_name}) failed: {primary_err}. No fallback provider configured.")
+                logger.error(sanitize_log_message(f"[LLM Call] Primary provider ({self.primary_name}) failed: {primary_err}. No fallback provider configured."))
                 raise primary_err
 
     def bind_tools(self, tools: Any, **kwargs: Any) -> "FallbackLLMWrapper":
@@ -108,8 +116,6 @@ class FallbackLLMWrapper(Runnable):
             fallback_name=self.fallback_name
         )
 
-
-# Fast Primary LLM for reasoning, drafting & mind map structuring
 _primary_llm = ChatNVIDIA(
     model="nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key=os.getenv("NVIDIA_API_KEY"),
@@ -118,15 +124,14 @@ _primary_llm = ChatNVIDIA(
     timeout=60,
     model_kwargs={
         "chat_template_kwargs": {"enable_thinking": True},
-        "reasoning_budget": 512  # Streamlined reasoning for fast generation
+        "reasoning_budget": 512
     }
 )
 
-# Ultra-Fast High-Precision SLM for Truth Guard Fact-Verification & Local Q&A
 _primary_verifier_llm = ChatNVIDIA(
     model="nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key=os.getenv("NVIDIA_API_KEY"),
-    temperature=0.1,  # Strict factual consistency
+    temperature=0.1,
     max_completion_tokens=2048,
     timeout=30,
     model_kwargs={
@@ -134,7 +139,6 @@ _primary_verifier_llm = ChatNVIDIA(
     }
 )
 
-# Configure Fallback Provider (Groq / OpenAI / OpenAI-Compatible)
 groq_key = os.getenv("GROQ_API_KEY")
 openai_key = os.getenv("OPENAI_API_KEY")
 
@@ -157,10 +161,7 @@ llm = FallbackLLMWrapper(primary_llm=_primary_llm, fallback_llm=_fallback_llm, p
 verifier_llm = FallbackLLMWrapper(primary_llm=_primary_verifier_llm, fallback_llm=_fallback_verifier_llm, primary_name="NVIDIA-Nemotron-30B", fallback_name=_fb_name)
 
 def get_llm():
-    """Returns the configured primary/fallback LLM client."""
     return llm
-
-# 1st Agent: Web Search Expert
 
 def build_search_agent():
     import datetime
@@ -174,7 +175,6 @@ def build_search_agent():
         )
     )
 
-# Pydantic models for structured verification response
 class VerificationResult(BaseModel):
     claim: str = Field(description="The claim being verified from the report")
     is_valid: bool = Field(description="True if supported by sources/web search, False if contradicted or unsupported")
@@ -184,7 +184,6 @@ class VerificationResult(BaseModel):
 class FactVerificationReport(BaseModel):
     results: List[VerificationResult] = Field(description="List of verification results for all key claims in the report")
 
-# Pydantic model for structured Critic quality evaluation
 class CriticScore(BaseModel):
     faithfulness: float = Field(ge=0.0, le=10.0, description="Score out of 10 for factual grounding in sources with no hallucinations")
     relevance: float = Field(ge=0.0, le=10.0, description="Score out of 10 for directly addressing the research topic")
@@ -197,7 +196,6 @@ class CriticScore(BaseModel):
     verdict: str = Field(description="One sentence summarizing report quality and readiness")
     reasoning: str = Field(description="Detailed evaluation reasoning behind the assigned scores")
 
-# 3rd Agent: Fact-Verifier SLM Chain (The Truth Guard)
 verifier_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are the Fact-Verifier Agent (The Truth Guard). Today's date is {current_date}.
 
@@ -235,13 +233,11 @@ Perform the factual verification audit now.""")
 verifier_chain = verifier_prompt | verifier_llm | StrOutputParser()
 
 def build_verifier_agent():
-    """Helper returning verifier_chain for backward compatibility."""
     return verifier_chain
 
-# Writer Chain
 writer_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a {role}. Write in a {tone} tone and respond in {language}. Today's date is {current_date}.
- 
+
 Given raw web research data, produce a structured research report with these sections:
 - **Introduction**: What the topic is and why it matters.
 - **Key Findings**: At least 2 well-explained findings backed by the research.
@@ -249,19 +245,18 @@ Given raw web research data, produce a structured research report with these sec
 - **Methodology**: How the research was gathered and assessed.
 - **Conclusion**: Key takeaways and actionable insights.
 - **Sources**: Numbered list of all URLs from the research data. Do not fabricate sources.
- 
+
 Be evidence-based and do not skip any section."""),
     ("human", """Topic: {topic}
- 
+
 Research Data:
 {research}
- 
+
 Write the research report.""")
 ])
- 
+
 writer_chain = writer_prompt | llm | StrOutputParser()
 
-# Critic Chain (LLM-as-a-Judge with Structured JSON Output)
 critic_parser = JsonOutputParser(pydantic_object=CriticScore)
 
 critic_prompt = ChatPromptTemplate.from_messages([
@@ -287,7 +282,6 @@ Evaluate the report now.""")
 
 critic_chain = critic_prompt | llm | StrOutputParser()
 
-# Follow-up Questions Generator Chain
 follow_up_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are an inquisitive research editor and strategic thought partner.
 Given a topic, synthesis/answer, and recent dialogue, generate 3 high-impact, forward-thinking follow-up questions or actions that help the user explore the most important next steps.
@@ -299,7 +293,7 @@ Rules:
 Example:
 ["Research empirical trade-offs against alternative architectures", "Compare scaling bottlenecks with recent hardware benchmarks", "What are the primary operational constraints for real-world deployment?"]"""),
     ("human", """Topic: {topic}
-    
+
 Report:
 {report}
 
@@ -309,7 +303,6 @@ Recent Context / Questions:
 
 follow_up_chain = follow_up_prompt | llm | StrOutputParser()
 
-# --- Mind Map Extractor Chain (Co-STORM Style Hierarchical Concept Graph) ---
 mindmap_extractor_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are an expert knowledge graph architect. Your job is to extract an intuitive, hierarchical concept graph (Mind Map) from a research report.
 
@@ -347,19 +340,24 @@ Extracted Sources:
 
 mindmap_extractor_chain = mindmap_extractor_prompt | llm | StrOutputParser()
 
-# --- Follow-Up Intent Router Chain ---
 router_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are an autonomous Research Query Router.
 Analyze the user's follow-up request against the existing research mind map and report to choose the most efficient execution path.
 
-Choose ONE of the following 3 routes:
+Choose ONE of the following 4 routes:
 1. "LOCAL_QA": The question can be answered completely and accurately from the existing report and Mind Map findings. (Fastest, 0 web search needed).
 2. "WEB_SEARCH": The question asks for new information, specific stats, latest updates, entities, or topics NOT covered in the current report/mindmap. (Triggers 1 focused web probe).
 3. "REPORT_EXPANSION": The user explicitly wants to add a new section, revise, or expand the master Synthesis Report itself.
+4. "CHITCHAT": The message is a straightforward greeting, farewell, acknowledgement, expression of thanks, social remark, or simple conversational question that does not require research retrieval or report modification.
+
+Critical Instruction:
+If a greeting or conversational remark is followed by a substantive question (e.g., 'Hi Thoth, explain fault tolerance in surface codes'), it must NOT be classified as CHITCHAT; route it according to the substantive question (LOCAL_QA, WEB_SEARCH, or REPORT_EXPANSION).
+
+Valid route values: LOCAL_QA, WEB_SEARCH, REPORT_EXPANSION, CHITCHAT.
 
 Respond with ONLY a JSON object formatted as follows:
 {{
-  "route": "LOCAL_QA" | "WEB_SEARCH" | "REPORT_EXPANSION",
+  "route": "LOCAL_QA",
   "reasoning": "One concise sentence explaining the routing decision",
   "search_query": "If WEB_SEARCH, the exact single targeted search query to execute; otherwise empty string"
 }}
@@ -378,7 +376,6 @@ User Follow-Up Query:
 
 router_chain = router_prompt | verifier_llm | StrOutputParser()
 
-# --- Mind Map Grounded Q&A Chain ---
 mindmap_qa_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are Thoth, an autonomous scientific intelligence and research thought partner.
 Answer the user's follow-up question accurately using the provided Research context, synthesis report, and prior dialogue.
@@ -404,7 +401,6 @@ User Question:
 
 mindmap_qa_chain = mindmap_qa_prompt | llm | StrOutputParser()
 
-# --- Mind Map Updater Chain (For Merging Follow-up Mini-Researches) ---
 mindmap_updater_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a Knowledge Graph Editor. Given an existing Mind Map JSON and new mini-research findings from a follow-up probe, update the Mind Map JSON.
 
@@ -426,7 +422,6 @@ New Mini-Research Findings:
 
 mindmap_updater_chain = mindmap_updater_prompt | llm | StrOutputParser()
 
-# --- Rolling Conversation Summarizer Chain ---
 summarizer_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a research conversation compressor. Condense the previous dialogue history into a dense, high-signal bulleted summary of key facts established, user queries asked, and insights discovered.
 Keep the summary under 200 words. Do not drop key domain entities, names, or source URLs."""),
@@ -439,7 +434,6 @@ Recent Conversation Turns to Incorporate:
 
 conversation_summarizer_chain = summarizer_prompt | verifier_llm | StrOutputParser()
 
-# --- Report Section Expander Chain ---
 report_expander_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are an academic research editor.
 The user wants to expand or add a new section to the master Synthesis Report based on their follow-up request and new research data.
@@ -465,7 +459,6 @@ Draft the section expansion now. Start immediately with the `### ` heading.""")
 
 report_expander_chain = report_expander_prompt | llm | StrOutputParser()
 
-# Direct conversational chat prompt for greetings, meta questions, and fast conversational Q&A
 direct_chat_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are Thoth (Djehuty), the ancient Egyptian deity of wisdom, truth, mathematics, and writing, operating as an autonomous multi-agent research intelligence.
 - For greetings or casual conversation, respond with dignity, warmth, and concise elegance in 2-3 sentences.
@@ -477,22 +470,42 @@ direct_chat_prompt = ChatPromptTemplate.from_messages([
 
 direct_chat_chain = direct_chat_prompt | verifier_llm | StrOutputParser()
 
-
-
-
 def strip_chain_of_thought(text: Any) -> str:
-    """Removes <think> tags, reasoning traces, and preamble from LLM responses."""
     if text is None:
         return ""
     if not isinstance(text, str):
         text = getattr(text, "content", str(text))
     if not text:
         return ""
-    # Strip <think>...</think> blocks
-    cleaned = re.sub(r"<think>.*?</think>", "", str(text), flags=re.DOTALL).strip()
-    
-    # If the text has reasoning preamble before the actual markdown title (e.g. "Let's do it.", "I'll draft...", etc.)
-    # and contains a heading like "### " or "## " or "# "
+
+    raw_str = str(text)
+
+    trimmed = raw_str.strip()
+    if trimmed.startswith(("{", "[")):
+        try:
+            json.loads(trimmed)
+            return trimmed
+        except Exception:
+            pass
+
+    cleaned = re.sub(
+        r"(?is)<(think|thought|reasoning)(?:\s+[^>]*)?>.*?</\1>",
+        "",
+        raw_str
+    ).strip()
+
+    cleaned = re.sub(
+        r"(?is)<(think|thought|reasoning)(?:\s+[^>]*)?>.*$",
+        "",
+        cleaned
+    ).strip()
+
+    cleaned = re.sub(
+        r"(?is)</(think|thought|reasoning)>",
+        "",
+        cleaned
+    ).strip()
+
     match = re.search(r"(?m)^(#{1,4}\s+.+)$", cleaned)
     if match and match.start() > 0:
         preamble = cleaned[:match.start()].strip()
@@ -502,10 +515,47 @@ def strip_chain_of_thought(text: Any) -> str:
 
     return cleaned
 
+def _find_json_candidates(text: str) -> List[Any]:
+    decoder = json.JSONDecoder()
+    candidates = []
+    i = 0
+    n = len(text)
+    while i < n:
+        match = re.search(r"[\{\[]", text[i:])
+        if not match:
+            break
+        start_pos = i + match.start()
+        try:
+            obj, end_pos = decoder.raw_decode(text, start_pos)
+            if isinstance(obj, (dict, list)):
+                candidates.append((start_pos, end_pos, obj))
+                i = end_pos
+                continue
+        except Exception:
+            pass
+        i = start_pos + 1
+    return [c[2] for c in candidates]
 
-# Helper function to parse JSON safely
+def _select_best_candidate(candidates: List[Any], default: Any = None) -> Any:
+    if not candidates:
+        return default
+    if len(candidates) == 1:
+        return candidates[0]
+
+    target_type = None
+    if isinstance(default, (dict, list)):
+        target_type = type(default)
+
+    def _score(item_idx_pair):
+        idx, item = item_idx_pair
+        type_match = 1 if (target_type and isinstance(item, target_type)) else 0
+        size = len(item) if isinstance(item, (dict, list)) else 0
+        return (type_match, size > 0, size, idx)
+
+    best_idx, best_item = max(enumerate(candidates), key=_score)
+    return best_item
+
 def safe_extract_json(raw_text: Any, default: Any = None) -> Any:
-    """Extracts JSON object or array from LLM response safely, removing thinking tokens & markdown codeblocks."""
     if raw_text is None:
         return default
     if isinstance(raw_text, (dict, list)):
@@ -517,60 +567,88 @@ def safe_extract_json(raw_text: Any, default: Any = None) -> Any:
     if not text:
         return default
 
-    # 1. Try direct parse
     try:
         return json.loads(text)
     except Exception:
         pass
 
-    # 2. Check for markdown code fence contents
-    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
-    if fence_match:
-        fenced_content = fence_match.group(1).strip()
-        try:
-            return json.loads(fenced_content)
-        except Exception:
-            pass
+    cleaned = strip_chain_of_thought(text).strip()
+    if not cleaned:
+        return default
 
-    # 3. Clean raw markdown code block tags if unbalanced
-    cleaned = re.sub(r"^```(?:json)?\s*", "", text, flags=re.MULTILINE)
-    cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE).strip()
     try:
         return json.loads(cleaned)
     except Exception:
         pass
 
-    # 4. Extract first outermost JSON object {...} or array [...]
-    try:
-        start_brace = cleaned.find('{')
-        end_brace = cleaned.rfind('}')
-        if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
-            return json.loads(cleaned[start_brace:end_brace+1])
-    except Exception:
-        pass
+    fence_matches = list(re.finditer(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned, re.IGNORECASE))
+    if fence_matches:
+        fenced_candidates = []
+        for fm in fence_matches:
+            fcontent = fm.group(1).strip()
+            try:
+                fenced_candidates.append(json.loads(fcontent))
+                continue
+            except Exception:
+                pass
+            fcands = _find_json_candidates(fcontent)
+            if fcands:
+                fenced_candidates.extend(fcands)
+        if fenced_candidates:
+            return _select_best_candidate(fenced_candidates, default)
 
-    try:
-        start_bracket = cleaned.find('[')
-        end_bracket = cleaned.rfind(']')
-        if start_bracket != -1 and end_bracket != -1 and end_bracket > start_bracket:
-            return json.loads(cleaned[start_bracket:end_bracket+1])
-    except Exception:
-        pass
+    unfenced = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.MULTILINE)
+    unfenced = re.sub(r"\s*```$", "", unfenced, flags=re.MULTILINE).strip()
+    if unfenced and unfenced != cleaned:
+        try:
+            return json.loads(unfenced)
+        except Exception:
+            pass
+        unfenced_cands = _find_json_candidates(unfenced)
+        if unfenced_cands:
+            return _select_best_candidate(unfenced_cands, default)
 
-    # 5. Salvage complete objects from truncated/unclosed JSON arrays
-    try:
-        start_bracket = cleaned.find('[')
-        if start_bracket != -1:
-            obj_matches = re.findall(r"(\{[^{}]+\})", cleaned[start_bracket:])
-            if obj_matches:
+    candidates = _find_json_candidates(cleaned)
+
+    start_bracket = cleaned.find('[')
+    start_brace = cleaned.find('{')
+    if start_bracket != -1 and (start_brace == -1 or start_bracket < start_brace):
+        has_array_candidate = any(isinstance(c, list) for c in candidates)
+        if not has_array_candidate:
+            try:
                 salvaged = []
-                for obj_str in obj_matches:
+                sub_text = cleaned[start_bracket:]
+                decoder = json.JSONDecoder()
+                for m in re.finditer(r"\{", sub_text):
                     try:
-                        salvaged.append(json.loads(obj_str))
+                        obj, _ = decoder.raw_decode(sub_text, m.start())
+                        if isinstance(obj, dict):
+                            salvaged.append(obj)
                     except Exception:
                         pass
                 if salvaged:
                     return {"results": salvaged} if any("claim" in p for p in salvaged) else salvaged
+            except Exception:
+                pass
+
+    if candidates:
+        return _select_best_candidate(candidates, default)
+
+    try:
+        start_bracket = cleaned.find('[')
+        if start_bracket != -1:
+            salvaged = []
+            sub_text = cleaned[start_bracket:]
+            decoder = json.JSONDecoder()
+            for m in re.finditer(r"\{", sub_text):
+                try:
+                    obj, _ = decoder.raw_decode(sub_text, m.start())
+                    if isinstance(obj, dict):
+                        salvaged.append(obj)
+                except Exception:
+                    pass
+            if salvaged:
+                return {"results": salvaged} if any("claim" in p for p in salvaged) else salvaged
     except Exception:
         pass
 

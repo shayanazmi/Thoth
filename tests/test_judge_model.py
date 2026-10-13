@@ -7,17 +7,13 @@ from unittest.mock import MagicMock, AsyncMock
 from backend.eval.judge_model import ThothJudgeModel, _construct_default_schema_instance, _repair_dict_for_schema
 from backend.agents import CriticScore, VerificationResult
 
-
 class SampleEvaluationSchema(BaseModel):
     verdict: str
     score: float = Field(ge=0.0, le=10.0)
     reasons: List[str] = []
     is_grounded: bool = True
 
-
 class TestThothJudgeModel(unittest.TestCase):
-    """Tests for ThothJudgeModel in isolation before wiring into DeepEval metrics."""
-
     def setUp(self):
         self.mock_llm = MagicMock()
         self.mock_llm.ainvoke = AsyncMock()
@@ -26,10 +22,6 @@ class TestThothJudgeModel(unittest.TestCase):
     def test_model_name_and_load_model(self):
         self.assertEqual(self.judge.get_model_name(), "Thoth-Test-Judge")
         self.assertEqual(self.judge.load_model(), self.mock_llm)
-
-    # -------------------------------------------------------------------------
-    # 1. Unstructured String Generation
-    # -------------------------------------------------------------------------
 
     def test_generate_unstructured_string(self):
         self.mock_llm.invoke.return_value = "<think>Analyzing...</think>The report is factually accurate."
@@ -40,10 +32,6 @@ class TestThothJudgeModel(unittest.TestCase):
         self.mock_llm.ainvoke.return_value = "<think>Async reasoning...</think>Solid methodology."
         res = asyncio.run(self.judge.a_generate("Evaluate async."))
         self.assertEqual(res, "Solid methodology.")
-
-    # -------------------------------------------------------------------------
-    # 2. Schema-Aware Structured Generation (Clean JSON)
-    # -------------------------------------------------------------------------
 
     def test_generate_with_schema_clean_json(self):
         clean_json = """
@@ -79,10 +67,6 @@ class TestThothJudgeModel(unittest.TestCase):
         self.assertEqual(res.verdict, "Async verified.")
         self.assertEqual(res.score, 8.5)
 
-    # -------------------------------------------------------------------------
-    # 3. Schema-Aware with Thinking Tokens & Markdown Fences
-    # -------------------------------------------------------------------------
-
     def test_generate_with_schema_thinking_tokens_and_markdown(self):
         llm_raw = """
         <think>
@@ -105,12 +89,7 @@ class TestThothJudgeModel(unittest.TestCase):
         self.assertEqual(res.score, 8.0)
         self.assertEqual(res.verdict, "Positive evidence alignment.")
 
-    # -------------------------------------------------------------------------
-    # 4. Partial Output & Field Repair
-    # -------------------------------------------------------------------------
-
     def test_generate_with_schema_partial_json_repairs_fields(self):
-        # LLM only provided 'verdict' and 'score', missing 'reasons' and 'is_grounded'
         partial_json = '{"verdict": "Partial response", "score": 7.5}'
         self.mock_llm.invoke.return_value = partial_json
 
@@ -118,16 +97,11 @@ class TestThothJudgeModel(unittest.TestCase):
         self.assertIsInstance(res, SampleEvaluationSchema)
         self.assertEqual(res.verdict, "Partial response")
         self.assertEqual(res.score, 7.5)
-        # Repaired defaults
+
         self.assertEqual(res.reasons, [])
         self.assertTrue(res.is_grounded)
 
-    # -------------------------------------------------------------------------
-    # 5. Malformed, Corrupted, or Garbled Output Never Raises or Returns None
-    # -------------------------------------------------------------------------
-
     def test_generate_with_schema_garbled_output_returns_valid_default(self):
-        # Completely unparseable prose output
         self.mock_llm.invoke.return_value = "Sorry, I cannot produce JSON output for this request."
 
         res = self.judge.generate("Evaluate bad text", schema=SampleEvaluationSchema)
@@ -139,7 +113,6 @@ class TestThothJudgeModel(unittest.TestCase):
         self.assertLessEqual(res.score, 10.0)
 
     def test_generate_with_schema_llm_exception_returns_valid_default(self):
-        # LLM raises an unexpected exception
         self.mock_llm.invoke.side_effect = RuntimeError("Rate limit or connection reset")
 
         res = self.judge.generate("Prompt causing error", schema=SampleEvaluationSchema)
@@ -152,10 +125,6 @@ class TestThothJudgeModel(unittest.TestCase):
         res = asyncio.run(self.judge.a_generate("Async bad text", schema=SampleEvaluationSchema))
         self.assertIsNotNone(res)
         self.assertIsInstance(res, SampleEvaluationSchema)
-
-    # -------------------------------------------------------------------------
-    # 6. Real Thoth Pydantic Schemas (CriticScore & VerificationResult)
-    # -------------------------------------------------------------------------
 
     def test_generate_with_real_critic_score_schema(self):
         mock_critic_json = """
@@ -194,7 +163,6 @@ class TestThothJudgeModel(unittest.TestCase):
         self.assertIsInstance(res, VerificationResult)
         self.assertTrue(res.is_valid)
         self.assertEqual(res.supporting_source_id, "src-superconducting_qubits")
-
 
 if __name__ == "__main__":
     unittest.main()

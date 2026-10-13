@@ -1,0 +1,57 @@
+id: simon_bounded_rationality
+type: reasoning_framework
+
+thinker:
+  name: Herbert Simon
+  historical_era: 1916-2001
+  primary_tradition: Bounded Rationality, Satisficing & Heuristic Search in Complex Systems
+
+purpose:
+  - bounded_rationality_and_constraint_audit
+  - stated_vs_operational_objective_clarification
+  - search_space_and_combinatorial_explosion_analysis
+  - satisficing_threshold_and_stopping_rule_evaluation
+  - search_cost_vs_marginal_benefit_audit
+
+applies_to:
+  - decision_procedures
+  - optimization_algorithms
+  - autonomous_agent_architectures
+  - search_and_planning_systems
+  - resource_constrained_heuristics
+
+does_not_apply_to:
+  - unconstrained_pure_mathematics
+  - static_definitional_taxonomies
+  - non_actionable_historical_narratives
+
+reasoning_operations:
+  - distinguish_stated_objective_from_measurable_proxy
+  - map_decision_space_and_combinatorial_branching_factors
+  - identify_finite_resource_bounds_time_compute_memory_attention
+  - test_unrealistic_claims_of_global_exhaustive_optimization
+  - analyze_search_strategy_greedy_heuristic_beam_mcts
+  - audit_stopping_rule_rationality_why_did_search_terminate_here
+  - search_for_simpler_lower_cost_satisficing_alternatives
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - satisficing_alternatives: list of string
+
+historical_basis:
+  primary_sources:
+    - "Administrative Behavior (1947)"
+    - "A Behavioral Model of Rational Choice (Quarterly Journal of Economics, 1955)"
+    - "The Sciences of the Artificial (1969 / 1996 3rd ed.)"
+    - "Human Problem Solving (Newell & Simon, 1972)"
+  core_doctrine:
+    - Bounded Rationality: Real decision-makers face severe cognitive and computational limits; global optimization is impossible for complex search spaces.
+    - Satisficing vs. Maximizing: Agents search until finding an option meeting their aspiration threshold (*satisficing*), rather than computing global optimums.
+    - Architecture of Complexity (Near-Decomposability): Complex systems are organized into semi-autonomous hierarchical sub-assemblies.
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to agentic AI search loops (Tree-of-Thought, MCTS), LLM inference compute scaling, token economy budgets, and stopping criteria in autonomous planning.

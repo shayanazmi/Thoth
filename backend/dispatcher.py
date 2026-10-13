@@ -3,23 +3,23 @@ import time
 import random
 import logging
 import inspect
+from enum import Enum
 from typing import Callable, Any, Dict, Optional
 
 logger = logging.getLogger("ThothDispatcher")
 
+class CircuitState(str, Enum):
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    HALF_OPEN = "HALF_OPEN"
+
+    def __str__(self) -> str:
+        return self.value
 
 class CircuitBreakerOpenError(Exception):
-    """Raised when call is blocked because Circuit Breaker is in OPEN state."""
     pass
 
-
 class Dispatcher:
-    """
-    Central concurrency and resilience dispatcher.
-    Provides asyncio.Semaphore concurrency capping, rate-limit pacing (token bucket / interval),
-    exponential backoff with jitter, and a 3-state Circuit Breaker (CLOSED, OPEN, HALF_OPEN).
-    """
-
     def __init__(
         self,
         max_concurrent: int = 3,
@@ -36,7 +36,7 @@ class Dispatcher:
         self.cooloff_seconds = cooloff_seconds
         self.min_interval_seconds = min_interval_seconds
 
-        self._state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+        self._state: CircuitState = CircuitState.CLOSED
         self._consecutive_failures = 0
         self._last_failure_time = 0.0
         self._last_call_time = 0.0
@@ -75,9 +75,8 @@ class Dispatcher:
             self._rate_locks[loop] = asyncio.Lock()
         return self._rate_locks[loop]
 
-
     @property
-    def state(self) -> str:
+    def state(self) -> CircuitState:
         return self._state
 
     @property
@@ -85,12 +84,11 @@ class Dispatcher:
         return self._consecutive_failures
 
     async def _check_and_update_circuit_breaker(self):
-        """Validates circuit breaker state prior to attempting a call."""
         async with self._lock:
             now = time.time()
-            if self._state == "OPEN":
+            if self._state == CircuitState.OPEN:
                 if now - self._last_failure_time >= self.cooloff_seconds:
-                    self._state = "HALF_OPEN"
+                    self._state = CircuitState.HALF_OPEN
                     self._half_open_in_flight = True
                     logger.info(f"[DISPATCHER CIRCUIT BREAKER] Cooloff of {self.cooloff_seconds}s expired. Transitioning to HALF_OPEN (permitting 1 test call).")
                     print(f"\n[INFO] [DISPATCHER] Circuit Breaker transitioned to HALF_OPEN (1 test call permitted).")
@@ -98,7 +96,7 @@ class Dispatcher:
                     remaining = round(self.cooloff_seconds - (now - self._last_failure_time), 1)
                     logger.warning(f"[DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. {remaining}s remaining in cooloff.")
                     raise CircuitBreakerOpenError(f"Circuit Breaker is OPEN. Blocked for cooloff ({remaining}s remaining).")
-            elif self._state == "HALF_OPEN":
+            elif self._state == CircuitState.HALF_OPEN:
                 if self._half_open_in_flight:
                     logger.warning("[DISPATCHER CIRCUIT BREAKER] Blocked call: State is HALF_OPEN and test call is already in flight.")
                     raise CircuitBreakerOpenError("Circuit Breaker is HALF_OPEN. Test call already in progress.")
@@ -106,34 +104,31 @@ class Dispatcher:
                     self._half_open_in_flight = True
 
     async def _record_success(self):
-        """Records call success, resetting failure counters and closing circuit breaker."""
         async with self._lock:
-            if self._state in ("OPEN", "HALF_OPEN"):
+            if self._state in (CircuitState.OPEN, CircuitState.HALF_OPEN):
                 logger.info(f"[DISPATCHER CIRCUIT BREAKER] Test call succeeded! Transitioning state from {self._state} -> CLOSED.")
                 print(f"\n[INFO] [DISPATCHER] Circuit Breaker recovered: {self._state} -> CLOSED.")
-            self._state = "CLOSED"
+            self._state = CircuitState.CLOSED
             self._consecutive_failures = 0
             self._half_open_in_flight = False
 
     async def _record_failure(self):
-        """Records call failure, incrementing failure counts and tripping circuit breaker if threshold hit."""
         async with self._lock:
             self._consecutive_failures += 1
             now = time.time()
             self._last_failure_time = now
 
-            if self._state == "HALF_OPEN":
-                self._state = "OPEN"
+            if self._state == CircuitState.HALF_OPEN:
+                self._state = CircuitState.OPEN
                 self._half_open_in_flight = False
                 logger.warning(f"[DISPATCHER CIRCUIT BREAKER] Test call failed in HALF_OPEN. Tripping back to OPEN for {self.cooloff_seconds}s.")
                 print(f"\n[WARNING] [DISPATCHER] Test call failed in HALF_OPEN. Tripping back to OPEN for {self.cooloff_seconds}s.")
             elif self._consecutive_failures >= self.max_consecutive_failures:
-                self._state = "OPEN"
+                self._state = CircuitState.OPEN
                 logger.warning(f"[DISPATCHER CIRCUIT BREAKER] {self._consecutive_failures} consecutive failures hit limit ({self.max_consecutive_failures}). Tripping to OPEN for {self.cooloff_seconds}s.")
                 print(f"\n[WARNING] [DISPATCHER] Circuit Breaker TRIPPED -> OPEN for {self.cooloff_seconds}s ({self._consecutive_failures} consecutive failures).")
 
     async def _enforce_rate_limit(self):
-        """Enforces minimum inter-request delay if min_interval_seconds is set."""
         if self.min_interval_seconds <= 0.0:
             return
         async with self._rate_lock:
@@ -146,20 +141,13 @@ class Dispatcher:
             self._last_call_time = time.time()
 
     async def call(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
-        """
-        Executes fn(*args, **kwargs) with concurrency capping, rate-limit pacing,
-        exponential backoff retries with jitter, and circuit breaker protection.
-        Supports both coroutines and sync callables.
-        """
         last_exception = None
 
         for attempt in range(1, self.max_attempts + 1):
-            # Check circuit breaker before attempting
             await self._check_and_update_circuit_breaker()
 
             try:
                 async with self._semaphore:
-                    # Enforce rate-limiting interval pacing under concurrency lock
                     await self._enforce_rate_limit()
 
                     logger.debug(f"[DISPATCHER] Executing call attempt {attempt}/{self.max_attempts} for {getattr(fn, '__name__', str(fn))}")
@@ -168,18 +156,15 @@ class Dispatcher:
                     else:
                         res = await asyncio.to_thread(fn, *args, **kwargs)
 
-                    # Update last call completion timestamp for rate limit pacing
                     if self.min_interval_seconds > 0.0:
                         self._last_call_time = time.time()
 
                 await self._record_success()
                 return res
 
-
             except Exception as e:
                 last_exception = e
 
-                # Determine if error is client error that should NOT be retried (404, 400, 401, 403)
                 is_non_retryable = False
                 if hasattr(e, "response") and hasattr(e.response, "status_code"):
                     if e.response.status_code in {400, 401, 403, 404, 422}:
@@ -191,8 +176,7 @@ class Dispatcher:
 
                 await self._record_failure()
 
-                # If circuit breaker tripped OPEN during this attempt, raise immediately
-                if self._state == "OPEN":
+                if self._state == CircuitState.OPEN:
                     logger.warning(f"[DISPATCHER] Call attempt {attempt}/{self.max_attempts} failed and Circuit Breaker is now OPEN.")
                     raise last_exception
 
@@ -200,7 +184,6 @@ class Dispatcher:
                     logger.warning(f"[DISPATCHER] All {self.max_attempts} attempts failed for {getattr(fn, '__name__', str(fn))}.")
                     raise last_exception
 
-                # Calculate exponential backoff delay with random jitter (up to 50% of delay)
                 delay = self.base_delay * (2 ** (attempt - 1))
                 jitter = random.uniform(0, 0.5 * delay)
                 total_delay = delay + jitter
@@ -211,11 +194,8 @@ class Dispatcher:
 
         raise last_exception
 
-
-# Global default dispatcher instance
 default_dispatcher = Dispatcher()
 
-# Default academic scholarly dispatcher
 scholarly_dispatcher = Dispatcher(
     max_concurrent=3,
     max_attempts=3,
@@ -224,7 +204,6 @@ scholarly_dispatcher = Dispatcher(
     cooloff_seconds=30.0
 )
 
-# Dedicated Semantic Scholar Dispatcher (strict 1 req/1.35s pacing to satisfy 1 req/sec limit)
 s2_dispatcher = Dispatcher(
     max_concurrent=1,
     min_interval_seconds=1.35,
@@ -234,5 +213,12 @@ s2_dispatcher = Dispatcher(
     cooloff_seconds=10.0
 )
 
-
+__all__ = [
+    "Dispatcher",
+    "CircuitBreakerOpenError",
+    "CircuitState",
+    "default_dispatcher",
+    "scholarly_dispatcher",
+    "s2_dispatcher",
+]
 

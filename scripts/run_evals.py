@@ -1,13 +1,6 @@
-#!/usr/bin/env python3
-"""
-scripts/run_evals.py - Thoth DeepEval Multi-Agent Evaluation & Calibration Suite.
-Runs evaluation across all agent roles, tool selection, argument accuracy,
-adversarial groundedness, calibrated report correctness, and router stress benchmarks.
-"""
 import sys
 import os
 
-# Add project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from backend.eval import (
@@ -21,7 +14,6 @@ from backend.eval import (
     run_conversational_simulation_and_evals
 )
 from backend.telemetry import enable_local_tracing, clear_local_traces
-
 
 def main():
     import argparse
@@ -45,7 +37,6 @@ def main():
         judge = get_offline_judge_model()
         print(f"\n[INFO] Running in OFFLINE mode with: {judge.get_model_name()}")
 
-    # 1. Evaluate the Six Uncovered Multi-Agent Stages
     print("\n" + "-" * 90)
     print("1. EVALUATING THE SIX UNCOVERED AGENT ROLES (Hand-Written GEval Steps & Raw Metrics)")
     print("-" * 90)
@@ -59,7 +50,6 @@ def main():
             print(f"        Raw Score : {item['score']:.2f} / 1.00 ({'PASS' if item['passed'] else 'FAIL'})")
             print(f"        Reason    : {item['reason']}")
 
-    # 2. Evaluate Adversarial Groundedness (JWST-Style True/False Mixture)
     print("\n" + "-" * 90)
     print("2. EVALUATING ADVERSARIAL GROUNDEDNESS & TRUTH GUARD (JWST-Style)")
     print("-" * 90)
@@ -70,7 +60,6 @@ def main():
         inp_prev = item['input'][:60] + "..."
         print(f"    [{idx}] Claim: \"{inp_prev}\" | Score: {item['score']:.2f} | Reason: {item['reason']}")
 
-    # 3. Evaluate Calibrated Report Correctness Benchmark (16 Reports: 8 Good vs 8 Bad)
     print("\n" + "-" * 90)
     print("3. CALIBRATED REPORT CORRECTNESS BENCHMARK (16 Hand-Labeled Goldens: Good vs Bad)")
     print("-" * 90)
@@ -87,7 +76,6 @@ def main():
         print(f"  {idx:<3} | {r['label']:<6} | {r['score']:<6.2f} | {'PASS' if r['passed'] else 'FAIL':<6} | {t_preview}")
         print(f"      └─ Reason: {r['reason']}")
 
-    # 4. Intent Router Reliability & Stress Benchmark (21 Queries)
     print("\n" + "-" * 90)
     print("4. INTENT ROUTER RELIABILITY & STRESS TEST (21 Queries)")
     print("-" * 90)
@@ -111,7 +99,6 @@ def main():
     print(f"  • Raw JSON Parse Failures:        {router_results['parse_failures']} ({router_results['parse_failure_rate'] * 100:.1f}%)")
     print(f"  • Router Reliability Verdict:     {'100% RELIABLE (0% Parse Failures)' if router_results['parse_failures'] == 0 else 'UNSTABLE'}")
 
-    # 5. Multi-Turn Conversation Simulation & Evaluation (6 Metrics, Granular Pass Tracking)
     print("\n" + "-" * 90)
     print("5. MULTI-TURN CONVERSATION SIMULATION & EVALUATION (16 Goldens, 6 DeepEval Metrics)")
     print("-" * 90)
@@ -149,7 +136,6 @@ def main():
         pair_avg = overlap_info.get("pairwise_avg_overlap_pct", 0.0)
         print(f"  • Search Stability Vault Overlap: {j_pct:.1f}% (3-way Jaccard) | Pairwise Avg: {pair_avg:.1f}%")
 
-    # 6. Logical Integrity & Fallacy Prevention Benchmark
     print("\n" + "-" * 90)
     print("6. LOGICAL INTEGRITY & FALLACY PREVENTION BENCHMARK")
     print("-" * 90)
@@ -162,7 +148,6 @@ def main():
     )
     from backend.memory.graph import find_contradictions_among_notes, format_vault_context_with_contradictions
 
-    # 6.1 Contradiction Leakage Check
     test_notes = [
         {"note_id": "src-sample-a", "content": "Surface code threshold is 1%."},
         {"note_id": "src-sample-b", "content": "Surface code threshold is 10%."}
@@ -170,27 +155,23 @@ def main():
     _, contradictions = format_vault_context_with_contradictions(test_notes)
     print(f"  • Contradiction Leakage Guard:    {'ACTIVE (Alert Injection Enabled)' if format_vault_context_with_contradictions else 'DISABLED'}")
 
-    # 6.2 Circular Replan Check
     prev_rej = ["Silicon spin qubits operate at 300K without cooling."]
     circ_sample = ["Silicon spin qubits operate at 300K without cooling [src-1]."]
     circ_findings = detect_circular_replan(prev_rej, circ_sample)
     print(f"  • Circular Replan Detection:      {'ACTIVE (Flagged ' + str(len(circ_findings)) + ' circular claims)' if circ_findings else 'ACTIVE'}")
 
-    # 6.3 Causal/Comparative Modality Metric
     causal_goldens = get_causal_comparative_adversarial_goldens()
     causal_metric = get_causal_comparative_metric(model=judge)
     causal_scores = [causal_metric.measure(g) for g in causal_goldens]
     avg_causal = sum(causal_scores) / len(causal_scores) if causal_scores else 1.0
     print(f"  • Causal/Comparative Integrity:   Avg Score: {avg_causal:.2f} / 1.00 | Pass: {'PASSED' if avg_causal >= 0.70 else 'FLAGGED'}")
 
-    # 6.4 Non-Sequitur Conclusion Metric
     nonseq_goldens = get_non_sequitur_conclusion_goldens()
     nonseq_metric = get_non_sequitur_conclusion_metric(model=judge)
     nonseq_scores = [nonseq_metric.measure(g) for g in nonseq_goldens]
     avg_nonseq = sum(nonseq_scores) / len(nonseq_scores) if nonseq_scores else 1.0
     print(f"  • Non-Sequitur Conclusion Guard:  Avg Score: {avg_nonseq:.2f} / 1.00 | Pass: {'PASSED' if avg_nonseq >= 0.70 else 'FLAGGED'}")
 
-    # 7. System Health, Retrieval Precision & Circuit Breaker Diagnostics (Full 16-Golden Run Aggregation)
     print("\n" + "-" * 90)
     print("7. SYSTEM HEALTH, RETRIEVAL PRECISION & CIRCUIT BREAKER DIAGNOSTICS (Full 16-Golden Run)")
     print("-" * 90)
@@ -201,7 +182,6 @@ def main():
     from backend.dispatcher import Dispatcher, CircuitBreakerOpenError
     import asyncio
 
-    # 7.1 Aggregate Wasted-Token & Retrieval Precision from full 16-golden multi-turn run
     wasted_stats = sim_results.get("wasted_token_metrics", {})
     avg_prec = wasted_stats.get("avg_retrieval_precision", 1.0)
     total_wasted_toks = wasted_stats.get("total_wasted_tokens", 0)
@@ -211,7 +191,6 @@ def main():
     print(f"  • Full Multi-Turn Retrieval Precision: {avg_prec * 100:.1f}% (Cited Notes / Retrieved Notes across {turns_analyzed} turns)")
     print(f"  • Multi-Turn Wasted Token Volume:      {total_wasted_toks} tokens ({wasted_ratio * 100:.1f}% of total retrieved tokens)")
 
-    # 7.2 No-Response & Apology Rate across all multi-turn conversations
     turn_outputs = []
     for c in sim_results.get("detailed_results", []):
         turn_outputs.append({
@@ -223,7 +202,6 @@ def main():
     print(f"  • No-Response / Empty Output Rate:     {health_stats['no_response_rate'] * 100:.1f}% | Apology Rate: {health_stats['apology_rate'] * 100:.1f}%")
     print(f"  • System Availability Health Status:   {health_stats['status']}")
 
-    # 7.3 Circuit Breaker Lifecycle Verification under simulated failure load
     disp = Dispatcher(max_concurrent=1, max_attempts=1, base_delay=0.01, max_consecutive_failures=2, cooloff_seconds=0.05)
     async def _test_cb():
         async def _fail(): raise RuntimeError("simulated_repeated_failure")
@@ -243,7 +221,6 @@ def main():
     print("\n" + "=" * 90)
     print("EVALUATION SUITE COMPLETE — All 7 Diagnostic Layers and Benchmarks Verified.")
     print("=" * 90 + "\n")
-
 
 if __name__ == "__main__":
     main()

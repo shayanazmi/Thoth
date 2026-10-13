@@ -1,11 +1,3 @@
-"""
-eval_sandbox/test_adversarial_continuity.py
-Adversarial Validation Suite for Thoth:
-1. Multi-Turn Sequential Report Expansion: Verifies cumulative preservation across multiple expansion and QA turns.
-2. Topic Switching & Negative Context Isolation: Verifies that switching topics isolates new research from prior topic contamination.
-3. Conversational Transition Sanitization: Verifies that transition prefaces and conversational fillers are cleanly stripped for academic APIs.
-"""
-
 import sys
 import os
 import unittest
@@ -19,11 +11,8 @@ from backend.pipeline import (
 )
 from backend.scholarly import _sanitize_academic_query
 
-
 class TestAdversarialContinuity(unittest.TestCase):
-
     def test_multi_turn_sequential_report_expansions(self):
-        """Test adding 3 sequential expansions interspersed with Q&A turns."""
         state = {
             "topic": "Quantum Computing Scaling Architectures",
             "report": "# Initial Synthesis\nQuantum computing faces physical error scaling limits.",
@@ -33,7 +22,6 @@ class TestAdversarialContinuity(unittest.TestCase):
             "conversation_summary": ""
         }
 
-        # Sequence of turns
         turns = [
             ("REPORT_EXPANSION", "Add Section A: Cryogenic Cooling Systems", "## Section A: Cryogenic Cooling\nDilution refrigerators maintain 10mK operating temperatures."),
             ("LOCAL_QA", "What is the operating temperature in Section A?", "The operating temperature is 10mK as noted in Section A."),
@@ -57,7 +45,6 @@ class TestAdversarialContinuity(unittest.TestCase):
                 state["report"] = comp["report"]
                 state["chat_turns"] = comp["chat_turns"]
 
-        # Assert all three sections survive cumulatively in state["report"]
         self.assertIn("Section A: Cryogenic Cooling", state["report"])
         self.assertIn("Section B: Neutral Atoms", state["report"])
         self.assertIn("Section C: 2026 Benchmarks", state["report"])
@@ -66,7 +53,6 @@ class TestAdversarialContinuity(unittest.TestCase):
         print("  ✓ Multi-turn sequential report expansion continuity verified (3 sections + QA turn preserved).")
 
     def test_topic_switching_isolation(self):
-        """Verify that switching topics isolates the new research query from prior topic contamination."""
         turns = [
             {"turn": 1, "user_query": "Could Bihar attract semiconductor fabs?", "assistant_response": "Bihar has power and water constraints."},
             {"turn": 2, "user_query": "What about ultrapure water in India?", "assistant_response": "UPW requirements in India face logistical hurdles."},
@@ -75,13 +61,12 @@ class TestAdversarialContinuity(unittest.TestCase):
         summary = "Discussion on Bihar and Indian semiconductor infrastructure."
 
         resolved = resolve_anaphoric_topic("Research this deeply", chat_turns=turns, conv_summary=summary)
-        # Should pick the latest turn (European photonics), NOT Bihar or India
+
         self.assertIn("European photonics foundries", resolved)
         self.assertNotIn("Bihar", resolved)
         print(f"  ✓ Topic switching correctly resolved latest focus: '{resolved}'")
 
     def test_conversational_preface_sanitization(self):
-        """Verify that conversational transitions and fillers are cleanly removed for academic search APIs."""
         raw_queries = [
             ("Now let's switch gears completely. What are the latest 2026 benchmarks for LLM sparse autoencoders?", "What are the latest 2026 benchmarks for LLM sparse autoencoders"),
             ("Can you please research the dielectric breakdown voltages of hexagonal boron nitride?", "the dielectric breakdown voltages of hexagonal boron nitride"),
@@ -98,7 +83,6 @@ class TestAdversarialContinuity(unittest.TestCase):
             self.assertNotIn("by the way", sanitized.lower())
 
         print("  ✓ Conversational prefaces and transition fillers successfully sanitized.")
-
 
 if __name__ == "__main__":
     unittest.main()

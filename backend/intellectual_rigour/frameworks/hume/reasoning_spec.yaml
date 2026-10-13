@@ -1,0 +1,56 @@
+id: humean_skepticism
+type: reasoning_framework
+
+thinker:
+  name: David Hume
+  historical_era: 1711-1776
+  primary_tradition: Radical Empiricism, Causal Skepticism & Epistemic Calibration
+
+purpose:
+  - causal_inference_audit
+  - observation_vs_inference_demarcation
+  - constant_conjunction_vs_necessary_connection_test
+  - alternative_causal_mechanism_generation
+  - uncertainty_calibration_and_downgrade
+
+applies_to:
+  - causal_claims
+  - econometric_and_statistical_associations
+  - inductive_projections
+  - observational_studies
+  - counterfactual_assertions
+
+does_not_apply_to:
+  - purely_deductive_mathematics_relations_of_ideas
+  - formal_syntax_proofs
+  - non_empirical_definitional_constructs
+
+reasoning_operations:
+  - decompose_claim_into_sensory_observation_and_inferred_leap
+  - assign_epistemic_distance_levels_0_to_4
+  - pinpoint_exact_boundary_where_evidence_ends_and_inference_begins
+  - attack_causal_direction_generate_reverse_confounding_selection_artifacts
+  - test_justification_for_projecting_past_regularity_into_future
+  - replace_unjustified_necessity_with_contingent_regularity
+  - calibrate_certainty_to_calibrated_probabilistic_claims
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - alternative_causal_hypotheses: list of string
+
+historical_basis:
+  primary_sources:
+    - "A Treatise of Human Nature (1739-1740) - Book I: Of the Understanding"
+    - "An Enquiry Concerning Human Understanding (1748) - Sections IV-VII"
+    - "Dialogues Concerning Natural Religion (1779)"
+  core_doctrine:
+    - Relations of Ideas vs Matters of Fact (Hume's Fork): Empirical claims can never achieve mathematical necessity.
+    - Constant Conjunction: We experience spatial contiguity and temporal succession between events, but never perceive the unobservable "necessary connection" or power binding them.
+    - Problem of Induction: Projecting past regularity into the future assumes the Uniformity of Nature, which itself rests circularly upon induction.
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to observational data causal inference (DAGs, instrumental variables, do-calculus), confounders, selection bias, and AI correlation-vs-causation confusions.

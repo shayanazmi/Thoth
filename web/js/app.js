@@ -1,13 +1,8 @@
-/**
- * Thoth · Client Application Engine
- * High-performance SSE stream handler, SVG Knowledge Graph, Vault Explorer & REPL
- */
-
 class ThothApp {
   constructor() {
-    this.currentView = 'landing'; // 'landing' | 'studio'
+    this.currentView = 'landing';
     this.activeTopic = '';
-    this.activeMode = 'auto'; // 'auto' | 'deep_research' | 'web_probe' | 'local_qa' | 'expand_report' | 'fast_chat'
+    this.activeMode = 'auto';
     this.currentState = null;
     this.chatTurns = [];
     this.vaultNotes = [];
@@ -35,50 +30,44 @@ class ThothApp {
       expand_report: { label: 'Expand Report', icon: 'file-plus' },
       auto: { label: 'Auto Router', icon: 'sparkles' }
     };
-    // Default mode is fast_chat — research is opt-in
+
     this.activeMode = 'fast_chat';
 
-    // Literature volume: default is Top 15 Most Relevant & Latest Papers
     this.scrapeTopN = parseInt(localStorage.getItem('thoth_scrape_top_n')) || 15;
 
-    // UX State Tracking
     this.isUserScrolledUp = false;
     this.activeAbortController = null;
 
     this.initElements();
     this.bindEvents();
-    this.setMode('fast_chat'); // Initialize UI to default chat mode
-    this.setPaperVolume(this.scrapeTopN); // Initialize paper count UI
+    this.setMode('fast_chat');
+    this.setPaperVolume(this.scrapeTopN);
     this.loadVaultNotes();
   }
 
   initElements() {
-    // Views
+
     this.landingView = document.getElementById('landingView');
     this.studioView = document.getElementById('studioView');
     this.tabLandingBtn = document.getElementById('tabLandingBtn');
     this.tabStudioBtn = document.getElementById('tabStudioBtn');
 
-    // Inputs & Buttons
     this.heroPromptInput = document.getElementById('heroPromptInput');
     this.heroLaunchBtn = document.getElementById('heroLaunchBtn');
     this.chatInput = document.getElementById('chatInput');
     this.chatSendBtn = document.getElementById('chatSendBtn');
 
-    // Floating Tool Menu & Mode Pills
     this.toolAttachBtn = document.getElementById('toolAttachBtn');
     this.floatingToolMenu = document.getElementById('floatingToolMenu');
     this.activeModeBadge = document.getElementById('activeModeBadge');
     this.activeModeLabel = document.getElementById('activeModeLabel');
     this.deepResearchToggle = document.getElementById('deepResearchToggle');
 
-    // Paper Volume Badges & Controls
     this.paperVolumeBadge = document.getElementById('paperVolumeBadge');
     this.paperVolumeLabel = document.getElementById('paperVolumeLabel');
     this.heroVolumeGroup = document.getElementById('heroVolumeGroup');
     this.paperVolumeOptionsGrid = document.getElementById('paperVolumeOptionsGrid');
 
-    // Feeds & Containers
     this.chatFeed = document.getElementById('chatFeed');
     this.jumpToLatestBtn = document.getElementById('jumpToLatestBtn');
     this.stepperBar = document.getElementById('pipelineStepperBar');
@@ -86,13 +75,11 @@ class ThothApp {
     this.vaultNotesList = document.getElementById('vaultNotesList');
     this.vaultSearchInput = document.getElementById('vaultSearchInput');
 
-    // Artifact Panes
     this.artifactReportPane = document.getElementById('artifactReportPane');
     this.artifactTruthPane = document.getElementById('artifactTruthPane');
     this.artifactMindmapPane = document.getElementById('artifactMindmapPane');
     this.artifactSourcesPane = document.getElementById('artifactSourcesPane');
 
-    // Modal
     this.noteModal = document.getElementById('noteModal');
     this.modalTitle = document.getElementById('modalTitle');
     this.modalBody = document.getElementById('modalBody');
@@ -100,22 +87,19 @@ class ThothApp {
   }
 
   bindEvents() {
-    // 3D Parallax
+
     if (window.ThothAnimations) {
       window.ThothAnimations.init3DParallax();
     }
 
-    // View Switching
     this.tabLandingBtn?.addEventListener('click', () => this.switchView('landing'));
     this.tabStudioBtn?.addEventListener('click', () => this.switchView('studio'));
 
-    // Hero Launcher
     this.heroLaunchBtn?.addEventListener('click', () => this.handleHeroLaunch());
     this.heroPromptInput?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.handleHeroLaunch();
     });
 
-    // Preset chips
     document.querySelectorAll('.preset-chip').forEach(chip => {
       chip.addEventListener('click', (e) => {
         const query = e.target.getAttribute('data-query');
@@ -126,7 +110,6 @@ class ThothApp {
       });
     });
 
-    // Volume chips on Landing page
     document.querySelectorAll('.volume-chip').forEach(chip => {
       chip.addEventListener('click', (e) => {
         const vol = parseInt(e.currentTarget.getAttribute('data-volume'));
@@ -134,7 +117,6 @@ class ThothApp {
       });
     });
 
-    // Chat REPL Input & Dynamic Auto-Resize
     this.chatInput?.addEventListener('input', () => this.autoResizeTextarea());
     this.chatSendBtn?.addEventListener('click', () => this.handleChatSend());
     this.chatInput?.addEventListener('keydown', (e) => {
@@ -144,7 +126,6 @@ class ThothApp {
       }
     });
 
-    // Scroll Detection & Jump-to-Latest Control
     this.chatFeed?.addEventListener('scroll', () => {
       const threshold = 100;
       const distFromBottom = this.chatFeed.scrollHeight - this.chatFeed.scrollTop - this.chatFeed.clientHeight;
@@ -159,7 +140,6 @@ class ThothApp {
       this.scrollToBottom(true);
     });
 
-    // Tool Menu Toggle
     this.toolAttachBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleToolMenu();
@@ -173,14 +153,12 @@ class ThothApp {
       this.toggleToolMenu();
     });
 
-    // Close tool menu when clicking outside
     document.addEventListener('click', (e) => {
       if (this.floatingToolMenu && !this.floatingToolMenu.contains(e.target) && e.target !== this.toolAttachBtn && e.target !== this.activeModeBadge && e.target !== this.paperVolumeBadge) {
         this.floatingToolMenu.classList.add('hidden');
       }
     });
 
-    // Tool Menu Item Selection
     document.querySelectorAll('.tool-menu-item').forEach(item => {
       item.addEventListener('click', (e) => {
         const targetItem = e.currentTarget;
@@ -192,7 +170,6 @@ class ThothApp {
       });
     });
 
-    // Volume Option Buttons inside Tool Menu
     document.querySelectorAll('.volume-option-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const vol = parseInt(e.currentTarget.getAttribute('data-volume'));
@@ -203,7 +180,6 @@ class ThothApp {
       });
     });
 
-    // Deep Research Quick Toggle — switches between chat and research
     this.deepResearchToggle?.addEventListener('click', () => {
       if (this.activeMode === 'deep_research') {
         this.setMode('fast_chat');
@@ -212,7 +188,6 @@ class ThothApp {
       }
     });
 
-    // Artifact Tab Switching
     document.querySelectorAll('.artifact-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const tab = e.target.getAttribute('data-tab');
@@ -220,13 +195,10 @@ class ThothApp {
       });
     });
 
-
-    // Vault Search
     this.vaultSearchInput?.addEventListener('input', (e) => {
       this.filterVaultNotes(e.target.value);
     });
 
-    // Modal Close
     this.modalCloseBtn?.addEventListener('click', () => {
       this.noteModal.classList.add('hidden');
     });
@@ -303,14 +275,13 @@ class ThothApp {
     }
     if (this.deepResearchToggle) {
       this.deepResearchToggle.classList.toggle('active', isResearch);
-      // Update icon inside the Deep Research button to show current state
+
       const btnIcon = this.deepResearchToggle.querySelector('i[data-lucide]');
       if (btnIcon) btnIcon.setAttribute('data-lucide', isResearch ? 'microscope' : 'microscope');
       const btnSpan = this.deepResearchToggle.querySelector('span');
       if (btnSpan) btnSpan.textContent = isResearch ? 'Deep Research' : 'Deep Research';
     }
 
-    // Send button icon: arrow-up for chat, zap for research
     if (this.chatSendBtn) {
       this.chatSendBtn.innerHTML = `<i data-lucide="${isResearch ? 'zap' : 'arrow-up'}" style="width:15px;height:15px;"></i>`;
       this.chatSendBtn.title = isResearch ? 'Launch Research Swarm' : 'Send Message';
@@ -319,14 +290,12 @@ class ThothApp {
         : '';
     }
 
-    // Update active highlight in menu items
     document.querySelectorAll('.tool-menu-item').forEach(el => {
       el.classList.toggle('active', el.getAttribute('data-mode') === mode);
     });
 
     if (window.lucide) lucide.createIcons();
 
-    // Update placeholder text
     const placeholders = {
       deep_research: 'Enter a topic to trigger the 8-agent research swarm & vault synthesis...',
       web_probe: 'Enter query for live targeted arXiv & web literature search...',
@@ -386,12 +355,10 @@ class ThothApp {
       this.paperVolumeLabel.textContent = validCount === 15 ? 'Top 15 Papers' : `${validCount} Papers`;
     }
 
-    // Update active highlight on landing page chips
     document.querySelectorAll('.volume-chip').forEach(chip => {
       chip.classList.toggle('active', parseInt(chip.getAttribute('data-volume')) === validCount);
     });
 
-    // Update active highlight in tool menu options
     document.querySelectorAll('.volume-option-btn').forEach(btn => {
       btn.classList.toggle('active', parseInt(btn.getAttribute('data-volume')) === validCount);
     });
@@ -404,7 +371,6 @@ class ThothApp {
     if (!topic || this.isGenerating) return;
     this.switchView('studio');
 
-    // Route casual greetings directly to fast conversational chat
     const casualPatterns = /^(hi|hello|hey|greetings|hola|howdy|sup|test|yo)(\s+.*|\!|\?)*$/i;
     if (casualPatterns.test(topic) || topic.length < 4) {
       this.setMode('fast_chat');
@@ -420,12 +386,10 @@ class ThothApp {
     if (!text || typeof text !== 'string') return false;
     const clean = text.trim().toLowerCase().replace(/[?!.,;:]+$/, '');
 
-    // Guard: Philosophical or definitional queries about research itself -> normal chat
     if (/^(what|why|how|who|when|where|is|are|was|were)\s+(is\s+|are\s+)?(research|investigation)\b/.test(clean)) {
       return false;
     }
 
-    // Direct action patterns
     const directivePatterns = [
       /^(do\s+|conduct\s+|run\s+|start\s+)?deep\s+research(\s+on|\s+into|\s+about)?/i,
       /^(can\s+you\s+|please\s+|go\s+)?(research|investigate|dig\s+into|look\s+into|examine|explore)(\s+this|\s+that|\s+it|\s+the\s+above|\s+further|\s+properly|\s+deeply)?(\s+on|\s+into|\s+about)?/i,
@@ -450,7 +414,6 @@ class ThothApp {
     this.chatInput.value = '';
     this.autoResizeTextarea();
 
-    // Handle Slash Commands
     if (text.startsWith('/')) {
       this.handleSlashCommand(text);
       return;
@@ -458,15 +421,15 @@ class ThothApp {
 
     this.appendUserMessage(text);
 
-    // ROUTING LOGIC:
-    // 1. Explicit deep_research mode OR contextual research directive -> 8-agent swarm with full context inheritance
-    if (this.activeMode === 'deep_research' || this.isResearchDirective(text)) {
+    const hasActiveSession = Boolean(this.currentState && (this.currentState.topic || (this.currentState.chat_turns && this.currentState.chat_turns.length > 0)));
+
+    if (!hasActiveSession && (this.activeMode === 'deep_research' || this.isResearchDirective(text))) {
       this.startResearch(text, false, true);
       return;
     }
 
-    // 2. All conversational dialogue -> fast contextual turn
     this.sendFollowup(text);
+
   }
 
   handleSlashCommand(cmd) {
@@ -492,13 +455,11 @@ class ThothApp {
       this.currentTopicDisplay.textContent = 'Awaiting Objective';
       this.appendAssistantMessage('Research workspace reset. Enter a new topic to begin.');
     } else {
-      this.appendAssistantMessage(`**Available Slash Commands:**\n- \`/report\` — View full synthesis report\n- \`/mindmap\` — Inspect interactive concept graph\n- \`/truth\` — View Scales of Ma'at verification results\n- \`/vault\` — Refresh Obsidian vault index\n- \`/clear\` — Reset session`);
+
+      this.sendFollowup(cmd);
     }
   }
 
-  // ============================================================================
-  // SSE RESEARCH STREAMING (Turn 0: Discovery)
-  // ============================================================================
   startResearch(topic, shouldAppendUser = true, inheritContext = true) {
     this.activeTopic = topic;
     this.setGenerating(true);
@@ -510,7 +471,6 @@ class ThothApp {
       this.appendUserMessage(topic);
     }
 
-    // Extract natural language paper count if present (e.g. 'research with 20 papers')
     const paperMatch = topic.match(/\b(?:top|scrape|fetch|analyze|with)\s+(\d{1,2})\s+papers?\b/i);
     if (paperMatch) {
       const extractedCount = parseInt(paperMatch[1]);
@@ -519,7 +479,6 @@ class ThothApp {
       }
     }
 
-    // Create placeholder assistant message with active stepper and CoT accordion
     const msgId = `msg_${Date.now()}`;
     const bubbleEl = this.createAssistantPlaceholder(msgId);
 
@@ -553,10 +512,10 @@ class ThothApp {
           }
 
           buffer += decoder.decode(value, { stream: true });
-          // Normalize CRLF (\r\n) to LF (\n) — sse_starlette uses HTTP CRLF line endings
+
           buffer = buffer.replace(/\r\n/g, '\n');
           const blocks = buffer.split('\n\n');
-          buffer = blocks.pop(); // Keep last incomplete chunk
+          buffer = blocks.pop();
 
           for (const block of blocks) {
             for (const line of block.split('\n')) {
@@ -612,8 +571,10 @@ class ThothApp {
   }
 
   handlePipelineEvent(event, msgId) {
-    const { node, update, state } = event;
-    this.currentState = state;
+    if (state && Object.keys(state).length > 0) {
+      this.currentState = { ...(this.currentState || {}), ...state };
+    }
+
 
     const msgContainer = document.getElementById(msgId);
     if (!msgContainer) return;
@@ -621,7 +582,6 @@ class ThothApp {
     const cotBody = msgContainer.querySelector('.cot-body');
     const contentBody = msgContainer.querySelector('.message-prose');
 
-    // Handle Fast Direct Chat Path (Greetings & Casual Q&A)
     if (node === 'direct_chat') {
       const directAnswer = update.answer || state.direct_answer || '';
       if (contentBody) {
@@ -637,7 +597,6 @@ class ThothApp {
       return;
     }
 
-    // Lazy initialize & update Stepper Badges only when real research nodes run
     if (this.pipelineNodes.includes(node)) {
       if (this.stepperBar && (!this.stepperBar.children || this.stepperBar.children.length === 0)) {
         this.resetStepper();
@@ -645,7 +604,6 @@ class ThothApp {
       this.updateStepperNode(node);
     }
 
-    // Update Chain of Thought logs
     if (cotBody) {
       if (node === 'search') {
         cotBody.textContent += `[SEARCH] Querying academic indices for top ${this.scrapeTopN || 15} peer-reviewed papers.\n`;
@@ -664,7 +622,6 @@ class ThothApp {
       }
     }
 
-    // Update Report & Artifacts in real-time
     if (state.report) {
       this.renderReport(state.report);
       contentBody.innerHTML = this.parseMarkdownWithWikilinks(state.report);
@@ -696,7 +653,6 @@ class ThothApp {
       this.renderSources(state.cumulative_sources);
     }
 
-    // On completion
     if (node === 'follow_up' || node === 'complete') {
       this.completeStepper();
       if (state.follow_up_questions) {
@@ -707,9 +663,6 @@ class ThothApp {
     this.scrollToBottom();
   }
 
-  // ============================================================================
-  // SSE FOLLOW-UP STREAMING (Multi-Turn Chat REPL)
-  // ============================================================================
   sendFollowup(query) {
     if (!this.currentState) {
       this.startResearch(query);
@@ -748,7 +701,7 @@ class ThothApp {
           }
 
           buffer += decoder.decode(value, { stream: true });
-          // Normalize CRLF (\r\n) to LF (\n) — sse_starlette uses HTTP CRLF line endings
+
           buffer = buffer.replace(/\r\n/g, '\n');
           const blocks = buffer.split('\n\n');
           buffer = blocks.pop();
@@ -847,17 +800,20 @@ class ThothApp {
     } else if (evType === 'followup_complete') {
       this.currentState.chat_turns = payload.chat_turns;
       this.currentState.conversation_summary = payload.conversation_summary;
+      if (payload.topic) {
+        this.currentState.topic = payload.topic;
+        this.activeTopic = payload.topic;
+        if (this.currentTopicDisplay) this.currentTopicDisplay.textContent = payload.topic;
+      }
       if (payload.follow_up_questions) {
         this.renderProactivePills(msgContainer, payload.follow_up_questions);
       }
       this.renderMessageActions(msgContainer, this.activeTopic || this.currentState?.topic);
       this.scrollToBottom();
     }
+
   }
 
-  // ============================================================================
-  // UI RENDERING HELPERS
-  // ============================================================================
   scrollToBottom(force = false) {
     if (!this.chatFeed) return;
     if (force || !this.isUserScrolledUp) {

@@ -9,9 +9,7 @@ from backend.orchestrator import (
     stream_research_pipeline
 )
 
-
 class TestConcurrentOrchestrator(unittest.IsolatedAsyncioTestCase):
-
     async def test_concurrent_scrape_urls_fans_out(self):
         urls = ["https://site1.com", "https://site2.com", "https://site3.com"]
         dispatcher = Dispatcher(max_concurrent=3, max_attempts=1, base_delay=0.01)
@@ -36,7 +34,6 @@ class TestConcurrentOrchestrator(unittest.IsolatedAsyncioTestCase):
 
         with patch("backend.orchestrator.verifier_node") as mock_ver, \
              patch("backend.orchestrator.critic_node") as mock_crit:
-            
             mock_ver.return_value = {"verifier_feedback": "Verified"}
             mock_crit.return_value = {"feedback": "Good", "score": 9.0}
 
@@ -47,9 +44,7 @@ class TestConcurrentOrchestrator(unittest.IsolatedAsyncioTestCase):
             mock_ver.assert_called_once()
             mock_crit.assert_called_once()
 
-
 class TestConcurrentPipelineStream(unittest.TestCase):
-
     @patch("backend.orchestrator.search_node")
     @patch("backend.orchestrator.concurrent_scrape_urls")
     @patch("backend.orchestrator.writer_node")
@@ -75,8 +70,6 @@ class TestConcurrentPipelineStream(unittest.TestCase):
 
         expected = ["search", "snowball", "scrape", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
         self.assertEqual(yielded, expected)
-
-
 
 if __name__ == "__main__":
     unittest.main()

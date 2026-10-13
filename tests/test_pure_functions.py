@@ -34,29 +34,25 @@ from backend.agents import (
     strip_chain_of_thought,
     safe_extract_json,
 )
-
+from web_server import is_casual_query
 
 class TestPipelinePureFunctions(unittest.TestCase):
-    """Pure unit tests for backend/pipeline.py utilities without mocks."""
-
     def test_slugify_expected_input(self):
         self.assertEqual(pipeline_slugify("Quantum Computing 101"), "quantum_computing_101")
         self.assertEqual(pipeline_slugify("Agentic-AI & LLMs!"), "agentic-ai_llms")
 
     def test_slugify_edge_cases(self):
-        # Empty string fallback
         self.assertEqual(pipeline_slugify(""), "note")
         self.assertEqual(pipeline_slugify("   "), "note")
-        # Pure special characters without word/dash/underscore chars
+
         self.assertEqual(pipeline_slugify("!@#$%^&*()+=~"), "note")
-        # Boundary length truncation
+
         long_title = "a" * 100
         self.assertEqual(len(pipeline_slugify(long_title, max_len=30)), 30)
 
     def test_slugify_malformed_input(self):
-        # Multiple contiguous underscores
         self.assertEqual(pipeline_slugify("___hello____world___"), "hello_world")
-        # Unicode characters replaced by underscore
+
         res = pipeline_slugify("Café & Résumé 2026")
         self.assertIn("caf", res)
         self.assertNotIn(" ", res)
@@ -70,9 +66,8 @@ class TestPipelinePureFunctions(unittest.TestCase):
         self.assertEqual(_extract_domain("https://subdomain.domain.co.uk/path/file.html"), "subdomain.domain.co.uk")
 
     def test_extract_domain_malformed_input(self):
-        # Plain non-URL string without scheme (has empty netloc)
         self.assertEqual(_extract_domain("not_a_valid_url"), "")
-        # Incomplete scheme
+
         self.assertEqual(_extract_domain("http:///"), "")
 
     def test_extract_urls_from_text_expected_input(self):
@@ -83,12 +78,11 @@ class TestPipelinePureFunctions(unittest.TestCase):
     def test_extract_urls_from_text_edge_cases(self):
         self.assertEqual(_extract_urls_from_text(""), [])
         self.assertEqual(_extract_urls_from_text("No links present in this text."), [])
-        # Deduplication preserving order
+
         text = "Links: https://example.com/one and https://example.com/one again."
         self.assertEqual(_extract_urls_from_text(text), ["https://example.com/one"])
 
     def test_extract_urls_from_text_malformed_and_punctuation(self):
-        # Trailing punctuation like period, comma, colon, quotes
         text = "Visit 'https://example.com/test.', (https://example.com/parens), and https://example.com/comma,"
         urls = _extract_urls_from_text(text)
         self.assertEqual(urls, ["https://example.com/test", "https://example.com/parens", "https://example.com/comma"])
@@ -123,7 +117,6 @@ class TestPipelinePureFunctions(unittest.TestCase):
         self.assertTrue(len(trimmed_sum) > 0)
 
     def test_fit_context_to_token_budget_edge_and_tight_ceiling(self):
-        # Empty context and empty turns
         trimmed_ctx, trimmed_sum, recent_turns = fit_context_to_token_budget(
             topic="AI",
             context_block="",
@@ -136,7 +129,6 @@ class TestPipelinePureFunctions(unittest.TestCase):
         self.assertEqual(trimmed_sum, "")
         self.assertEqual(recent_turns, "")
 
-        # Very tight ceiling (remaining budget <= 200 tokens)
         trimmed_ctx2, trimmed_sum2, recent_turns2 = fit_context_to_token_budget(
             topic="A very long topic string " * 10,
             context_block="Some context " * 50,
@@ -145,19 +137,12 @@ class TestPipelinePureFunctions(unittest.TestCase):
             user_query="A very detailed user query " * 10,
             max_tokens=150
         )
-        # Should gracefully cap context, summary, and drop recent turns
+
         self.assertEqual(recent_turns2, "")
         self.assertLessEqual(pipeline_count_tokens(trimmed_ctx2), 200)
         self.assertLessEqual(pipeline_count_tokens(trimmed_sum2), 100)
 
-
 class TestTokenCountingDuplicationParity(unittest.TestCase):
-    """
-    CRITICAL CONTRACT: Asserts that pipeline.py's and memory/session.py's
-    count_tokens and truncate_text_to_tokens implementations produce identical
-    outputs on all inputs, guarding against silent drift across duplicated utilities.
-    """
-
     def test_count_tokens_identical_behavior(self):
         test_inputs = [
             "",
@@ -213,10 +198,7 @@ class TestTokenCountingDuplicationParity(unittest.TestCase):
             self.assertEqual(pipeline_truncate_tokens(None, budget), "")
             self.assertEqual(session_truncate_tokens(None, budget), "")
 
-
 class TestOrchestratorPureFunctions(unittest.TestCase):
-    """Pure unit tests for backend/orchestrator.py state initialization and claim extraction."""
-
     def test_create_initial_state_expected(self):
         state = create_initial_state(
             topic="Neuromorphic Computing",
@@ -286,11 +268,11 @@ class TestOrchestratorPureFunctions(unittest.TestCase):
             {
                 "claim": "Valid but missing source attribution claim",
                 "is_valid": True,
-                "supporting_source_id": ""  # Unattributed
+                "supporting_source_id": ""
             },
             {
                 "claim": "False or contradicted claim",
-                "is_valid": False,  # Invalid
+                "is_valid": False,
                 "supporting_source_id": "src-valid_source"
             },
             {
@@ -309,26 +291,24 @@ class TestOrchestratorPureFunctions(unittest.TestCase):
         self.assertEqual(claims[0], "- Valid cited claim [[src-valid_source]]")
 
     def test_extract_atomic_claims_edge_cases(self):
-        # Empty sources list
         self.assertEqual(extract_atomic_claims("Draft", [], []), [])
-        # None verification results
+
         self.assertEqual(extract_atomic_claims("Draft", ["src-1"], None), [])
-        # Empty verification results list
+
         self.assertEqual(extract_atomic_claims("Draft", ["src-1"], []), [])
 
     def test_extract_atomic_claims_normalization_resilience(self):
-        # Supporting source ID with brackets [[src-paper]] or hyphen/underscore variations
         source_ids = ["src-neural_network_scaling"]
         verification_results = [
             {
                 "claim": "Loss scales as a power law with compute.",
                 "is_valid": True,
-                "supporting_source_id": "[[src-neural_network_scaling]]"  # Has markdown brackets
+                "supporting_source_id": "[[src-neural_network_scaling]]"
             },
             {
                 "claim": "Batch size scales with critical batch size.",
                 "is_valid": True,
-                "supporting_source_id": "src-neural-network-scaling"  # Hyphen vs underscore
+                "supporting_source_id": "src-neural-network-scaling"
             }
         ]
         claims = extract_atomic_claims(
@@ -339,10 +319,7 @@ class TestOrchestratorPureFunctions(unittest.TestCase):
         self.assertEqual(len(claims), 2)
         self.assertTrue(all("[[src-neural_network_scaling]]" in c for c in claims))
 
-
 class TestMemoryVaultPureFunctions(unittest.TestCase):
-    """Pure unit tests for Note serialization, link extraction, and citation validation in vault.py."""
-
     def test_note_to_dict_expected(self):
         note = Note(
             note_id="topic-quantum",
@@ -375,12 +352,11 @@ class TestMemoryVaultPureFunctions(unittest.TestCase):
         self.assertEqual(extract_links(""), [])
         self.assertEqual(extract_links(None), [])
         self.assertEqual(extract_links("No wikilinks here."), [])
-        # Deduplication preserving first seen order
+
         content = "[[src-1]] followed by [[src-2]] and [[src-1]] again."
         self.assertEqual(extract_links(content), ["src-1", "src-2"])
 
     def test_extract_links_malformed_patterns(self):
-        # Nested brackets, empty brackets, and malformed tags
         content = "Invalid [[unclosed and [[]] and [[  ]] and [[valid_link]] and normal [markdown](url)"
         links = extract_links(content)
         self.assertEqual(links, ["valid_link"])
@@ -395,15 +371,14 @@ class TestMemoryVaultPureFunctions(unittest.TestCase):
 ## Discussion
 General text without citations is allowed in other sections.
 """
-        # Should not raise exception
+
         _validate_claims_citations("topic-test", valid_content)
 
     def test_validate_claims_citations_edge_cases(self):
-        # Content without claims section
         _validate_claims_citations("topic-test", "# Pure Overview\nNo claims section here.")
         _validate_claims_citations("topic-test", "")
         _validate_claims_citations("topic-test", None)
-        # Empty claims section
+
         _validate_claims_citations("topic-test", "# Topic\n\n## Claims\n\n## Next Section")
 
     def test_validate_claims_citations_uncited_claim_raises_value_error(self):
@@ -417,16 +392,13 @@ General text without citations is allowed in other sections.
 """
         with self.assertRaises(ValueError) as ctx:
             _validate_claims_citations("topic-invalid", invalid_content)
-        
+
         err_msg = str(ctx.exception)
         self.assertIn("Uncited claim in note 'topic-invalid'", err_msg)
         self.assertIn("must end with a [[source-note-id]] citation", err_msg)
         self.assertIn("Rogue uncited claim", err_msg)
 
-
 class TestMemoryIndexPureFunctions(unittest.TestCase):
-    """Pure unit tests for SQLite FTS query sanitization in index.py."""
-
     def test_sanitize_fts_query_expected(self):
         self.assertEqual(_sanitize_fts_query("quantum computing"), '"quantum" "computing"')
         self.assertEqual(_sanitize_fts_query("agentic AI 2026"), '"agentic" "AI" "2026"')
@@ -437,17 +409,13 @@ class TestMemoryIndexPureFunctions(unittest.TestCase):
         self.assertEqual(_sanitize_fts_query("!@#$%^&*()+="), '""')
 
     def test_sanitize_fts_query_malformed_and_sql_injection(self):
-        # Malformed punctuation & quotes
         self.assertEqual(_sanitize_fts_query('query "with" \'nested\' `quotes`'), '"query" "with" "nested" "quotes"')
-        # SQL Injection attempt
+
         injection = "test' OR '1'='1; DROP TABLE notes; --"
         sanitized = _sanitize_fts_query(injection)
         self.assertEqual(sanitized, '"test" "OR" "1" "1" "DROP" "TABLE" "notes"')
 
-
 class TestScholarlyPureFunctions(unittest.TestCase):
-    """Pure unit tests for bibliographic models, abstract reconstruction, and XML/JSON parsers in scholarly.py."""
-
     def test_source_candidate_to_dict_and_snippet(self):
         cand = SourceCandidate(
             title="Transformer Scaling Laws",
@@ -504,7 +472,6 @@ class TestScholarlyPureFunctions(unittest.TestCase):
         self.assertEqual(_reconstruct_openalex_abstract({}), "")
 
     def test_reconstruct_openalex_abstract_malformed_and_unordered(self):
-        # Inverted index with multi-position words and shuffled keys
         inverted = {
             "world": [3],
             "hello": [0, 2],
@@ -539,11 +506,10 @@ class TestScholarlyPureFunctions(unittest.TestCase):
         self.assertEqual(c.published_date, "2024-01-20")
 
     def test_parse_arxiv_xml_edge_and_malformed(self):
-        # Empty feed
         self.assertEqual(parse_arxiv_xml("<feed></feed>"), [])
-        # Empty string
+
         self.assertEqual(parse_arxiv_xml(""), [])
-        # Corrupt XML
+
         self.assertEqual(parse_arxiv_xml("<feed><unclosed>garbage XML"), [])
 
     def test_parse_semantic_scholar_json_expected(self):
@@ -573,7 +539,7 @@ class TestScholarlyPureFunctions(unittest.TestCase):
     def test_parse_semantic_scholar_json_edge_and_malformed(self):
         self.assertEqual(parse_semantic_scholar_json({}), [])
         self.assertEqual(parse_semantic_scholar_json({"data": []}), [])
-        # Item with None values and missing fields
+
         corrupt_data = {
             "data": [
                 {"title": None},
@@ -615,7 +581,7 @@ class TestScholarlyPureFunctions(unittest.TestCase):
     def test_parse_openalex_json_edge_and_malformed(self):
         self.assertEqual(parse_openalex_json({}), [])
         self.assertEqual(parse_openalex_json({"results": []}), [])
-        # Results with nulls
+
         corrupt_oa = {
             "results": [
                 {"title": None},
@@ -635,10 +601,7 @@ class TestScholarlyPureFunctions(unittest.TestCase):
         self.assertEqual(candidates[1].authors, [])
         self.assertEqual(candidates[1].abstract, "")
 
-
 class TestAgentsPureFunctions(unittest.TestCase):
-    """Pure unit tests for LLM output sanitization and resilient JSON extraction in agents.py."""
-
     def test_strip_chain_of_thought_expected(self):
         raw_text = (
             "<think>\n"
@@ -671,17 +634,43 @@ class TestAgentsPureFunctions(unittest.TestCase):
         plain_text = "Just a direct paragraph with no think tags or headings."
         self.assertEqual(strip_chain_of_thought(plain_text), plain_text)
 
+    def test_strip_chain_of_thought_alternative_tags_and_case_insensitivity(self):
+        t1 = "<THINK>Capitalized reasoning</THINK>Final answer"
+        self.assertEqual(strip_chain_of_thought(t1), "Final answer")
+
+        t2 = "<thought>Alternative thought process</thought>Result content"
+        self.assertEqual(strip_chain_of_thought(t2), "Result content")
+
+        t3 = "<reasoning>Alternative reasoning</reasoning>Clean answer"
+        self.assertEqual(strip_chain_of_thought(t3), "Clean answer")
+
+        t4 = "<Reasoning>Some logic</Reasoning><THINK>More logic</THINK>Done."
+        self.assertEqual(strip_chain_of_thought(t4), "Done.")
+
+    def test_strip_chain_of_thought_unclosed_reasoning_blocks(self):
+        unclosed_think = "<think>\nThinking: maybe return {\"route\": \"WEB_SEARCH\"}?"
+        self.assertEqual(strip_chain_of_thought(unclosed_think), "")
+
+        unclosed_thought = "<thought>Unfinished contemplation without close tag"
+        self.assertEqual(strip_chain_of_thought(unclosed_thought), "")
+
+        text_with_tail_unclosed = "Real answer here.<think>Unfinished scratchpad"
+        self.assertEqual(strip_chain_of_thought(text_with_tail_unclosed), "Real answer here.")
+
+    def test_strip_chain_of_thought_preserves_valid_json_with_tag_words(self):
+        json_with_tag = '{"route": "LOCAL_QA", "reasoning": "The user mentioned <think> tags in the prompt."}'
+        cleaned = strip_chain_of_thought(json_with_tag)
+        self.assertEqual(cleaned, json_with_tag)
+        self.assertIn("<think>", cleaned)
+
     def test_safe_extract_json_expected_dict_and_list(self):
-        # Direct JSON dict
         res_dict = safe_extract_json('{"key": "value", "count": 42}')
         self.assertEqual(res_dict, {"key": "value", "count": 42})
 
-        # Direct JSON list
         res_list = safe_extract_json('["item_1", "item_2", "item_3"]')
         self.assertEqual(res_list, ["item_1", "item_2", "item_3"])
 
     def test_safe_extract_json_markdown_codeblocks(self):
-        # Fenced ```json ... ``` block
         fenced_text = """Here is the extracted analysis:
 ```json
 {
@@ -695,19 +684,57 @@ Hope this helps!"""
         self.assertEqual(extracted.get("route"), "WEB_SEARCH")
         self.assertEqual(extracted.get("search_query"), "mamba vs transformer 2026")
 
+    def test_safe_extract_json_reasoning_tags(self):
+        t1 = "<think>Deciding route</think>{\"route\": \"LOCAL_QA\", \"reasoning\": \"Fast\"}"
+        res1 = safe_extract_json(t1)
+        self.assertEqual(res1.get("route"), "LOCAL_QA")
+
+        t2 = "<thought>Deciding route</thought>{\"route\": \"CHITCHAT\", \"reasoning\": \"Greeting\"}"
+        res2 = safe_extract_json(t2)
+        self.assertEqual(res2.get("route"), "CHITCHAT")
+
+        t3 = "<reasoning>Analyzing query</reasoning>{\"route\": \"REPORT_EXPANSION\", \"reasoning\": \"Expand\"}"
+        res3 = safe_extract_json(t3)
+        self.assertEqual(res3.get("route"), "REPORT_EXPANSION")
+
+    def test_safe_extract_json_unclosed_reasoning_fails_safely(self):
+        misleading = "<think>I could do: {\"route\": \"WEB_SEARCH\", \"search_query\": \"should not parse\"}\nLet me ponder..."
+        res = safe_extract_json(misleading, default={"fallback": True})
+        self.assertEqual(res, {"fallback": True})
+
+    def test_safe_extract_json_nested_structures_and_braces_in_strings(self):
+        nested_text = '{"route": "LOCAL_QA", "meta": {"sub": {"deep": 42}}}'
+        res_nested = safe_extract_json(nested_text)
+        self.assertEqual(res_nested.get("meta", {}).get("sub", {}).get("deep"), 42)
+
+        braces_in_string = '{"route": "LOCAL_QA", "reasoning": "Matched pattern {key} and {template}."}'
+        res_braces = safe_extract_json(braces_in_string)
+        self.assertEqual(res_braces.get("reasoning"), "Matched pattern {key} and {template}.")
+
+    def test_safe_extract_json_commentary_with_braces(self):
+        noisy = 'Note {not_json}: actual response is {"route": "CHITCHAT", "reasoning": "hello"} and {more_noise}.'
+        res = safe_extract_json(noisy)
+        self.assertEqual(res.get("route"), "CHITCHAT")
+        self.assertEqual(res.get("reasoning"), "hello")
+
+    def test_safe_extract_json_primitives(self):
+        self.assertEqual(safe_extract_json("123"), 123)
+        self.assertEqual(safe_extract_json("true"), True)
+        self.assertEqual(safe_extract_json("false"), False)
+        self.assertEqual(safe_extract_json('"hello world"'), "hello world")
+
     def test_safe_extract_json_edge_cases(self):
         self.assertIsNone(safe_extract_json(""))
         self.assertIsNone(safe_extract_json("   "))
         self.assertIsNone(safe_extract_json(None))
-        # Custom default
+
         self.assertEqual(safe_extract_json("", default={"default": True}), {"default": True})
         self.assertEqual(safe_extract_json("Not JSON at all", default=[]), [])
-        # Already parsed python structures
+
         self.assertEqual(safe_extract_json({"already": "parsed"}), {"already": "parsed"})
         self.assertEqual(safe_extract_json([1, 2, 3]), [1, 2, 3])
 
     def test_safe_extract_json_partial_array_salvage(self):
-        # Unclosed JSON array from an LLM token limit cutoff
         truncated_array = """Thinking: Here are the verification results.
 [
   {"claim": "Claim 1 is verified.", "is_valid": true, "reason_if_failed": "", "supporting_source_id": "src-1"},
@@ -721,6 +748,65 @@ Hope this helps!"""
         self.assertEqual(salvaged["results"][0]["claim"], "Claim 1 is verified.")
         self.assertEqual(salvaged["results"][1]["claim"], "Claim 2 is verified.")
 
+class TestCasualQueryDetector(unittest.TestCase):
+    def test_casual_greetings_and_social_pleasantries(self):
+        casual_cases = [
+            "hi",
+            "Hi there",
+            "Hello!",
+            "Hi Thoth",
+            "Hey, how are you?",
+            "Good morning",
+            "Thanks",
+            "Thank you",
+            "You're welcome",
+            "How are you?",
+            "What can you do?",
+            "good evening",
+            "thanks a lot",
+            "thank you so much",
+            "who are you",
+            "what do you do",
+            "how do you do",
+            "whats up",
+            "see you later",
+            "help",
+            "commands",
+        ]
+        for query in casual_cases:
+            with self.subTest(query=query):
+                self.assertTrue(is_casual_query(query), f"Expected '{query}' to be classified as casual.")
+
+    def test_substantive_research_queries_not_casual(self):
+        substantive_cases = [
+            "Hi Thoth, explain fault tolerance in surface codes",
+            "Hello, what are the latest developments in quantum error correction?",
+            "What is the physical error threshold for 2D surface codes?",
+            "Under a standard phenomenological error model, what is the maximum allowable physical gate infidelity?",
+            "Can you conduct an investigation on CRISPR prime editing?",
+            "Explain fault tolerance",
+            "How does lattice surgery compare to braided defects?",
+        ]
+        for query in substantive_cases:
+            with self.subTest(query=query):
+                self.assertFalse(is_casual_query(query), f"Expected '{query}' to be classified as substantive.")
+
+    def test_thinker_commands_not_casual(self):
+        thinker_cases = [
+            "/logic Under a standard phenomenological error model, what is the maximum allowable physical gate infidelity?",
+            "/popper Check this hypothesis against empirical literature",
+            "/rigour",
+            "/falsify",
+            "/aristotle",
+        ]
+        for query in thinker_cases:
+            with self.subTest(query=query):
+                self.assertFalse(is_casual_query(query), f"Expected thinker command '{query}' to not be classified as casual.")
+
+    def test_edge_cases_empty_and_whitespace(self):
+        self.assertFalse(is_casual_query(""))
+        self.assertFalse(is_casual_query("   "))
+        self.assertFalse(is_casual_query(None))
 
 if __name__ == "__main__":
     unittest.main()

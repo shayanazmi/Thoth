@@ -1,0 +1,56 @@
+id: kuhnian_paradigm
+type: reasoning_framework
+
+thinker:
+  name: Thomas Kuhn
+  historical_era: 1922-1996
+  primary_tradition: Historiography of Science, Paradigm Shifts & Disciplinary Matrices
+
+purpose:
+  - paradigm_dependence_audit
+  - normal_science_vs_crisis_classification
+  - anomaly_accumulation_and_suppression_analysis
+  - competing_conceptual_framework_construction
+  - degree_of_conceptual_displacement_evaluation
+
+applies_to:
+  - foundational_claims_of_novelty
+  - architectural_breakthroughs
+  - methodological_revolutions
+  - disciplinary_matrices_and_assumptions
+  - anomalies_and_unsolved_failures
+
+does_not_apply_to:
+  - routine_parameter_tuning
+  - ordinary_implementation_bugfixes
+  - narrow_data_cleaning_scripts
+
+reasoning_operations:
+  - reconstruct_dominant_disciplinary_paradigm
+  - locate_research_normal_puzzle_solving_vs_anomaly_resolution_vs_paradigm_change
+  - detect_suppressed_or_unresolved_paradigm_anomalies
+  - test_paradigm_dependence_does_work_require_status_quo_to_make_sense
+  - construct_competing_alternative_framework
+  - compare_problem_solving_power_and_explanatory_scope
+  - classify_true_conceptual_displacement_vs_inflated_novelty
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - paradigm_anomalies: list of string
+
+historical_basis:
+  primary_sources:
+    - "The Structure of Scientific Revolutions (1962 / 1970 2nd ed.)"
+    - "The Essential Tension: Selected Studies in Scientific Tradition and Change (1977)"
+    - "The Road Since Structure (2000)"
+  core_doctrine:
+    - Disciplinary Matrix / Exemplar: Normal science operates within shared assumptions, instruments, and exemplary puzzle solutions.
+    - Anomaly Accumulation & Crisis: Repeated failures to solve standard puzzles within the accepted framework create crisis.
+    - Paradigm Incommensurability: Competing paradigms view the same phenomena through different conceptual lenses.
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to AI architectural shifts (RNNs -> Transformers -> Diffusion), algorithmic breakthroughs, and unmasking false claims of "revolutionary" paradigm shifts.

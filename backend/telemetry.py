@@ -13,48 +13,38 @@ except ImportError:
     EvalMode = None
 
     def observe(*args, **kwargs):
-        """Fallback no-op decorator when deepeval is not installed."""
         def decorator(func):
             return func
         return decorator
 
     def update_current_span(*args, **kwargs):
-        """Fallback no-op function when deepeval is not installed."""
         pass
 
-
 def enable_local_tracing() -> None:
-    """Enables local offline in-memory tracing in DeepEval without requiring Confident AI API keys."""
     if DEEPEVAL_AVAILABLE and trace_manager and EvalMode:
         trace_manager.eval_session.mode = EvalMode.ITERATOR_ASYNC
         logger.info("[TELEMETRY] DeepEval local in-memory tracing enabled (EvalMode.ITERATOR_ASYNC).")
 
-
 def clear_local_traces() -> None:
-    """Clears all captured in-memory traces."""
     if DEEPEVAL_AVAILABLE and trace_manager:
         trace_manager.clear_traces()
-        # Reset eval session queue if needed
+
         if hasattr(trace_manager, "eval_session") and trace_manager.eval_session:
             trace_manager.eval_session.traces_to_evaluate.clear()
             trace_manager.eval_session.pending_traces.clear()
 
-
 def get_local_traces() -> List[Any]:
-    """Retrieves all captured traces."""
     if DEEPEVAL_AVAILABLE and trace_manager:
         return trace_manager.get_all_traces_dict()
     return []
 
-
 def get_telemetry_status() -> Dict[str, Any]:
-    """Returns telemetry, circuit breaker, and LLM configuration status."""
     import os
     from backend.dispatcher import default_dispatcher, scholarly_dispatcher, s2_dispatcher
 
     primary_model = os.getenv("NVIDIA_PRIMARY_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
     fallback_model = os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-120b")
-    
+
     return {
         "status": "online",
         "deepeval_tracing": DEEPEVAL_AVAILABLE,

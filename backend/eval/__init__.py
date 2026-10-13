@@ -1,6 +1,3 @@
-"""
-backend/eval/__init__.py - Evaluation harness, datasets, and custom judge model for Thoth.
-"""
 from backend.eval.judge_model import ThothJudgeModel, get_offline_judge_model, OfflineDeterministicModel
 from backend.eval.datasets import (
     get_mindmap_extractor_goldens,

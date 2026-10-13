@@ -14,12 +14,8 @@ from backend.telemetry import observe
 load_dotenv()
 logger = logging.getLogger("ThothScholarly")
 
-
 @dataclass
 class SourceCandidate:
-    """
-    Unified dataclass representing an academic or web research candidate across all sources.
-    """
     title: str
     authors: List[str] = field(default_factory=list)
     abstract: str = ""
@@ -48,7 +44,6 @@ class SourceCandidate:
         }
 
     def to_formatted_snippet(self) -> str:
-        """Formats the candidate into a clean Markdown / text snippet for LLM context."""
         authors_str = ", ".join(self.authors) if self.authors else "Unknown Authors"
         extra = []
         if self.relation:
@@ -72,9 +67,7 @@ class SourceCandidate:
             f"Abstract / Snippet: {self.abstract[:600]}..."
         )
 
-
 def _reconstruct_openalex_abstract(inverted_index: Optional[Dict[str, List[int]]]) -> str:
-    """Reconstructs text from OpenAlex's abstract_inverted_index format."""
     if not inverted_index or not isinstance(inverted_index, dict):
         return ""
     words_by_pos = {}
@@ -84,13 +77,7 @@ def _reconstruct_openalex_abstract(inverted_index: Optional[Dict[str, List[int]]
     sorted_positions = sorted(words_by_pos.keys())
     return " ".join(words_by_pos[pos] for pos in sorted_positions)
 
-
-# ==============================================================================
-# 1. arXiv API Client
-# ==============================================================================
-
 async def _fetch_arxiv_raw(query: str, max_results: int = 15) -> str:
-    """Performs raw GET request to arXiv Atom XML API."""
     url = "https://export.arxiv.org/api/query"
     params = {
         "search_query": f"all:{query}",
@@ -105,9 +92,7 @@ async def _fetch_arxiv_raw(query: str, max_results: int = 15) -> str:
         resp.raise_for_status()
         return resp.text
 
-
 def parse_arxiv_xml(xml_text: str) -> List[SourceCandidate]:
-    """Parses arXiv Atom XML response into SourceCandidate objects."""
     candidates = []
     if not xml_text:
         return candidates
@@ -126,10 +111,8 @@ def parse_arxiv_xml(xml_text: str) -> List[SourceCandidate]:
             id_elem = entry.find("atom:id", ns)
             raw_id = id_elem.text.strip() if id_elem is not None and id_elem.text else ""
 
-            # Extract arXiv ID
             arxiv_id = raw_id.split("/abs/")[-1] if "/abs/" in raw_id else raw_id
 
-            # Locate PDF URL and entry URL
             pdf_url = ""
             entry_url = raw_id
             for link in entry.findall("atom:link", ns):
@@ -145,18 +128,15 @@ def parse_arxiv_xml(xml_text: str) -> List[SourceCandidate]:
 
             url = pdf_url if pdf_url else entry_url
 
-            # Extract publication date
             published_elem = entry.find("atom:published", ns)
             published_date = published_elem.text.strip()[:10] if published_elem is not None and published_elem.text else None
 
-            # Extract authors
             authors = []
             for author in entry.findall("atom:author", ns):
                 name_elem = author.find("atom:name", ns)
                 if name_elem is not None and name_elem.text:
                     authors.append(name_elem.text.strip())
 
-            # Extract DOI if present
             doi_elem = entry.find("arxiv:doi", ns)
             doi = doi_elem.text.strip() if doi_elem is not None and doi_elem.text else None
 
@@ -178,16 +158,12 @@ def parse_arxiv_xml(xml_text: str) -> List[SourceCandidate]:
 
     return candidates
 
-
 @observe(type="tool", description="Searches arXiv repository for academic preprints and papers")
 async def search_arxiv(
     query: str,
     max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """
-    Searches arXiv by query and returns a list of SourceCandidate objects.
-    """
     disp = dispatcher or scholarly_dispatcher
     try:
         xml_text = await disp.call(_fetch_arxiv_raw, query, max_results)
@@ -196,22 +172,14 @@ async def search_arxiv(
         logger.warning(f"[SCHOLARLY] arXiv search failed for '{query}': {e}")
         return []
 
-
-# ==============================================================================
-# 2. Semantic Scholar API Client & Advanced Graph Tools
-# ==============================================================================
-
 def _get_s2_headers() -> Dict[str, str]:
-    """Returns headers with Semantic Scholar API key if configured."""
     headers = {"User-Agent": "Thoth-Academic-Researcher/1.0"}
     api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
     if api_key:
         headers["x-api-key"] = api_key
     return headers
 
-
 async def _fetch_semantic_scholar_raw(query: str, max_results: int = 15) -> Dict[str, Any]:
-    """Performs GET request to Semantic Scholar Paper Search Graph API."""
     url = "https://api.semanticscholar.org/graph/v1/paper/search"
     params = {
         "query": query,
@@ -224,9 +192,7 @@ async def _fetch_semantic_scholar_raw(query: str, max_results: int = 15) -> Dict
         resp.raise_for_status()
         return resp.json()
 
-
 def parse_semantic_scholar_json(data: Dict[str, Any]) -> List[SourceCandidate]:
-    """Parses Semantic Scholar JSON response into SourceCandidate objects."""
     candidates = []
     if not data or not isinstance(data, dict):
         return candidates
@@ -266,17 +232,12 @@ def parse_semantic_scholar_json(data: Dict[str, Any]) -> List[SourceCandidate]:
         )
     return candidates
 
-
 @observe(type="tool", description="Queries Semantic Scholar Academic Graph API for peer-reviewed papers")
 async def search_semantic_scholar(
     query: str,
     max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """
-    Searches Semantic Scholar by query and returns SourceCandidate objects.
-    Routed through s2_dispatcher with strict 1 req/sec pacing.
-    """
     disp = dispatcher or s2_dispatcher
     try:
         json_data = await disp.call(_fetch_semantic_scholar_raw, query, max_results)
@@ -285,9 +246,7 @@ async def search_semantic_scholar(
         logger.warning(f"[SCHOLARLY] Semantic Scholar search failed/rate-limited for '{query}': {e}")
         return []
 
-
 def _normalize_s2_id(pid: str) -> str:
-    """Normalizes raw IDs for S2 API endpoints (e.g. adding CorpusId, DOI, or ARXIV prefixes)."""
     p = str(pid).strip()
     if not p:
         return ""
@@ -303,9 +262,7 @@ def _normalize_s2_id(pid: str) -> str:
         return f"DOI:{p[4:].strip()}"
     return p
 
-
 async def _fetch_s2_recommendations_raw(positive_ids: List[str], negative_ids: List[str], limit: int = 5) -> Dict[str, Any]:
-    """Performs POST request to S2 Recommendations API."""
     url = "https://api.semanticscholar.org/recommendations/v1/papers"
     params = {
         "fields": "title,authors,abstract,url,venue,year,citationCount,externalIds,publicationDate,paperId",
@@ -321,7 +278,6 @@ async def _fetch_s2_recommendations_raw(positive_ids: List[str], negative_ids: L
         resp.raise_for_status()
         return resp.json()
 
-
 @observe(type="tool", description="Fetches neural paper recommendations based on positive/negative seed papers")
 async def get_paper_recommendations(
     positive_paper_ids: List[str],
@@ -329,10 +285,6 @@ async def get_paper_recommendations(
     limit: int = 5,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """
-    Recommends papers given a list of positive and optional negative seed paper IDs.
-    """
-    # S2 recommendations v1 accepts 40-char SHA paperId or CorpusId:123
     clean_pos_ids = [p for p in positive_paper_ids if p and (len(p) == 40 or p.startswith("CorpusId:") or p.isdigit())]
     if not clean_pos_ids:
         return []
@@ -365,9 +317,7 @@ async def get_paper_recommendations(
         logger.warning(f"[SCHOLARLY] S2 recommendations failed: {e}")
         return []
 
-
 async def _fetch_s2_citations_raw(paper_id: str, limit: int = 5) -> Dict[str, Any]:
-    """Fetches citing papers for a given paper ID from S2."""
     norm_id = _normalize_s2_id(paper_id)
     url = f"https://api.semanticscholar.org/graph/v1/paper/{norm_id}/citations"
     params = {
@@ -380,14 +330,12 @@ async def _fetch_s2_citations_raw(paper_id: str, limit: int = 5) -> Dict[str, An
         resp.raise_for_status()
         return resp.json()
 
-
 @observe(type="tool", description="Fetches papers that cite the specified seed paper")
 async def get_paper_citations(
     paper_id: str,
     limit: int = 5,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """Retrieves forward citation descendants for a paper."""
     disp = dispatcher or s2_dispatcher
     try:
         json_data = await disp.call(_fetch_s2_citations_raw, paper_id, limit)
@@ -419,9 +367,7 @@ async def get_paper_citations(
         logger.warning(f"[SCHOLARLY] S2 citations failed for {paper_id}: {e}")
         return []
 
-
 async def _fetch_s2_references_raw(paper_id: str, limit: int = 5) -> Dict[str, Any]:
-    """Fetches cited papers (bibliography) for a given paper ID from S2."""
     norm_id = _normalize_s2_id(paper_id)
     url = f"https://api.semanticscholar.org/graph/v1/paper/{norm_id}/references"
     params = {
@@ -434,15 +380,12 @@ async def _fetch_s2_references_raw(paper_id: str, limit: int = 5) -> Dict[str, A
         resp.raise_for_status()
         return resp.json()
 
-
-
 @observe(type="tool", description="Fetches papers cited in the bibliography of the specified seed paper")
 async def get_paper_references(
     paper_id: str,
     limit: int = 5,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """Retrieves backward references (foundational bibliography) for a paper."""
     disp = dispatcher or s2_dispatcher
     try:
         json_data = await disp.call(_fetch_s2_references_raw, paper_id, limit)
@@ -474,9 +417,7 @@ async def get_paper_references(
         logger.warning(f"[SCHOLARLY] S2 references failed for {paper_id}: {e}")
         return []
 
-
 async def _fetch_s2_snippets_raw(query: str, limit: int = 5) -> Dict[str, Any]:
-    """Performs GET request to S2 snippet search endpoint for full-text passages."""
     url = "https://api.semanticscholar.org/graph/v1/snippet/search"
     params = {
         "query": query,
@@ -488,16 +429,12 @@ async def _fetch_s2_snippets_raw(query: str, limit: int = 5) -> Dict[str, Any]:
         resp.raise_for_status()
         return resp.json()
 
-
 @observe(type="tool", description="Searches 500-word full-text excerpt snippets from academic papers")
 async def search_paper_snippets(
     query: str,
     limit: int = 5,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """
-    Searches ~500-word full-text passages from papers to verify specific factual claims.
-    """
     disp = dispatcher or s2_dispatcher
     try:
         json_data = await disp.call(_fetch_s2_snippets_raw, query, limit)
@@ -535,14 +472,7 @@ async def search_paper_snippets(
         logger.warning(f"[SCHOLARLY] S2 snippet search failed for '{query}': {e}")
         return []
 
-
-
-# ==============================================================================
-# 3. OpenAlex API Client
-# ==============================================================================
-
 async def _fetch_openalex_raw(query: str, max_results: int = 15) -> Dict[str, Any]:
-    """Performs GET request to OpenAlex Works API."""
     url = "https://api.openalex.org/works"
     params = {
         "search": query,
@@ -554,9 +484,7 @@ async def _fetch_openalex_raw(query: str, max_results: int = 15) -> Dict[str, An
         resp.raise_for_status()
         return resp.json()
 
-
 def parse_openalex_json(data: Dict[str, Any]) -> List[SourceCandidate]:
-    """Parses OpenAlex JSON response into SourceCandidate objects."""
     candidates = []
     if not data or not isinstance(data, dict):
         return candidates
@@ -601,14 +529,12 @@ def parse_openalex_json(data: Dict[str, Any]) -> List[SourceCandidate]:
         )
     return candidates
 
-
 @observe(type="tool", description="Queries OpenAlex global scholarly corpus for research publications")
 async def search_openalex(
     query: str,
     max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """Searches OpenAlex by query and returns SourceCandidate objects."""
     disp = dispatcher or scholarly_dispatcher
     try:
         json_data = await disp.call(_fetch_openalex_raw, query, max_results)
@@ -617,13 +543,7 @@ async def search_openalex(
         logger.warning(f"[SCHOLARLY] OpenAlex search failed for '{query}': {e}")
         return []
 
-
-# ==============================================================================
-# 4. Europe PMC API Client
-# ==============================================================================
-
 async def _fetch_europepmc_raw(query: str, max_results: int = 15) -> Dict[str, Any]:
-    """Performs GET request to Europe PMC REST API (Open Access filter enabled)."""
     url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
     clean_query = f"{query} AND OPEN_ACCESS:y"
     params = {
@@ -638,9 +558,7 @@ async def _fetch_europepmc_raw(query: str, max_results: int = 15) -> Dict[str, A
         resp.raise_for_status()
         return resp.json()
 
-
 def parse_europepmc_json(data: Dict[str, Any]) -> List[SourceCandidate]:
-    """Parses Europe PMC JSON response into SourceCandidate objects."""
     candidates = []
     if not data or not isinstance(data, dict):
         return candidates
@@ -678,14 +596,12 @@ def parse_europepmc_json(data: Dict[str, Any]) -> List[SourceCandidate]:
         )
     return candidates
 
-
 @observe(type="tool", description="Queries Europe PMC database for open-access scientific publications")
 async def search_europepmc(
     query: str,
     max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """Searches Europe PMC for open-access papers."""
     disp = dispatcher or scholarly_dispatcher
     try:
         json_data = await disp.call(_fetch_europepmc_raw, query, max_results)
@@ -694,13 +610,7 @@ async def search_europepmc(
         logger.warning(f"[SCHOLARLY] Europe PMC search failed for '{query}': {e}")
         return []
 
-
-# ==============================================================================
-# 5. PubMed NCBI API Client
-# ==============================================================================
-
 async def _fetch_pubmed_raw(query: str, max_results: int = 15) -> List[Dict[str, Any]]:
-    """Performs ESearch followed by ESummary on NCBI Entrez API."""
     search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
     search_params = {
         "db": "pubmed",
@@ -734,9 +644,7 @@ async def _fetch_pubmed_raw(query: str, max_results: int = 15) -> List[Dict[str,
                 papers.append(item)
         return papers
 
-
 def parse_pubmed_json(results: List[Dict[str, Any]]) -> List[SourceCandidate]:
-    """Parses PubMed ESummary JSON into SourceCandidate objects."""
     candidates = []
     for paper in results:
         title = paper.get("title") or "Untitled"
@@ -769,14 +677,12 @@ def parse_pubmed_json(results: List[Dict[str, Any]]) -> List[SourceCandidate]:
         )
     return candidates
 
-
 @observe(type="tool", description="Queries PubMed database for biomedical and clinical literature")
 async def search_pubmed(
     query: str,
     max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """Searches PubMed via NCBI Entrez."""
     disp = dispatcher or scholarly_dispatcher
     try:
         raw_items = await disp.call(_fetch_pubmed_raw, query, max_results)
@@ -784,11 +690,6 @@ async def search_pubmed(
     except Exception as e:
         logger.warning(f"[SCHOLARLY] PubMed search failed for '{query}': {e}")
         return []
-
-
-# ==============================================================================
-# 6. Literature Snowballing Engine
-# ==============================================================================
 
 @observe(type="tool", description="Snowballs academic literature via citation traversal and neural recommendations")
 async def snowball_literature_graph(
@@ -798,12 +699,6 @@ async def snowball_literature_graph(
     max_references: int = 2,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """
-    Expands seed research papers into a deeper literature graph using:
-    1. Neural Recommendations based on top seed paper IDs.
-    2. Forward Citations (subsequent papers citing seeds).
-    3. Backward References (foundational papers in seeds' bibliographies).
-    """
     disp = dispatcher or s2_dispatcher
     seed_paper_ids = []
     for s in seed_candidates:
@@ -831,10 +726,9 @@ async def snowball_literature_graph(
     print(f"\n[INFO] [SNOWBALL] Expanding literature graph from {len(seed_paper_ids)} seed papers...")
 
     tasks = []
-    # 1. Recommendations task
+
     tasks.append(get_paper_recommendations(seed_paper_ids[:3], limit=max_recommendations, dispatcher=disp))
 
-    # 2. Citations & References for top 2 seeds
     for pid in seed_paper_ids[:2]:
         tasks.append(get_paper_citations(pid, limit=max_citations, dispatcher=disp))
         tasks.append(get_paper_references(pid, limit=max_references, dispatcher=disp))
@@ -853,7 +747,6 @@ async def snowball_literature_graph(
                     seen_keys.add(norm_title)
                     snowballed_candidates.append(cand)
 
-    # Multi-Corpus Fallback: If S2 returned no connected candidates (e.g. rate-limited), query OpenAlex related works
     if not snowballed_candidates:
         logger.info("[SNOWBALL] S2 returned 0 connected papers. Attempting OpenAlex related works fallback...")
         openalex_fallback = await _snowball_openalex_fallback(seed_candidates, limit=max_recommendations)
@@ -867,9 +760,7 @@ async def snowball_literature_graph(
     print(f"[INFO] [SNOWBALL] Discovered {len(snowballed_candidates)} connected papers.")
     return snowballed_candidates
 
-
 async def _snowball_openalex_fallback(seeds: List[SourceCandidate], limit: int = 3) -> List[SourceCandidate]:
-    """Fallback snowballing using OpenAlex related works when S2 is rate-limited."""
     candidates: List[SourceCandidate] = []
     headers = {"User-Agent": "Thoth-Academic-Snowballer/1.0 (mailto:academic-research@thoth.ai)"}
     async with httpx.AsyncClient(timeout=12.0) as client:
@@ -898,14 +789,7 @@ async def _snowball_openalex_fallback(seeds: List[SourceCandidate], limit: int =
                 logger.debug(f"[SNOWBALL FALLBACK] OpenAlex fallback failed for {query}: {e}")
     return candidates
 
-
-
-# ==============================================================================
-# 7. Tavily Web Search Client (Fallback Adapter)
-# ==============================================================================
-
 def _fetch_tavily_sync(query: str, max_results: int = 15) -> List[Dict[str, Any]]:
-    """Performs synchronous search against Tavily API."""
     from tavily import TavilyClient
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
@@ -914,14 +798,12 @@ def _fetch_tavily_sync(query: str, max_results: int = 15) -> List[Dict[str, Any]
     res = client.search(query=query, search_depth="advanced", max_results=max_results)
     return res.get("results", [])
 
-
 @observe(type="tool", description="Queries Tavily search engine for recent web intelligence and fallback discovery")
 async def search_tavily(
     query: str,
     max_results: int = 15,
     dispatcher: Optional[Dispatcher] = None
 ) -> List[SourceCandidate]:
-    """Searches Tavily and returns results formatted as SourceCandidate objects."""
     disp = dispatcher or scholarly_dispatcher
     try:
         raw_results = await disp.call(_fetch_tavily_sync, query, max_results)
@@ -945,30 +827,22 @@ async def search_tavily(
         logger.warning(f"[SCHOLARLY] Tavily search failed for '{query}': {e}")
         return []
 
-
 def _sanitize_academic_query(query: str, max_chars: int = 150) -> str:
-    """
-    Sanitizes raw user/agent queries for academic APIs (arXiv, S2, EuropePMC, PubMed, OpenAlex).
-    Removes markdown code fences, multiline report dumps, parenthetical instructions, quotes, and cleans excess whitespace.
-    """
     if not query:
         return ""
-    # Strip markdown code blocks / fences (```...```)
+
     clean_raw = re.sub(r'```[a-zA-Z0-9_-]*\n?', '', query).replace('```', '')
-    
-    # Filter out empty or markdown-only lines (e.g., 'markdown', '#', '---')
+
     lines = [
-        line.strip() for line in clean_raw.splitlines() 
+        line.strip() for line in clean_raw.splitlines()
         if line.strip() and line.strip().lower() not in {"markdown", "json", "python", "text", "xml", "---", "==="}
     ]
     cleaned = lines[0] if lines else clean_raw
-    
-    # Remove outer quotes and markdown symbols
+
     cleaned = re.sub(r'[\r\n\t]+', ' ', cleaned)
     cleaned = re.sub(r'[#*`_~\[\](){}<>]', ' ', cleaned)
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
 
-    # Strip conversational transition phrases and prefaces
     conversational_prefaces = [
         r'^(now\s+)?(let\'s\s+|lets\s+)?switch(ing)?\s+(topics?|gears?)\s+(completely|now)?[\.,;:]*\s*',
         r'^(on\s+another\s+note|by\s+the\s+way|moving\s+on|in\s+addition|furthermore|additionally)[\.,;:]*\s*',
@@ -977,7 +851,6 @@ def _sanitize_academic_query(query: str, max_chars: int = 150) -> str:
     for pref in conversational_prefaces:
         cleaned = re.sub(pref, '', cleaned, flags=re.IGNORECASE).strip()
 
-    # If still too long, extract primary substantive clause
     if len(cleaned) > max_chars:
         parts = re.split(r'[\.;\?!]', cleaned)
         substantive = [p.strip() for p in parts if len(p.strip()) >= 15 and not any(re.match(pref, p.strip(), re.IGNORECASE) for pref in conversational_prefaces)]
@@ -987,11 +860,6 @@ def _sanitize_academic_query(query: str, max_chars: int = 150) -> str:
             cleaned = cleaned[:max_chars].rsplit(' ', 1)[0]
     return cleaned.strip()
 
-
-# ==============================================================================
-# 8. Unified Multi-Source Scholarly Search Aggregator
-# ==============================================================================
-
 async def search_scholarly_sources(
     query: str,
     max_results: int = 15,
@@ -999,12 +867,6 @@ async def search_scholarly_sources(
     dispatcher: Optional[Dispatcher] = None,
     enable_snowball: bool = False
 ) -> List[SourceCandidate]:
-    """
-    Federates search across academic sources (arXiv, Semantic Scholar, OpenAlex, Europe PMC, PubMed)
-    concurrently, deduplicates candidates, optionally snowballs citation graph, and falls back to
-    Tavily web search if fewer than `min_scholarly_results` academic candidates are found.
-    Ranks top candidates by semantic relevance, recency, and citation impact.
-    """
     disp = dispatcher or scholarly_dispatcher
     clean_query = _sanitize_academic_query(query)
     if not clean_query:
@@ -1012,7 +874,6 @@ async def search_scholarly_sources(
 
     api_limit = max(max_results, 15)
 
-    # Concurrently query all federated academic endpoints
     academic_tasks = [
         search_arxiv(clean_query, max_results=api_limit, dispatcher=disp),
         search_semantic_scholar(clean_query, max_results=api_limit, dispatcher=s2_dispatcher),
@@ -1028,7 +889,6 @@ async def search_scholarly_sources(
         if isinstance(res, list):
             combined.extend(res)
 
-    # Deduplicate candidates based on normalized title or URL or DOI
     seen_keys = set()
     deduped_candidates: List[SourceCandidate] = []
 
@@ -1039,7 +899,6 @@ async def search_scholarly_sources(
             seen_keys.add(norm_title)
             deduped_candidates.append(candidate)
 
-    # Optional Snowballing
     if enable_snowball and deduped_candidates:
         snowballed = await snowball_literature_graph(deduped_candidates[:3], dispatcher=s2_dispatcher)
         for cand in snowballed:
@@ -1048,7 +907,6 @@ async def search_scholarly_sources(
                 seen_keys.add(norm_title)
                 deduped_candidates.append(cand)
 
-    # If insufficient academic results, fall back/supplement with Tavily web search
     if len(deduped_candidates) < min_scholarly_results:
         logger.info(f"[SCHOLARLY] Only {len(deduped_candidates)} academic results found. Supplementing with Tavily web search...")
         tavily_candidates = await search_tavily(query, max_results=api_limit, dispatcher=disp)
@@ -1059,14 +917,8 @@ async def search_scholarly_sources(
                 seen_keys.add(norm_title)
                 deduped_candidates.append(cand)
 
-    # Rank candidates by semantic relevance, recency (2026/2025/2024), and citation impact
     ranked_candidates = rank_sources_by_relevance(clean_query or query, deduped_candidates, top_k=max_results)
     return ranked_candidates[:max_results]
-
-
-# ==============================================================================
-# 9. Semantic Relevance Pre-Filtering & Source Ranker
-# ==============================================================================
 
 def rank_sources_by_relevance(
     topic: str,
@@ -1074,13 +926,6 @@ def rank_sources_by_relevance(
     top_k: Optional[int] = None,
     min_similarity: float = 0.10
 ) -> List[Any]:
-    """
-    Ranks source dictionaries or SourceCandidate objects by composite score:
-    - Semantic cosine similarity to the topic using the CPU embedding model
-    - Recency bonus for recent preprints/papers (2026: +0.15, 2025: +0.10, 2024: +0.05)
-    - Citation count impact bonus (log-scaled)
-    Fast (<25ms for 30 candidates), ensuring the best, latest, and most relevant papers surface first.
-    """
     if not sources or not topic:
         return sources
 
@@ -1109,7 +954,6 @@ def rank_sources_by_relevance(
             doc_emb = model.encode(text, normalize_embeddings=True)
             sim = float(np.dot(topic_emb, doc_emb))
 
-            # Recency bonus for latest scientific literature
             recency_bonus = 0.0
             if "2026" in pub_date or "2026" in text[:300]:
                 recency_bonus = 0.15
@@ -1118,7 +962,6 @@ def rank_sources_by_relevance(
             elif "2024" in pub_date or "2024" in text[:300]:
                 recency_bonus = 0.05
 
-            # Citation count impact bonus
             citation_bonus = 0.0
             if isinstance(citations, (int, float)) and citations > 0:
                 citation_bonus = min(float(np.log1p(citations)) * 0.01, 0.06)
@@ -1126,7 +969,6 @@ def rank_sources_by_relevance(
             composite_score = sim + recency_bonus + citation_bonus
             scored_sources.append((composite_score, s))
 
-        # Sort by composite score descending
         scored_sources.sort(key=lambda x: x[0], reverse=True)
 
         filtered = [s for score, s in scored_sources if score >= min_similarity]

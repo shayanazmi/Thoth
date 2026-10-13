@@ -5,12 +5,9 @@ from backend.tools import scrape_url, _scrape_url_with_retry
 from backend.agents import FallbackLLMWrapper
 from langchain_core.messages import AIMessage
 
-
 class TestNetworkAndLLMResilience(unittest.TestCase):
-
     @patch("requests.get")
     def test_scrape_url_retries_on_503(self, mock_get):
-        # First 2 attempts return 503, 3rd attempt succeeds
         resp_503 = MagicMock()
         resp_503.status_code = 503
         resp_503.raise_for_status.side_effect = requests.exceptions.RequestException("HTTP 503")
@@ -68,7 +65,6 @@ class TestNetworkAndLLMResilience(unittest.TestCase):
         self.assertEqual(res.content, "Fallback response")
         primary_mock.invoke.assert_called_once()
         fallback_mock.invoke.assert_called_once()
-
 
 if __name__ == "__main__":
     unittest.main()

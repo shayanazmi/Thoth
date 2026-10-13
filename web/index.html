@@ -4,23 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>THOTH · The Divine Scribe | Autonomous Multi-Agent Research</title>
-  
-  <!-- Favicon / Vector Emblem -->
+
   <link rel="icon" type="image/png" href="/assets/thoth_logo.png">
-  
-  <!-- CSS Stylesheet -->
+
   <link rel="stylesheet" href="/css/styles.css">
-  
-  <!-- CDN Libraries -->
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
 
-  <!-- ============================================================================
-       APP HEADER & TOP TELEMETRY NAVIGATION BAR
-       ============================================================================ -->
   <header class="app-header">
     <div class="brand-badge" id="brandHomeBtn">
       <img src="/assets/thoth_logo.png" alt="Thoth" class="brand-emblem">
@@ -30,7 +24,6 @@
       </div>
     </div>
 
-    <!-- Live Telemetry Status HUD -->
     <div class="header-telemetry">
       <div class="telemetry-pill">
         <span class="status-dot pulse"></span>
@@ -42,7 +35,6 @@
       </div>
     </div>
 
-    <!-- View Switcher Tabs -->
     <div class="view-tabs">
       <button class="view-tab-btn active" id="tabLandingBtn">
         <i data-lucide="compass" style="width:14px;height:14px;"></i> Overview
@@ -53,17 +45,10 @@
     </div>
   </header>
 
-  <!-- ============================================================================
-       MAIN APP CONTAINER (DUAL-VIEW SPA)
-       ============================================================================ -->
   <main class="app-container">
 
-    <!-- ==========================================================================
-         VIEW 1: 3D HERO LANDING & ARCHITECTURE SHOWCASE
-         ========================================================================== -->
     <section class="view-section landing-view" id="landingView">
-      
-      <!-- Hero Section -->
+
       <div class="hero-grid">
         <div class="hero-content">
           <div class="hero-tag">
@@ -77,7 +62,6 @@
             Thoth synthesizes vast academic literature through an 8-agent swarm: deep scholarly discovery, neural citation snowballing, SLM fact-checking against the Scales of Ma'at, and automatic Obsidian Vault knowledge indexing.
           </p>
 
-          <!-- Metrics Row -->
           <div class="hero-stats-row">
             <div class="stat-card">
               <div class="stat-value">8</div>
@@ -93,7 +77,6 @@
             </div>
           </div>
 
-          <!-- Prompt Launcher Box -->
           <div class="prompt-launcher-box">
             <div class="prompt-input-wrapper">
               <input type="text" id="heroPromptInput" class="prompt-input" placeholder="Enter research objective (e.g. Quantum Error Correction with Surface Codes)...">
@@ -124,7 +107,6 @@
           </div>
         </div>
 
-        <!-- 3D Deity Parallax Column -->
         <div class="hero-visual-col perspective-container">
           <div class="deity-showcase-card card-3d">
             <div class="card-3d-glare"></div>
@@ -142,7 +124,6 @@
         </div>
       </div>
 
-      <!-- Architecture Swarm Showcase -->
       <div class="architecture-section">
         <div class="section-header">
           <h2 class="section-title">The 8-Agent Research Swarm</h2>
@@ -195,12 +176,8 @@
 
     </section>
 
-    <!-- ==========================================================================
-         VIEW 2: CONVERSATIONAL CHATBOT & ARTIFACTS STUDIO
-         ========================================================================== -->
     <section class="view-section studio-view hidden" id="studioView">
-      
-      <!-- 1. Left Sidebar: Vault & Past Notes -->
+
       <aside class="studio-sidebar">
         <div class="sidebar-header">
           <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -215,14 +192,12 @@
 
         <div class="sidebar-section-title">Indexed Notes</div>
         <div class="vault-notes-tree" id="vaultNotesList">
-          <!-- Dynamic note items -->
+
         </div>
       </aside>
 
-      <!-- 2. Center Column: Chat Cockpit -->
       <main class="studio-center">
-        
-        <!-- Topic & Stepper Header -->
+
         <div class="topic-header-bar">
           <div class="current-topic-label">
             <i data-lucide="book-open" style="width:16px;height:16px;color:#c99a6b;"></i>
@@ -238,12 +213,10 @@
           </div>
         </div>
 
-        <!-- Real-Time Pipeline Stepper -->
         <div class="pipeline-stepper-bar" id="pipelineStepperBar">
-          <!-- Dynamic step badges -->
+
         </div>
 
-        <!-- Conversational Chat Feed -->
         <div class="chat-scroll-feed" id="chatFeed">
           <div class="chat-message-row assistant">
             <div class="chat-avatar">
@@ -257,16 +230,13 @@
           </div>
         </div>
 
-        <!-- Jump to Latest Floating Button -->
         <button class="jump-to-latest-btn hidden" id="jumpToLatestBtn" title="Jump to latest message">
           <i data-lucide="arrow-down" style="width:13px;height:13px;"></i>
           <span>New messages</span>
         </button>
 
-        <!-- Modern ChatGPT / Gemini Style Chat Input Bar -->
         <div class="chat-input-bar">
-          
-          <!-- Floating Action / Tool Menu (Pop-up on '+' click) -->
+
           <div class="floating-tool-menu hidden" id="floatingToolMenu">
             <div class="tool-menu-item active" data-mode="auto">
               <div class="tool-item-icon"><i data-lucide="sparkles"></i></div>
@@ -325,7 +295,6 @@
             </div>
           </div>
 
-          <!-- Input Container -->
           <div class="chat-input-container">
             <div class="chat-input-row">
               <textarea id="chatInput" class="chat-textarea" placeholder="Ask follow-up questions, request sub-topic probes, or type /help..."></textarea>
@@ -360,7 +329,6 @@
         </div>
       </main>
 
-      <!-- 3. Right Column: Slide-in Artifacts -->
       <aside class="studio-artifacts">
         <div class="artifact-tabs-header">
           <button class="artifact-tab-btn active" data-tab="report">
@@ -398,9 +366,6 @@
 
   </main>
 
-  <!-- ============================================================================
-       MODAL DIALOG (OBSIDIAN NOTE READER)
-       ============================================================================ -->
   <div class="modal-overlay hidden" id="noteModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -408,12 +373,11 @@
         <button class="preset-chip" id="modalCloseBtn"><i data-lucide="x" style="width:12px;height:12px;"></i> Close</button>
       </div>
       <div class="modal-body prose" id="modalBody">
-        <!-- Note content -->
+
       </div>
     </div>
   </div>
 
-  <!-- App Scripts -->
   <script src="/js/animations.js?v=3.5"></script>
   <script src="/js/app.js?v=3.5"></script>
   <script>

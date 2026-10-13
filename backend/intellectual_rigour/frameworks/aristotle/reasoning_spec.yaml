@@ -1,0 +1,58 @@
+id: aristotelian_inquiry
+type: reasoning_framework
+
+thinker:
+  name: Aristotle
+  historical_era: 384-322 BCE
+  primary_tradition: Classical Logic & Essentialist Categorization
+
+purpose:
+  - conceptual_clarity_audit
+  - essential_vs_accidental_property_differentiation
+  - category_error_detection
+  - syllogistic_logical_validity_testing
+  - four_causes_explanatory_completeness
+
+applies_to:
+  - theoretical_foundations
+  - taxonomy_and_ontologies
+  - definitions_and_constructs
+  - deductive_arguments
+  - explanatory_theories
+
+does_not_apply_to:
+  - purely_empirical_numerical_curve_fitting
+  - unstructured_heuristic_observations
+  - statistical_noise_modeling
+
+reasoning_operations:
+  - extract_primary_entities_and_constructs
+  - test_definition_rigour_genus_differentia
+  - build_hierarchical_category_tree
+  - detect_category_errors_and_level_mixing
+  - reconstruct_premises_inference_conclusions
+  - audit_four_causes_material_formal_efficient_final
+  - search_internal_contradictions_and_equivocation
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - clarified_definitions: list of string
+
+historical_basis:
+  primary_sources:
+    - "Categories (Organon I)"
+    - "Prior Analytics (Organon III) & Posterior Analytics (Organon IV)"
+    - "Metaphysics (Books IV, VII, VIII)"
+    - "Physics (Book II - Doctrine of the Four Causes)"
+  core_doctrine:
+    - Definition by Genus and Differentia: A valid definition identifies the broader category and the essential distinguishing characteristic.
+    - Non-Contradiction: Contradictory propositions cannot both be true at the same time and in the same respect.
+    - Category Separation: Predications valid for substance cannot be applied indiscriminately to accidents or relations.
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to semantic type safety, concept drift, ontologies, and formal argument validity in scientific and AI research papers.
+    - Translates the Four Causes into modern explanatory adequacy: substrate/hardware (material), architecture/schema (formal), training/mechanism (efficient), objective function/telos (final).

@@ -8,15 +8,12 @@ from backend.pipeline import (
 )
 from langchain_core.runnables import RunnableSequence
 
-
 class TestTokenBudget(unittest.TestCase):
-
     def test_count_tokens_and_truncate(self):
         sample_text = "The quick brown fox jumps over the lazy dog." * 50
         initial_tokens = count_tokens(sample_text)
         self.assertGreater(initial_tokens, 100)
 
-        # Truncate to 30 tokens
         truncated = truncate_text_to_tokens(sample_text, 30)
         truncated_tokens = count_tokens(truncated)
         self.assertLessEqual(truncated_tokens, 30)
@@ -27,7 +24,6 @@ class TestTokenBudget(unittest.TestCase):
         summary = "Rolling summary of initial discovery." * 10
         user_query = "Explain qubit decoherence."
 
-        # Create 5 historical turns with long responses
         chat_turns = [
             {"turn": 1, "user_query": "Turn 1 Q", "assistant_response": "Turn 1 Answer " * 50},
             {"turn": 2, "user_query": "Turn 2 Q", "assistant_response": "Turn 2 Answer " * 50},
@@ -36,7 +32,6 @@ class TestTokenBudget(unittest.TestCase):
             {"turn": 5, "user_query": "Turn 5 Q", "assistant_response": "Turn 5 Answer " * 50},
         ]
 
-        # Fit into a strict budget of 500 tokens
         trimmed_ctx, trimmed_sum, recent_turns_text = fit_context_to_token_budget(
             topic=topic,
             context_block=context_block,
@@ -46,13 +41,11 @@ class TestTokenBudget(unittest.TestCase):
             max_tokens=500
         )
 
-        # Total tokens of assembled prompt components must not exceed 500
         total_assembled = count_tokens(f"Topic: {topic}\nUser Query: {user_query}") + count_tokens(trimmed_ctx) + count_tokens(trimmed_sum) + count_tokens(recent_turns_text)
         self.assertLessEqual(total_assembled, 500)
 
-        # Oldest turns (Turn 1, Turn 2) should have been dropped first
         self.assertNotIn("Turn 1 Answer", recent_turns_text)
-        # Most recent turn (Turn 5) should be retained if it fits
+
         if recent_turns_text:
             self.assertIn("Turn 5 Answer", recent_turns_text)
 
@@ -72,7 +65,6 @@ class TestTokenBudget(unittest.TestCase):
             "conversation_summary": "Summary of prior turns."
         }
 
-        # Stream followup turn with max_context_tokens=1000
         events = {}
         for ev_name, ev_payload in stream_followup_turn(state, "What are multi-agent bottlenecks?", max_context_tokens=1000):
             events[ev_name] = ev_payload
@@ -86,9 +78,9 @@ class TestTokenBudget(unittest.TestCase):
     def test_stream_followup_web_search_writes_to_vault(self, mock_invoke, mock_scrape, mock_web_search):
         mock_invoke.side_effect = [
             '{"route": "WEB_SEARCH", "reasoning": "New info needed", "search_query": "agent communication protocols"}',
-            '{"nodes": [], "edges": []}',  # mindmap_updater
-            'Agent communication protocols rely on standard JSON-RPC specifications.',  # answer
-            '["What are multi-agent consensus protocols?", "How does latency affect agent orchestration?"]'  # follow_up_chain
+            '{"nodes": [], "edges": []}',
+            'Agent communication protocols rely on standard JSON-RPC specifications.',
+            '["What are multi-agent consensus protocols?", "How does latency affect agent orchestration?"]'
         ]
         mock_web_search.invoke.return_value = "Search result with link https://arxiv.org/abs/2402.12345"
         mock_scrape.invoke.return_value = "Detailed paper content on agent protocols."
@@ -110,7 +102,6 @@ class TestTokenBudget(unittest.TestCase):
         self.assertTrue(len(events["vault_update"]["vault_notes"]) >= 1)
         self.assertIn("answer", events)
         self.assertEqual(events["answer"]["route"], "WEB_SEARCH")
-
 
 if __name__ == "__main__":
     unittest.main()

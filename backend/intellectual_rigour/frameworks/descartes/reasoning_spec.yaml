@@ -1,0 +1,55 @@
+id: cartesian_first_principles
+type: reasoning_framework
+
+thinker:
+  name: René Descartes
+  historical_era: 1596-1650
+  primary_tradition: Rationalist Foundationalism & Methodological Decomposition
+
+purpose:
+  - first_principles_decomposition_audit
+  - unchecked_assumption_suspension
+  - primitive_component_identification
+  - dependency_graph_and_cascade_analysis
+  - single_assumption_subtraction_stress_test
+
+applies_to:
+  - complex_multi_component_systems
+  - theoretical_architectures
+  - mathematical_proofs
+  - computational_pipelines
+  - compound_causal_models
+
+does_not_apply_to:
+  - unstructured_empirical_observations
+  - purely_descriptive_chronologies
+  - aesthetic_judgments
+
+reasoning_operations:
+  - suspend_inherited_and_common_sense_assumptions
+  - decompose_compound_problem_into_atomic_primitives
+  - classify_primitives_established_inferred_assumed_unknown
+  - order_reasoning_from_simplest_to_complex_consequences
+  - build_dependency_dag_foundations_intermediates_conclusions
+  - subtract_assumptions_one_by_one_to_test_conclusion_survival
+  - reconstruct_minimal_necessary_argument
+
+outputs:
+  - verdict: ["MATERIAL_OBJECTION", "NO_MATERIAL_OBJECTION", "INSUFFICIENT_CONTEXT", "INSUFFICIENT_EVIDENCE", "OUTSIDE_SCOPE", "UNRESOLVED"]
+  - critiques: list of CritiqueFinding
+  - unresolved_questions: list of string
+  - primitive_foundations: list of string
+
+historical_basis:
+  primary_sources:
+    - "Discours de la méthode (1637) - Four Rules of Method"
+    - "Meditationes de Prima Philosophia (1641) - Methodological Doubt"
+    - "Regulae ad directionem ingenii (Rules for the Direction of the Mind, 1684)"
+  core_doctrine:
+    - Four Rules of Cartesian Method: Never accept anything as true unless clearly known; divide difficulties into as many parts as possible; conduct thoughts in order from simplest to complex; make comprehensive enumerations.
+    - Foundationalism: Knowledge must rest on indubitable first principles; any weakness in foundational premises cascades through the entire deduction tree.
+
+modern_adaptation:
+  enabled: true
+  scope:
+    - Applied to software architecture dependencies, mathematical formalisms, machine learning pipeline decoupling, and first-principles cost/physics scaling limits.

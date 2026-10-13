@@ -1,7 +1,3 @@
-"""
-Comprehensive unit test suite for Pre-Flight Clarification Gating.
-"""
-
 import unittest
 from backend.conversation.mandate import ResearchMandate
 from backend.conversation.clarification import (
@@ -10,10 +6,7 @@ from backend.conversation.clarification import (
     BROAD_TOPIC_KEYWORDS,
 )
 
-
 class TestPreFlightClarificationGate(unittest.TestCase):
-    """Tests scoping evaluation and option generation for ambiguous queries."""
-
     def test_broad_single_word_topics_require_clarification(self):
         for kw in ["ai", "cancer", "battery", "quantum", "robotics"]:
             mandate = ResearchMandate(
@@ -50,8 +43,6 @@ class TestPreFlightClarificationGate(unittest.TestCase):
             self.assertEqual(len(res.options), 0)
 
     def test_inherited_constraints_bypass_clarification(self):
-        # Even if the topic string is broad ("AI"), having constraints from
-        # previous dialogue eliminates the need for redundant clarification
         mandate = ResearchMandate(
             objective="Research AI",
             primary_question="AI",
@@ -74,7 +65,6 @@ class TestPreFlightClarificationGate(unittest.TestCase):
         self.assertTrue(d["needs_clarification"])
         self.assertEqual(len(d["options"]), 2)
         self.assertEqual(d["reason"], "Ambiguous query")
-
 
 if __name__ == "__main__":
     unittest.main()

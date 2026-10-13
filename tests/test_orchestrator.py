@@ -7,9 +7,7 @@ from backend.orchestrator import (
     run_research_pipeline
 )
 
-
 class TestOrchestrator(unittest.TestCase):
-
     def test_create_initial_state(self):
         state = create_initial_state(topic="Quantum Mechanics", scrape_top_n=3, min_score=7.0)
         self.assertEqual(state["topic"], "Quantum Mechanics")
@@ -38,7 +36,6 @@ class TestOrchestrator(unittest.TestCase):
         for node_name, update, current_state in stream_research_pipeline(topic="Test Topic"):
             yielded_nodes.append(node_name)
 
-        # Assert full Plan -> Act -> Observe -> Replan flow sequence
         expected_nodes = ["search", "snowball", "scrape", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
         self.assertEqual(yielded_nodes, expected_nodes)
 
@@ -53,13 +50,12 @@ class TestOrchestrator(unittest.TestCase):
     ):
         mock_search.return_value = {"search_results": "Search data"}
         mock_scrape.return_value = ("Scraped content", [])
-        
+
         mock_writer.side_effect = [
             {"report": "Draft Report v1", "attempt": 1},
             {"report": "Revised Report v2", "attempt": 2}
         ]
-        
-        # Critic returns 5.0 on attempt 1, 8.5 on attempt 2
+
         mock_ver_crit.side_effect = [
             ({"verifier_feedback": ""}, {"feedback": "Needs work", "score": 5.0}),
             ({"verifier_feedback": ""}, {"feedback": "Exceeds threshold", "score": 8.5})
@@ -71,15 +67,13 @@ class TestOrchestrator(unittest.TestCase):
         for node_name, update, current_state in stream_research_pipeline(topic="Low Score Topic", min_score=6.5, max_retries=2):
             yielded_nodes.append(node_name)
 
-        # Expected flow: search -> snowball -> scrape -> writer (1) -> verifier -> critic (5.0) -> REPLAN -> writer (2) -> verifier -> critic (8.5) -> vault -> mindmap -> follow_up
         expected = ["search", "snowball", "scrape", "writer", "verifier", "critic", "writer", "verifier", "critic", "vault", "mindmap", "follow_up"]
         self.assertEqual(yielded_nodes, expected)
-
 
     @patch("backend.orchestrator.search_node")
     def test_orchestrator_cancellation_event(self, mock_search):
         cancel = Event()
-        cancel.set()  # Immediately cancelled
+        cancel.set()
 
         yielded_nodes = []
         for node_name, update, current_state in stream_research_pipeline(topic="Cancelled Topic", cancel_event=cancel):
@@ -137,23 +131,19 @@ Neuromorphic architectures emulate biological nervous systems.
             self.assertIn("primary_topic_note", vault_update)
             self.assertIn("source_notes", vault_update)
 
-            # Confirm files exist in vault
             all_notes = list_notes(vault_dir=vault_dir)
             self.assertTrue(len(all_notes) >= 2)
             self.assertIn(vault_update["primary_topic_note"], all_notes)
 
-            # Confirm topic note claims have valid citations
             topic_note = read_note(vault_update["primary_topic_note"], vault_dir=vault_dir)
             self.assertIn("Claims", topic_note.content)
             self.assertIn("[[src-", topic_note.content)
 
-            # Confirm hybrid search finds the topic
             search_hits = hybrid_search("biological nervous systems energy", top_k=2, db_path=db_path, vault_dir=vault_dir)
             self.assertTrue(len(search_hits) > 0)
             self.assertEqual(search_hits[0]["note_id"], vault_update["primary_topic_note"])
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
-
 
 if __name__ == "__main__":
     unittest.main()
