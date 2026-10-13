@@ -1,0 +1,156 @@
+/* Thoth Components & Auth Modal Styles */
+
+.thoth-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(4, 5, 10, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thoth-modal-card {
+  width: 90%;
+  max-width: 460px;
+  background: #0f111a;
+  border: 1px solid rgba(231, 199, 123, 0.25);
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(231, 199, 123, 0.08);
+  padding: 24px;
+  color: #f0f2fa;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  animation: thothModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes thothModalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.thoth-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.thoth-icon-btn {
+  background: transparent;
+  border: none;
+  color: #9499ad;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+.thoth-icon-btn:hover { color: #f0f2fa; }
+
+.thoth-modal-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.thoth-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #8e92a8;
+  font-size: 13px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.thoth-tab-btn.active {
+  color: #e7c77b;
+  border-bottom-color: #e7c77b;
+}
+
+.thoth-modal-body {
+  padding-top: 16px;
+}
+
+.auth-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(231, 199, 123, 0.06);
+  border: 1px solid rgba(231, 199, 123, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #d1d4e2;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.thoth-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #090a10;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #f0f2fa;
+  font-size: 13px;
+  outline: none;
+  margin-top: 4px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.thoth-input:focus {
+  border-color: #e7c77b;
+  box-shadow: 0 0 0 2px rgba(231, 199, 123, 0.15);
+}
+
+.thoth-primary-btn {
+  background: linear-gradient(135deg, #c99a6b 0%, #e7c77b 100%);
+  color: #0b0c13;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.thoth-primary-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+
+.thoth-secondary-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e4ef;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.thoth-secondary-btn:hover { background: rgba(255, 255, 255, 0.09); }
+
+.thoth-danger-btn {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.thoth-danger-btn:hover { background: rgba(239, 68, 68, 0.2); }

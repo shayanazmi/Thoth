@@ -3,15 +3,16 @@ __pycache__/
 *$py.class
 *.so
 
-bin/
-build/
+/bin/
+/build/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
+!frontend/lib/
 parts/
 sdist/
 var/
@@ -91,24 +92,14 @@ yarn-error.log*
 .deepeval/
 .deepeval_cache/
 
-thoth_chat_summary_with_thinking.md
-thoth_full_chat_history_with_thinking.md
 thoth_modification_plan.md
-diagnostic_test.py
-todo-shayanwentonawalk
-eval_sandbox/production_eval_results.json
+backend/evals/production_eval_results.json
+backend/evals/.deepeval/
 
 vault/topics/*.md
 vault/sources/*.md
 
-handling api limit like feynman/
-handling api limit like feynman
-research_repos/
-research_repos
-
 .gemini/
-.agents/
-
-.streamlit/
 
 *.log
+
