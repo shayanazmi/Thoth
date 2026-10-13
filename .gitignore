@@ -101,7 +101,5 @@ vault/sources/*.md
 
 .gemini/
 
-/.streamlit/
-
 *.log
 

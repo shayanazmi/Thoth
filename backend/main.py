@@ -69,7 +69,7 @@ if not os.path.exists(_FRONTEND_DIR):
     _FRONTEND_DIR = os.path.join(_PROJECT_ROOT, "web")
 
 if os.path.exists(_FRONTEND_DIR):
-    for sub in ["styles", "lib", "components", "pages", "css", "js", "assets"]:
+    for sub in ["styles", "lib", "components", "js", "assets"]:
         subdir = os.path.join(_FRONTEND_DIR, sub)
         if os.path.exists(subdir):
             app.mount(f"/{sub}", StaticFiles(directory=subdir), name=sub)
