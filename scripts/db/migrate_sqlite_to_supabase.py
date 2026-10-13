@@ -161,7 +161,10 @@ def migrate_to_supabase(
 
 def main():
     parser = argparse.ArgumentParser(description="Migrate SQLite store.db to Supabase Postgres")
-    parser.add_argument("--sqlite-path", default=os.path.join(_PROJECT_ROOT, "store.db"), help="Path to SQLite store.db")
+    default_db = os.path.join(_PROJECT_ROOT, "db", "store.db")
+    if not os.path.exists(default_db):
+        default_db = os.path.join(_PROJECT_ROOT, "store.db")
+    parser.add_argument("--sqlite-path", default=default_db, help="Path to SQLite store.db")
     parser.add_argument("--dry-run", action="store_true", help="Inspect and count records without writing")
     args = parser.parse_args()
 

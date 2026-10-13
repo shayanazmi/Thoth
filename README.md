@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="web/assets/thoth_logo.png" alt="Thoth Logo" width="130" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(201, 154, 107, 0.35); margin-bottom: 12px;"/>
+<img src="frontend/assets/thoth_logo.png" alt="Thoth Logo" width="130" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(201, 154, 107, 0.35); margin-bottom: 12px;"/>
 
 # THOTH · THE DIVINE SCRIBE
 ### Autonomous Multi-Agent Academic Intelligence & Epistemic Synthesis Studio
@@ -10,13 +10,13 @@
 [![Railway](https://img.shields.io/badge/deploy-Railway-0B0D0E.svg?style=flat-square&logo=railway&logoColor=white)](https://railway.app)
 [![Supabase](https://img.shields.io/badge/auth%20%26%20db-Supabase-3ECF8E.svg?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
 [![Redis](https://img.shields.io/badge/caching-Redis-DC382D.svg?style=flat-square&logo=redis&logoColor=white)](https://redis.io)
-[![Tests Passing](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg?style=flat-square)](tests/)
+[![Tests Passing](https://img.shields.io/badge/tests-passing-brightgreen.svg?style=flat-square)](backend/tests/)
 
 **Thoth** is an autonomous multi-agent academic research intelligence engine. It combines recursive scholarly retrieval (ArXiv, Semantic Scholar, Tavily), dual-key claim-evidence provenance verification, 10 epistemic philosopher reasoning desks, a persistent knowledge vault graph, and an interactive celestial research studio.
 
 <br/>
 
-<img src="web/assets/thoth_hero.jpg" alt="Thoth Studio Preview" width="850" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);"/>
+<img src="frontend/assets/thoth_hero.jpg" alt="Thoth Studio Preview" width="850" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);"/>
 
 </div>
 
@@ -29,7 +29,7 @@ git clone https://github.com/shayanazmi/Thoth.git && cd Thoth
 python3 -m venv venv && source venv/bin/activate
 pip install -r backend/requirements.txt
 cp .env.example .env  # Add your NVIDIA_API_KEY and TAVILY_API_KEY
-python -m uvicorn web_server:app --port 8000
+make dev              # Starts backend on http://localhost:8000
 ```
 Open **`http://localhost:8000`** in your browser to launch the studio.
 
@@ -101,11 +101,14 @@ Thoth incorporates 10 classical and scientific frameworks into its critique and 
 ## 🧪 Testing & Verification
 
 ```bash
-# Run unit & schema tests
-pytest tests/test_schemas.py tests/test_pure_functions.py -v
+# Run core unit, db, schema, and API test suites
+make test
+
+# Run all test suites
+make test-all
 
 # Run 7-layer system diagnostic
-python scripts/dev/diagnostic_test.py
+make diagnostics
 ```
 
 ---

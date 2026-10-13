@@ -34,7 +34,7 @@ from backend.agents import (
     strip_chain_of_thought,
     safe_extract_json,
 )
-from web_server import is_casual_query
+from backend.api.routes_research import is_casual_query
 
 class TestPipelinePureFunctions(unittest.TestCase):
     def test_slugify_expected_input(self):

@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
-from web_server import app
+from backend.main import app
 from backend.intellectual_rigour.matcher import match_ideation_archetype, ARCHETYPE_DEFINITIONS
 from backend.intellectual_rigour.sparring import spar_with_thinker, evaluate_ideation_convergence, EscalationProposal
 from backend.conversation.escalation import evaluate_brainstorm_escalation, EscalationState

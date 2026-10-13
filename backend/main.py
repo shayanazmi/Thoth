@@ -64,16 +64,19 @@ app.include_router(brainstorm_router)
 app.include_router(vault_router)
 
 # Mount local frontend if available
-_WEB_DIR = os.path.join(_PROJECT_ROOT, "web")
-if os.path.exists(_WEB_DIR):
+_FRONTEND_DIR = os.path.join(_PROJECT_ROOT, "frontend")
+if not os.path.exists(_FRONTEND_DIR):
+    _FRONTEND_DIR = os.path.join(_PROJECT_ROOT, "web")
+
+if os.path.exists(_FRONTEND_DIR):
     for sub in ["styles", "lib", "components", "pages", "css", "js", "assets"]:
-        subdir = os.path.join(_WEB_DIR, sub)
+        subdir = os.path.join(_FRONTEND_DIR, sub)
         if os.path.exists(subdir):
             app.mount(f"/{sub}", StaticFiles(directory=subdir), name=sub)
 
     @app.get("/", response_class=HTMLResponse)
     async def serve_index():
-        index_file = os.path.join(_WEB_DIR, "index.html")
+        index_file = os.path.join(_FRONTEND_DIR, "index.html")
         if os.path.exists(index_file):
             with open(index_file, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())

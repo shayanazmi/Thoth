@@ -249,3 +249,24 @@ async def api_stream_research(request: Request):
             }
 
     return EventSourceResponse(event_generator())
+
+@router.post("/api/research/clarify")
+async def api_check_clarification(request: Request):
+    body = await request.json()
+    topic = body.get("topic", "")
+    chat_turns = body.get("chat_turns", [])
+    summary = body.get("conversation_summary", "")
+
+    mandate = synthesize_research_mandate(
+        user_query=topic,
+        chat_turns=chat_turns,
+        conversation_summary=summary,
+    )
+    result = evaluate_clarification_need(mandate)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content={
+            "mandate": mandate.to_dict(),
+            "clarification": result.to_dict(),
+        }
+    )

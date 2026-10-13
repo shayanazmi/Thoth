@@ -57,32 +57,32 @@ dev:
 	@$(UVICORN) backend.main:app --host 0.0.0.0 --port 8000 --reload
 
 dev-web:
-	@echo "Starting Thoth Web server on http://localhost:3000..."
-	@cd web && python3 -m http.server 3000
+	@echo "Starting Thoth Frontend server on http://localhost:3000..."
+	@cd frontend && python3 -m http.server 3000
 
 test:
 	@echo "Running core unit, db, schema, and API adapter test suites..."
-	@$(PYTEST) tests/test_pure_functions.py tests/test_db.py tests/test_ui_adapter.py tests/test_schemas.py tests/test_dispatcher.py tests/test_all_ten_frameworks.py tests/test_claim_evidence_integrity.py -v
+	@$(PYTEST) backend/tests/test_pure_functions.py backend/tests/test_db.py backend/tests/test_ui_adapter.py backend/tests/test_schemas.py backend/tests/test_dispatcher.py backend/tests/test_all_ten_frameworks.py backend/tests/test_claim_evidence_integrity.py -v
 
 test-all:
 	@echo "Running all pytest test suites..."
-	@$(PYTEST) tests/ -v
+	@$(PYTEST) backend/tests/ -v
 
 test-ui:
 	@echo "Running Web API adapter test suite..."
-	@$(PYTEST) tests/test_ui_adapter.py -v
+	@$(PYTEST) backend/tests/test_ui_adapter.py -v
 
 eval:
 	@echo "Running Thoth DeepEval Benchmark..."
-	@$(PYTHON) evals/run_production_evals.py
+	@$(PYTHON) backend/evals/run_production_evals.py
 
 lint:
 	@echo "Validating Python syntax and imports..."
-	@$(PYTHON) -m py_compile backend/main.py web_server.py
+	@$(PYTHON) -m py_compile backend/main.py
 	@$(PYTHON) -c "import backend.main; import backend.core.config; print('All core modules imported successfully.')"
 
 migrate:
-	@echo "Migrating SQLite store.db to Supabase Postgres..."
+	@echo "Migrating SQLite db/store.db to Supabase Postgres..."
 	@$(PYTHON) scripts/db/migrate_sqlite_to_supabase.py
 
 migrate-dry-run:
@@ -120,9 +120,9 @@ deploy:
 	@echo "  - Required Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, REDIS_URL,"
 	@echo "                  OPENAI_API_KEY, NVIDIA_API_KEY, TAVILY_API_KEY"
 	@echo ""
-	@echo "Service 2: Frontend Web (Nginx Alpine)"
-	@echo "  - Root Directory: web/"
-	@echo "  - Config: web/railway.toml & web/Dockerfile"
+	@echo "Service 2: Frontend Client (Nginx Alpine)"
+	@echo "  - Root Directory: frontend/"
+	@echo "  - Config: frontend/railway.toml & frontend/Dockerfile"
 	@echo "  - Env: None required (runtime env injected or uses origin API)"
 	@echo "========================================================================"
 

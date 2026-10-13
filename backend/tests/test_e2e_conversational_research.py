@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
-from web_server import app
+from backend.main import app
 from backend.conversation import (
     EscalationState,
     detect_escalation_intent,

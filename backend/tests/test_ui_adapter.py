@@ -3,7 +3,25 @@ import unittest
 from unittest.mock import patch, MagicMock
 from starlette.testclient import TestClient
 
-from web_server import app, is_casual_query
+import sys
+import types
+from backend.main import app
+from backend.api.routes_research import is_casual_query
+import backend.api.routes_research as routes_research
+import backend.api.routes_followup as routes_followup
+import backend.api.routes_vault as routes_vault
+
+# Module alias for backward compatibility with mock patches in existing tests
+if "web_server" not in sys.modules:
+    web_server = types.ModuleType("web_server")
+    web_server.app = app
+    web_server.is_casual_query = is_casual_query
+    web_server.direct_chat_chain = routes_research.direct_chat_chain
+    web_server.stream_research_pipeline = routes_research.stream_research_pipeline
+    web_server.stream_followup_turn = routes_followup.stream_followup_turn
+    web_server.read_note = routes_vault.read_note
+    web_server.list_notes = routes_vault.list_notes
+    sys.modules["web_server"] = web_server
 
 class TestWebServerEndpoints(unittest.TestCase):
     def setUp(self):

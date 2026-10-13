@@ -12,7 +12,7 @@ eggs/
 .eggs/
 /lib/
 /lib64/
-!web/lib/
+!frontend/lib/
 parts/
 sdist/
 var/
@@ -93,8 +93,8 @@ yarn-error.log*
 .deepeval_cache/
 
 thoth_modification_plan.md
-evals/production_eval_results.json
-evals/.deepeval/
+backend/evals/production_eval_results.json
+backend/evals/.deepeval/
 
 vault/topics/*.md
 vault/sources/*.md
