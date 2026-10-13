@@ -6,9 +6,19 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
+_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.abspath(os.path.join(_CURRENT_DIR, ".."))
+for _p in (_CURRENT_DIR, _PROJECT_ROOT):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+# Ensure 'backend' package is resolvable when rootDirectory is deployed as /backend
+_backend_symlink = os.path.join(_CURRENT_DIR, "backend")
+if not os.path.exists(_backend_symlink):
+    try:
+        os.symlink(_CURRENT_DIR, _backend_symlink)
+    except Exception:
+        pass
 
 from backend.core.config import get_settings
 from backend.core.logging import get_logger
