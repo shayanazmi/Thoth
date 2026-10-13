@@ -1,0 +1,2013 @@
+{
+  "repo_name": "miroflow",
+  "full_name": "MiroMindAI/MiroFlow",
+  "default_branch": "main",
+  "repo_size_kb": 9617,
+  "description": "\ud83c\udfc6 Top-1 on 5+ benchmarks | Web UI | Supports MiroThinker, Claude, Kimi, OpenAI",
+  "tree": [
+    {
+      "path": ".env.template",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "06ff671e7a9cb18fbfa61c5f5ca9159e025c4842",
+      "size": 84,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/06ff671e7a9cb18fbfa61c5f5ca9159e025c4842"
+    },
+    {
+      "path": ".gitattributes",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3982d50d48835bb37c6eaa1c54cc042152303f5b",
+      "size": 297,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/3982d50d48835bb37c6eaa1c54cc042152303f5b"
+    },
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "11f6bd315343150ed87e48e658c170c0fe14694d",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/11f6bd315343150ed87e48e658c170c0fe14694d"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "297071d972c79764ba659d5a30f16877c96bdeca",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/297071d972c79764ba659d5a30f16877c96bdeca"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dd84ea7824f11be1eeda22377549cbc1aec7f980",
+      "size": 834,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/dd84ea7824f11be1eeda22377549cbc1aec7f980"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bbcbbe7d61558adde3cbfd0c7a63a67c27ed6d30",
+      "size": 595,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bbcbbe7d61558adde3cbfd0c7a63a67c27ed6d30"
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7975734eccf900d412867becfd77b185e7287dc1",
+      "size": 1574,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/7975734eccf900d412867becfd77b185e7287dc1"
+    },
+    {
+      "path": ".github/scripts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "27215217ec0ce0bb711ce6c62da8b06728004e6f",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/27215217ec0ce0bb711ce6c62da8b06728004e6f"
+    },
+    {
+      "path": ".github/scripts/check_pr_title.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bbcc81f6442a9cd21aec63d950b288f540fc4887",
+      "size": 2704,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bbcc81f6442a9cd21aec63d950b288f540fc4887"
+    },
+    {
+      "path": ".github/workflows",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "140812ba41e683a62df8f5ea5e28dd9e01e2bcf3",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/140812ba41e683a62df8f5ea5e28dd9e01e2bcf3"
+    },
+    {
+      "path": ".github/workflows/check-pr-title.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fca39397e0cc1f804c4158ef2b77dfb30dae13ef",
+      "size": 446,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/fca39397e0cc1f804c4158ef2b77dfb30dae13ef"
+    },
+    {
+      "path": ".github/workflows/run-ruff.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e2d6176430515fdeb51f876b9729299382724bae",
+      "size": 1353,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/e2d6176430515fdeb51f876b9729299382724bae"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8cbc94e87f7c9652c1e2eeafd71f83acf89889eb",
+      "size": 4780,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/8cbc94e87f7c9652c1e2eeafd71f83acf89889eb"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "size": 11357,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4bda2677f08c2919dd3416c1c4fa786adc5cdfad",
+      "size": 10980,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/4bda2677f08c2919dd3416c1c4fa786adc5cdfad"
+    },
+    {
+      "path": "README_ja.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ed574928231958ab53da24306423c58d698eba3b",
+      "size": 12445,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ed574928231958ab53da24306423c58d698eba3b"
+    },
+    {
+      "path": "README_zh.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a9d73f271e1ff080fc69a8551ebb83d0b3207f8f",
+      "size": 10340,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a9d73f271e1ff080fc69a8551ebb83d0b3207f8f"
+    },
+    {
+      "path": "REUSE.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a1e69bad0d90920ac174eb0bbbef8d7f54652a83",
+      "size": 695,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a1e69bad0d90920ac174eb0bbbef8d7f54652a83"
+    },
+    {
+      "path": "common_benchmark.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "16264c7af24cc0f131659941df70eeff04b5f7a3",
+      "size": 27999,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/16264c7af24cc0f131659941df70eeff04b5f7a3"
+    },
+    {
+      "path": "config",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1f1e91765dc93c6ce2857f151fd1a19cc870c8e8",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/1f1e91765dc93c6ce2857f151fd1a19cc870c8e8"
+    },
+    {
+      "path": "config/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "939100f8b4567352e176f82064d46470d52249a6",
+      "size": 516,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/939100f8b4567352e176f82064d46470d52249a6"
+    },
+    {
+      "path": "config/agent_browsecomp-en_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "baa3e156c75fb0bca74805d40d17d6522af8dbc2",
+      "size": 2321,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/baa3e156c75fb0bca74805d40d17d6522af8dbc2"
+    },
+    {
+      "path": "config/agent_browsecomp-en_mirothinker.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ffbf6deaee36ddb8e0ab2b7201e99b0c3e6c1bca",
+      "size": 1530,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ffbf6deaee36ddb8e0ab2b7201e99b0c3e6c1bca"
+    },
+    {
+      "path": "config/agent_browsecomp-zh_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "92fd3b2cda9340d9abf7c17c42ed65425b83ccce",
+      "size": 2321,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/92fd3b2cda9340d9abf7c17c42ed65425b83ccce"
+    },
+    {
+      "path": "config/agent_browsecomp-zh_mirothinker.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f3edf1350a9a9bf2ec66b968ea076ac308cca3b2",
+      "size": 1530,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/f3edf1350a9a9bf2ec66b968ea076ac308cca3b2"
+    },
+    {
+      "path": "config/agent_finsearchcomp_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "70cc22b69b3b9a16e6052df7e0bb4c48b80d389f",
+      "size": 2320,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/70cc22b69b3b9a16e6052df7e0bb4c48b80d389f"
+    },
+    {
+      "path": "config/agent_finsearchcomp_mirothinker.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df0b56cef8d131db4df66fa1c5ab9185c20ff6a4",
+      "size": 2200,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/df0b56cef8d131db4df66fa1c5ab9185c20ff6a4"
+    },
+    {
+      "path": "config/agent_gaia-test.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3bdf5629b2f0e31465449b7b9ae1e51973874d61",
+      "size": 2316,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/3bdf5629b2f0e31465449b7b9ae1e51973874d61"
+    },
+    {
+      "path": "config/agent_gaia-validation-gpt5.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f0d78f183c04674c69e06bd76775b9f9593d50cb",
+      "size": 2270,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/f0d78f183c04674c69e06bd76775b9f9593d50cb"
+    },
+    {
+      "path": "config/agent_gaia-validation-text-only.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2eea55df55802fb83225879038276b8d5c52be4a",
+      "size": 2332,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/2eea55df55802fb83225879038276b8d5c52be4a"
+    },
+    {
+      "path": "config/agent_gaia-validation-text-only_mirothinker.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a813115b1d4d452a8161476a8849e787eb514207",
+      "size": 2213,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a813115b1d4d452a8161476a8849e787eb514207"
+    },
+    {
+      "path": "config/agent_gaia-validation-text-only_mirothinker_single_agent.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b9e92e69015905a66154590d2c322c5e220c5b76",
+      "size": 1534,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b9e92e69015905a66154590d2c322c5e220c5b76"
+    },
+    {
+      "path": "config/agent_gaia-validation_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "274bca6dcb9f6529f39817f8bce7e1af391e053e",
+      "size": 2322,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/274bca6dcb9f6529f39817f8bce7e1af391e053e"
+    },
+    {
+      "path": "config/agent_gaia-validation_deepseek.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c46654935f19c49a551a7a4e1139b4a97ac9fcd4",
+      "size": 2328,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c46654935f19c49a551a7a4e1139b4a97ac9fcd4"
+    },
+    {
+      "path": "config/agent_gaia-validation_mirothinker.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "24f59dfc087485478c79ec95c8516dcae12bc89b",
+      "size": 2192,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/24f59dfc087485478c79ec95c8516dcae12bc89b"
+    },
+    {
+      "path": "config/agent_hle-text-only_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "075c7214a4e2ebf3b0b747360bd86a271afefc06",
+      "size": 2321,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/075c7214a4e2ebf3b0b747360bd86a271afefc06"
+    },
+    {
+      "path": "config/agent_hle_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9ab62f1a9f84ced3353813cf88a9ce74ac3ff5e7",
+      "size": 2311,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/9ab62f1a9f84ced3353813cf88a9ce74ac3ff5e7"
+    },
+    {
+      "path": "config/agent_llm_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "59261b7b7b20222ddac825e2a665621d5612fbc2",
+      "size": 1521,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/59261b7b7b20222ddac825e2a665621d5612fbc2"
+    },
+    {
+      "path": "config/agent_llm_claude37sonnet_anthropic.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a57851e09e29a0b03f55b4347ed9a5bf2e9c4a50",
+      "size": 1474,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a57851e09e29a0b03f55b4347ed9a5bf2e9c4a50"
+    },
+    {
+      "path": "config/agent_llm_deepseek_openrouter.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f02d1e447ad39b29f104684f279ef207be4ff5f",
+      "size": 1559,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/1f02d1e447ad39b29f104684f279ef207be4ff5f"
+    },
+    {
+      "path": "config/agent_llm_gpt4o.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a94656a22f38b4636b08d245a87191a2e7751161",
+      "size": 1401,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a94656a22f38b4636b08d245a87191a2e7751161"
+    },
+    {
+      "path": "config/agent_llm_gpt5.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5223b774b27ae973d66b0c9ff2f992f484a58616",
+      "size": 1505,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/5223b774b27ae973d66b0c9ff2f992f484a58616"
+    },
+    {
+      "path": "config/agent_llm_mirothinker.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "afc855b4edcc0b6ac04375f6d600a28ec703453b",
+      "size": 1461,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/afc855b4edcc0b6ac04375f6d600a28ec703453b"
+    },
+    {
+      "path": "config/agent_prompts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "95211c78f303cee99c07777533e0c7271054bc51",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/95211c78f303cee99c07777533e0c7271054bc51"
+    },
+    {
+      "path": "config/agent_prompts/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ee3aedd0c42dee51ab883c790482a793d6baeb4d",
+      "size": 843,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ee3aedd0c42dee51ab883c790482a793d6baeb4d"
+    },
+    {
+      "path": "config/agent_prompts/base_agent_prompt.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "889728678e1d5fd21f05ced79666776e3b16f158",
+      "size": 3856,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/889728678e1d5fd21f05ced79666776e3b16f158"
+    },
+    {
+      "path": "config/agent_prompts/main_agent_prompt_deepseek.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3231bd56245841aca8ed812dda139a5b77cfd20d",
+      "size": 10516,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/3231bd56245841aca8ed812dda139a5b77cfd20d"
+    },
+    {
+      "path": "config/agent_prompts/main_agent_prompt_gaia.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5b75e877251a1d03e6f1002c582eb7e5e907def",
+      "size": 11642,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a5b75e877251a1d03e6f1002c582eb7e5e907def"
+    },
+    {
+      "path": "config/agent_prompts/main_boxed_answer.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2340e89e13d90bea558cbbce07100397960394e0",
+      "size": 11917,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/2340e89e13d90bea558cbbce07100397960394e0"
+    },
+    {
+      "path": "config/agent_prompts/sub_worker.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f51578858e018250c31e2068d3ac7a0b5c172d5",
+      "size": 25098,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/4f51578858e018250c31e2068d3ac7a0b5c172d5"
+    },
+    {
+      "path": "config/agent_quickstart_reading.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ed3b69f6035a3974ad961e4535e96f97d107ecf8",
+      "size": 1497,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ed3b69f6035a3974ad961e4535e96f97d107ecf8"
+    },
+    {
+      "path": "config/agent_quickstart_search.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a027d2bb3b572e208b9f726c3b19080ce7d6be0e",
+      "size": 1506,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a027d2bb3b572e208b9f726c3b19080ce7d6be0e"
+    },
+    {
+      "path": "config/agent_quickstart_single_agent.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "39d70687793f9ad13b3a6b953f62a9e31ec3c270",
+      "size": 1519,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/39d70687793f9ad13b3a6b953f62a9e31ec3c270"
+    },
+    {
+      "path": "config/agent_webwalkerqa_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df76d98d06a73d690d589c96b0070f9d006f3a76",
+      "size": 1584,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/df76d98d06a73d690d589c96b0070f9d006f3a76"
+    },
+    {
+      "path": "config/agent_webwalkerqa_mirothinker.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "282e493b12288f06d433a01adedcdb60494e13ff",
+      "size": 1529,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/282e493b12288f06d433a01adedcdb60494e13ff"
+    },
+    {
+      "path": "config/agent_xbench-ds_claude37sonnet.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aeaac0865a7e662ccf2e1235b388743d536057e0",
+      "size": 2290,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/aeaac0865a7e662ccf2e1235b388743d536057e0"
+    },
+    {
+      "path": "config/benchmark",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fe30ebf88def5738a9a9c144dac36cb1bb833288",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/fe30ebf88def5738a9a9c144dac36cb1bb833288"
+    },
+    {
+      "path": "config/benchmark/browsecomp-en.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "98c32bbb91e7f491524f3f1c34db99eb7fa02cfe",
+      "size": 624,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/98c32bbb91e7f491524f3f1c34db99eb7fa02cfe"
+    },
+    {
+      "path": "config/benchmark/browsecomp-zh.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8dfb1e58c08970f9cf268bd23cd365393b7dff8f",
+      "size": 634,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/8dfb1e58c08970f9cf268bd23cd365393b7dff8f"
+    },
+    {
+      "path": "config/benchmark/default.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dbe2e41e61de7399f235f2035e23b24677592a09",
+      "size": 332,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/dbe2e41e61de7399f235f2035e23b24677592a09"
+    },
+    {
+      "path": "config/benchmark/example_dataset.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "36eee7e20f8603ecd2b90e43dcb20b3b44bfd540",
+      "size": 616,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/36eee7e20f8603ecd2b90e43dcb20b3b44bfd540"
+    },
+    {
+      "path": "config/benchmark/finsearchcomp.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0aaa8211048540ff739b345f959f9d940b88bc85",
+      "size": 612,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/0aaa8211048540ff739b345f959f9d940b88bc85"
+    },
+    {
+      "path": "config/benchmark/futurex.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "97109882a6f28d9799f2c25c856983c6a366a5f0",
+      "size": 544,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/97109882a6f28d9799f2c25c856983c6a366a5f0"
+    },
+    {
+      "path": "config/benchmark/gaia-test.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "83b37f8ba7f24b47a067872944a26c915504590b",
+      "size": 272,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/83b37f8ba7f24b47a067872944a26c915504590b"
+    },
+    {
+      "path": "config/benchmark/gaia-validation-text-only.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7b1d93021abc520b988ff444d129bb2e386dc144",
+      "size": 296,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/7b1d93021abc520b988ff444d129bb2e386dc144"
+    },
+    {
+      "path": "config/benchmark/gaia-validation.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "34b3d86916e40cb648fcdb1e630975bd966db8a6",
+      "size": 277,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/34b3d86916e40cb648fcdb1e630975bd966db8a6"
+    },
+    {
+      "path": "config/benchmark/hle-text-only.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "870e73c1dcf3fd6d8da66fe844e2c90423624b67",
+      "size": 614,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/870e73c1dcf3fd6d8da66fe844e2c90423624b67"
+    },
+    {
+      "path": "config/benchmark/hle.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1e3765c2908c54e4fd4a8e55a68517030275f5ef",
+      "size": 564,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/1e3765c2908c54e4fd4a8e55a68517030275f5ef"
+    },
+    {
+      "path": "config/benchmark/webwalkerqa.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3a7ad71c37c7d274bb7b19ebe6480b0c305f0a9c",
+      "size": 604,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/3a7ad71c37c7d274bb7b19ebe6480b0c305f0a9c"
+    },
+    {
+      "path": "config/benchmark/xbench-ds.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0721a541ea9738071f4553384cf56e6b38311e84",
+      "size": 266,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/0721a541ea9738071f4553384cf56e6b38311e84"
+    },
+    {
+      "path": "config/tool",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d26700c759eb8ea391d82349ab3bb3750e679f45",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/d26700c759eb8ea391d82349ab3bb3750e679f45"
+    },
+    {
+      "path": "config/tool/tool-audio-os.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf33f6a0c3edd1634645f637ea4675ad36e2b315",
+      "size": 260,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bf33f6a0c3edd1634645f637ea4675ad36e2b315"
+    },
+    {
+      "path": "config/tool/tool-audio.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c917e8dbe30e1d682a9b542ee01078fa37e918b9",
+      "size": 506,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c917e8dbe30e1d682a9b542ee01078fa37e918b9"
+    },
+    {
+      "path": "config/tool/tool-browsing.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c09f54ee4101848ed530a7758cab18054bed8182",
+      "size": 593,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c09f54ee4101848ed530a7758cab18054bed8182"
+    },
+    {
+      "path": "config/tool/tool-code.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5b783e9352f59429c5d375efa4ee933a9bddca07",
+      "size": 331,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/5b783e9352f59429c5d375efa4ee933a9bddca07"
+    },
+    {
+      "path": "config/tool/tool-image-video-os.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f9a61dfdfa0adb4e15692fb3921e36a3243093f1",
+      "size": 261,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/f9a61dfdfa0adb4e15692fb3921e36a3243093f1"
+    },
+    {
+      "path": "config/tool/tool-image-video.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b30a2195e062f842d352e1af7e2e01728f9f09b4",
+      "size": 938,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b30a2195e062f842d352e1af7e2e01728f9f09b4"
+    },
+    {
+      "path": "config/tool/tool-markitdown.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "76404f855be7c4361a1a5f90e7e94368068f5ea0",
+      "size": 54,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/76404f855be7c4361a1a5f90e7e94368068f5ea0"
+    },
+    {
+      "path": "config/tool/tool-reading.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ba224eb42719c234043f60b9021c747efb02a556",
+      "size": 200,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ba224eb42719c234043f60b9021c747efb02a556"
+    },
+    {
+      "path": "config/tool/tool-reasoning-os.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c845d45ee3676de03423828f9c77dff2dbab2949",
+      "size": 280,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c845d45ee3676de03423828f9c77dff2dbab2949"
+    },
+    {
+      "path": "config/tool/tool-reasoning.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ba9cc64d46c9702af073bf09df5e84425625d825",
+      "size": 693,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ba9cc64d46c9702af073bf09df5e84425625d825"
+    },
+    {
+      "path": "config/tool/tool-searching-serper.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6fa4c22156a499e2e11f560210e55f8f8782efdf",
+      "size": 228,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6fa4c22156a499e2e11f560210e55f8f8782efdf"
+    },
+    {
+      "path": "config/tool/tool-searching.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "132015b226ece2f4a4e34552636e8884844c4197",
+      "size": 454,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/132015b226ece2f4a4e34552636e8884844c4197"
+    },
+    {
+      "path": "data",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2fa09936689f6e1ec9f1e6e16189e73be57d5f79",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/2fa09936689f6e1ec9f1e6e16189e73be57d5f79"
+    },
+    {
+      "path": "data/FSI-2023-DOWNLOAD.xlsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0d468da53ee77c93678239b15e6db6f6b23cc76a",
+      "size": 26952,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/0d468da53ee77c93678239b15e6db6f6b23cc76a"
+    },
+    {
+      "path": "data/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "edaef033eca00c42c6487fc23c3859af286ab294",
+      "size": 1563,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/edaef033eca00c42c6487fc23c3859af286ab294"
+    },
+    {
+      "path": "docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0550553245d098f3071aa513ec1c446d0a686bcb",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/0550553245d098f3071aa513ec1c446d0a686bcb"
+    },
+    {
+      "path": "docs/mkdocs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0f5f22e2616b308c851b4e13601d7f74fa54b52b",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/0f5f22e2616b308c851b4e13601d7f74fa54b52b"
+    },
+    {
+      "path": "docs/mkdocs/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7009c0e5bd9b620d97fa1218cc3ddce25e1018e3",
+      "size": 982,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/7009c0e5bd9b620d97fa1218cc3ddce25e1018e3"
+    },
+    {
+      "path": "docs/mkdocs/docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "885258cd47b14cb13056a4bedd7147137386e4c6",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/885258cd47b14cb13056a4bedd7147137386e4c6"
+    },
+    {
+      "path": "docs/mkdocs/docs/all_about_agents.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2891bab134cdaddea9be4c75cb07b907b2d074e2",
+      "size": 27835,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/2891bab134cdaddea9be4c75cb07b907b2d074e2"
+    },
+    {
+      "path": "docs/mkdocs/docs/applications.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "48042c69f846e330c2a090ac2298995c1c156cb6",
+      "size": 1120,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/48042c69f846e330c2a090ac2298995c1c156cb6"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "cb1b58a887b631db7a81a73b6f6f054d1f794c74",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/cb1b58a887b631db7a81a73b6f6f054d1f794c74"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/benchmark_results.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5352cb4faabd14c6564c8e55fd874e43ad8a226e",
+      "size": 131,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/5352cb4faabd14c6564c8e55fd874e43ad8a226e"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/execution_pipeline.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "97286d4c164b5894043e1ac98ad7ac21c1a7c47c",
+      "size": 131,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/97286d4c164b5894043e1ac98ad7ac21c1a7c47c"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/futurex-09-12.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b74340ccff9ebbe4fa5a4882e347b7cfead9eba4",
+      "size": 132,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b74340ccff9ebbe4fa5a4882e347b7cfead9eba4"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/gaia_score.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "145e8cb8be14a92e305f6dac61067be54318df71",
+      "size": 131,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/145e8cb8be14a92e305f6dac61067be54318df71"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/logo.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ea384dd36db3a4ba364d0deca229c61ba0b074f1",
+      "size": 132,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ea384dd36db3a4ba364d0deca229c61ba0b074f1"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/m_logo.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "60bb7e37281ad1cf14e6bd55489bed25b237032a",
+      "size": 130,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/60bb7e37281ad1cf14e6bd55489bed25b237032a"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/miroflow-0.2-performance.avif",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0b44e3aebf9f722c2b98566572949e23ddec115a",
+      "size": 100768,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/0b44e3aebf9f722c2b98566572949e23ddec115a"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/miroflow-0.2-performance_short.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f662545f1d172910150ff6096cff0328db272a7",
+      "size": 131,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/4f662545f1d172910150ff6096cff0328db272a7"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/miroflow_architecture.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a2f0c3f01ac74660b9ab28dd413267fb93aa3d34",
+      "size": 131,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a2f0c3f01ac74660b9ab28dd413267fb93aa3d34"
+    },
+    {
+      "path": "docs/mkdocs/docs/assets/miroflow_logo.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "460843a9b2dc4278aecce34e694405ccd177a726",
+      "size": 130,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/460843a9b2dc4278aecce34e694405ccd177a726"
+    },
+    {
+      "path": "docs/mkdocs/docs/browsecomp_en.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cdde3c69aa436fea61f7c630687bb5ad391c9da3",
+      "size": 2719,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/cdde3c69aa436fea61f7c630687bb5ad391c9da3"
+    },
+    {
+      "path": "docs/mkdocs/docs/browsecomp_zh.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b9f237d5c6d05357d130723e71ac2e6623f80b74",
+      "size": 2991,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b9f237d5c6d05357d130723e71ac2e6623f80b74"
+    },
+    {
+      "path": "docs/mkdocs/docs/claude-3.7-sonnet.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d875683ecc29650e82dac205ec6866aa6465dc9e",
+      "size": 1640,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/d875683ecc29650e82dac205ec6866aa6465dc9e"
+    },
+    {
+      "path": "docs/mkdocs/docs/contribute_benchmarks.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2f09dc2152501b101f0b77a5fa6759488e78996d",
+      "size": 5868,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/2f09dc2152501b101f0b77a5fa6759488e78996d"
+    },
+    {
+      "path": "docs/mkdocs/docs/contribute_llm_clients.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6f21cf1074ff9d9ca1b7f66d2a2451511727fae0",
+      "size": 2089,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6f21cf1074ff9d9ca1b7f66d2a2451511727fae0"
+    },
+    {
+      "path": "docs/mkdocs/docs/contribute_tools.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6e3106ebe90dd78bb686ad0e5b150aee148d163a",
+      "size": 2245,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6e3106ebe90dd78bb686ad0e5b150aee148d163a"
+    },
+    {
+      "path": "docs/mkdocs/docs/contributors.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9dd9e1f034b46b106e12d5a3924c8392c8d4a9db",
+      "size": 2576,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/9dd9e1f034b46b106e12d5a3924c8392c8d4a9db"
+    },
+    {
+      "path": "docs/mkdocs/docs/core_concepts.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "742005cefa63e223f4acafe31782a16bc22f0188",
+      "size": 2415,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/742005cefa63e223f4acafe31782a16bc22f0188"
+    },
+    {
+      "path": "docs/mkdocs/docs/data.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3912ba40720796bb4604eebfd1c44efd96d509c6",
+      "size": 16589,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/3912ba40720796bb4604eebfd1c44efd96d509c6"
+    },
+    {
+      "path": "docs/mkdocs/docs/deepseek.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e0bc6410bf6f0427e7ad796546ecde3459233b89",
+      "size": 1601,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/e0bc6410bf6f0427e7ad796546ecde3459233b89"
+    },
+    {
+      "path": "docs/mkdocs/docs/download_datasets.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bd67c2b50c23c97f59a3a3c5d7c7a104b1b9402b",
+      "size": 3989,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bd67c2b50c23c97f59a3a3c5d7c7a104b1b9402b"
+    },
+    {
+      "path": "docs/mkdocs/docs/e2b_advanced_features.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c87d333c2327d51b54676bfaea4a82f575c79859",
+      "size": 6295,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c87d333c2327d51b54676bfaea4a82f575c79859"
+    },
+    {
+      "path": "docs/mkdocs/docs/evaluation_overview.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aa95f874d73bb4cb9a80f4d1ea7b5e64ee1ee715",
+      "size": 2091,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/aa95f874d73bb4cb9a80f4d1ea7b5e64ee1ee715"
+    },
+    {
+      "path": "docs/mkdocs/docs/faq_and_known_issues.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d159ae37972b60a2981d05a9c3246260d141fda3",
+      "size": 1150,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/d159ae37972b60a2981d05a9c3246260d141fda3"
+    },
+    {
+      "path": "docs/mkdocs/docs/faqs.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3c65c1cd195d28cea65fc24933fc1a3ab925db58",
+      "size": 1200,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/3c65c1cd195d28cea65fc24933fc1a3ab925db58"
+    },
+    {
+      "path": "docs/mkdocs/docs/finsearchcomp.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8d2556e446b3f8938a281921388535fab7f3cff6",
+      "size": 6728,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/8d2556e446b3f8938a281921388535fab7f3cff6"
+    },
+    {
+      "path": "docs/mkdocs/docs/futurex.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "97a3da08071799ad28be37b14f524bc0e2f628e1",
+      "size": 9334,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/97a3da08071799ad28be37b14f524bc0e2f628e1"
+    },
+    {
+      "path": "docs/mkdocs/docs/gaia_test.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ae5d593193ffaa98554d92435aecae1b85006d2c",
+      "size": 2475,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ae5d593193ffaa98554d92435aecae1b85006d2c"
+    },
+    {
+      "path": "docs/mkdocs/docs/gaia_validation_claude37sonnet.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c1db1a85887ea1928178c1b54be30a1f1d37ddb4",
+      "size": 3473,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c1db1a85887ea1928178c1b54be30a1f1d37ddb4"
+    },
+    {
+      "path": "docs/mkdocs/docs/gaia_validation_gpt5.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1607e477334dbbcbc800a428d34bd874132ea8ef",
+      "size": 1766,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/1607e477334dbbcbc800a428d34bd874132ea8ef"
+    },
+    {
+      "path": "docs/mkdocs/docs/gaia_validation_mirothinker.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "959cdc44aec191359e610195437eca52a5c1ed07",
+      "size": 2578,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/959cdc44aec191359e610195437eca52a5c1ed07"
+    },
+    {
+      "path": "docs/mkdocs/docs/gaia_validation_prerequisites.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "09f1396a81d949ada7b06c946e5b41ede4aadecb",
+      "size": 2756,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/09f1396a81d949ada7b06c946e5b41ede4aadecb"
+    },
+    {
+      "path": "docs/mkdocs/docs/gaia_validation_text_only.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d19f2a08de61425eeee9457b88bb4955c7b4286c",
+      "size": 3555,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/d19f2a08de61425eeee9457b88bb4955c7b4286c"
+    },
+    {
+      "path": "docs/mkdocs/docs/hle.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "664e0c2a1f952c697d322898da70b9f326979df9",
+      "size": 2659,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/664e0c2a1f952c697d322898da70b9f326979df9"
+    },
+    {
+      "path": "docs/mkdocs/docs/hle_text_only.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ddf17526e8e041769774eac9cba44dc1b59d8890",
+      "size": 2593,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ddf17526e8e041769774eac9cba44dc1b59d8890"
+    },
+    {
+      "path": "docs/mkdocs/docs/index.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "34cd130a73ad21a971b0891418cfefc75d1107b1",
+      "size": 3751,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/34cd130a73ad21a971b0891418cfefc75d1107b1"
+    },
+    {
+      "path": "docs/mkdocs/docs/license.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2c4c61cbc034ae616a600fc20c27aa78071309c0",
+      "size": 1658,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/2c4c61cbc034ae616a600fc20c27aa78071309c0"
+    },
+    {
+      "path": "docs/mkdocs/docs/llm_clients_overview.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "08f3064d92ae75b3d6bcb347438efed639a5679f",
+      "size": 1476,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/08f3064d92ae75b3d6bcb347438efed639a5679f"
+    },
+    {
+      "path": "docs/mkdocs/docs/miro_api.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d01e477e5a6c5ba22693d86dbf5c5489fb0df71b",
+      "size": 828,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/d01e477e5a6c5ba22693d86dbf5c5489fb0df71b"
+    },
+    {
+      "path": "docs/mkdocs/docs/mirothinker.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ec284eaca4c5df0e227eaa3d18a01be32e51a8f9",
+      "size": 3182,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ec284eaca4c5df0e227eaa3d18a01be32e51a8f9"
+    },
+    {
+      "path": "docs/mkdocs/docs/openai-gpt4o.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4bc59bba74205d7931b17401a5fbdcdd875d3271",
+      "size": 1496,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/4bc59bba74205d7931b17401a5fbdcdd875d3271"
+    },
+    {
+      "path": "docs/mkdocs/docs/openai-gpt5.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4409a7e75b28192d80b8b31c98443fcc00993777",
+      "size": 1581,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/4409a7e75b28192d80b8b31c98443fcc00993777"
+    },
+    {
+      "path": "docs/mkdocs/docs/openrouter-claude-3.7-sonnet.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "83c3ddf4524a253a07ffa4888a5f4a8b3b7da0e8",
+      "size": 1551,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/83c3ddf4524a253a07ffa4888a5f4a8b3b7da0e8"
+    },
+    {
+      "path": "docs/mkdocs/docs/prerequisite.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ba8d5f97cf6ce714ff21d915d0d2accd0ae98d7d",
+      "size": 5131,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ba8d5f97cf6ce714ff21d915d0d2accd0ae98d7d"
+    },
+    {
+      "path": "docs/mkdocs/docs/quickstart.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8f502b70b18ffb91b47ad2040018b2bbf7ce5af1",
+      "size": 4937,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/8f502b70b18ffb91b47ad2040018b2bbf7ce5af1"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_audio.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8321e215e60de245bbeb66d010426ab4f154c1f9",
+      "size": 2016,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/8321e215e60de245bbeb66d010426ab4f154c1f9"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_audio_os.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e803846893681c586ed5cf4e2203435810251498",
+      "size": 4347,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/e803846893681c586ed5cf4e2203435810251498"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_overview.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5f8d494fafdba27be9045683238c5b30d00a6237",
+      "size": 997,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/5f8d494fafdba27be9045683238c5b30d00a6237"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_python.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6198e7078c291a7c3776579a406ba5570adc3fa0",
+      "size": 4089,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6198e7078c291a7c3776579a406ba5570adc3fa0"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_reading.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "41d3123e4412983df074de8afe53015332419685",
+      "size": 1638,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/41d3123e4412983df074de8afe53015332419685"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_reasoning.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6aa65ca5f862256d9b873a85e7099bf68c9545e7",
+      "size": 2426,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6aa65ca5f862256d9b873a85e7099bf68c9545e7"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_reasoning_os.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6d34aca9f0de095f2ccf82314de1c2db4ddd0f31",
+      "size": 4697,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6d34aca9f0de095f2ccf82314de1c2db4ddd0f31"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_searching.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cc22c86e5deeabd7874318b37352037b91b3d8b2",
+      "size": 5338,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/cc22c86e5deeabd7874318b37352037b91b3d8b2"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_searching_serper.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "98043b68e2977c6599fc22734c2922328c2deba5",
+      "size": 2162,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/98043b68e2977c6599fc22734c2922328c2deba5"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_vqa.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f88b35a8d83fa9e937568b9e5b5f23fb1d66d3cb",
+      "size": 3763,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/f88b35a8d83fa9e937568b9e5b5f23fb1d66d3cb"
+    },
+    {
+      "path": "docs/mkdocs/docs/tool_vqa_os.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d308bbc7d1f50afd96b76374a5bf2a0c03418f94",
+      "size": 4649,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/d308bbc7d1f50afd96b76374a5bf2a0c03418f94"
+    },
+    {
+      "path": "docs/mkdocs/docs/webwalkerqa.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "020c3bdf8d894a974211208b0e0745ce8f9905e8",
+      "size": 3854,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/020c3bdf8d894a974211208b0e0745ce8f9905e8"
+    },
+    {
+      "path": "docs/mkdocs/docs/xbench_ds.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c1f9bf7d8b77e359b0375313bb0cfa673c1fc815",
+      "size": 4404,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c1f9bf7d8b77e359b0375313bb0cfa673c1fc815"
+    },
+    {
+      "path": "docs/mkdocs/docs/yaml_config.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "693cde80631f2c7a29b094b183efc87cd562839d",
+      "size": 4667,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/693cde80631f2c7a29b094b183efc87cd562839d"
+    },
+    {
+      "path": "docs/mkdocs/mkdocs.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "429393d389b605916eefce4f2bf0f4890a36c631",
+      "size": 3074,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/429393d389b605916eefce4f2bf0f4890a36c631"
+    },
+    {
+      "path": "main.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eaa5d81ed515503a1aed41cbf0af3577d9d6fb14",
+      "size": 1383,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/eaa5d81ed515503a1aed41cbf0af3577d9d6fb14"
+    },
+    {
+      "path": "pyproject.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "255970459a6630fd0cd3790c68a7c152eddc6107",
+      "size": 873,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/255970459a6630fd0cd3790c68a7c152eddc6107"
+    },
+    {
+      "path": "scripts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "404819e983a6cdaa51a785c8dcf7dbc46bf20fc2",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/404819e983a6cdaa51a785c8dcf7dbc46bf20fc2"
+    },
+    {
+      "path": "scripts/archived",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b02ac5bf24d36c41d4138c0775ef47657fad057b",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/b02ac5bf24d36c41d4138c0775ef47657fad057b"
+    },
+    {
+      "path": "scripts/archived/run_evaluate_multiple_runs_browsecomp-zh.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac0591306a9293205250838a28ebb2db05c0c7f4",
+      "size": 2812,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ac0591306a9293205250838a28ebb2db05c0c7f4"
+    },
+    {
+      "path": "scripts/archived/run_evaluate_multiple_runs_browsecomp.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "83b1205a4dbf85ceeeaf960e86bfdb5169ee74b5",
+      "size": 2810,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/83b1205a4dbf85ceeeaf960e86bfdb5169ee74b5"
+    },
+    {
+      "path": "scripts/archived/run_evaluate_multiple_runs_gaia-test.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "23a27c48cb41c4c1580216561d3ce8fee2fb8c92",
+      "size": 2809,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/23a27c48cb41c4c1580216561d3ce8fee2fb8c92"
+    },
+    {
+      "path": "scripts/archived/run_evaluate_multiple_runs_gaia-validation.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2bbf0b33682c03e2b8447c7609268a14dde65a21",
+      "size": 2815,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/2bbf0b33682c03e2b8447c7609268a14dde65a21"
+    },
+    {
+      "path": "scripts/archived/run_evaluate_multiple_runs_hle.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3ceb6b96a802aef683ec69e3bb70367091889f33",
+      "size": 2803,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/3ceb6b96a802aef683ec69e3bb70367091889f33"
+    },
+    {
+      "path": "scripts/archived/run_evaluate_multiple_runs_nohintreason_hle.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df463989f592d41433b0e4bb80ede1eb415cd56a",
+      "size": 2816,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/df463989f592d41433b0e4bb80ede1eb415cd56a"
+    },
+    {
+      "path": "scripts/archived/run_evaluate_multiple_runs_nosandbox_gaia-validation.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9b40257ee574e9fc3e546a28622bdc51138d2c46",
+      "size": 2822,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/9b40257ee574e9fc3e546a28622bdc51138d2c46"
+    },
+    {
+      "path": "scripts/run_evaluate_multiple_runs_finsearchcomp.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "b6d65aa9feb9885ea744ebc3db1537e367e45daf",
+      "size": 3773,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b6d65aa9feb9885ea744ebc3db1537e367e45daf"
+    },
+    {
+      "path": "scripts/run_evaluate_multiple_runs_futurex.sh",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "ce54e1bf99eedb9df6d6d36f123f6445086fd1a8",
+      "size": 4449,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ce54e1bf99eedb9df6d6d36f123f6445086fd1a8"
+    },
+    {
+      "path": "scripts/run_evaluate_multiple_runs_mirothinker_gaia-validation-text-only.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0cc11fb1c786b90d24539540ee3ed65961b33033",
+      "size": 2089,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/0cc11fb1c786b90d24539540ee3ed65961b33033"
+    },
+    {
+      "path": "scripts/run_evaluate_multiple_runs_mirothinker_gaia-validation.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6037c87554611c00bd0fa22bc5b5d484c1534f75",
+      "size": 2067,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6037c87554611c00bd0fa22bc5b5d484c1534f75"
+    },
+    {
+      "path": "scripts/run_evaluate_multiple_runs_xbench-ds.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bd166f7bc12f3ef68e46b6fffd6ff6080fe1d926",
+      "size": 2721,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bd166f7bc12f3ef68e46b6fffd6ff6080fe1d926"
+    },
+    {
+      "path": "scripts/run_prepare_benchmark.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0411b011e0bfea6b96beb48121b4acf146c73bca",
+      "size": 987,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/0411b011e0bfea6b96beb48121b4acf146c73bca"
+    },
+    {
+      "path": "src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "83feb87323846bef419836595bacc58c12d3579c",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/83feb87323846bef419836595bacc58c12d3579c"
+    },
+    {
+      "path": "src/core",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8ae7d46e1ffbf425efc2378fba6813a173d7228c",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/8ae7d46e1ffbf425efc2378fba6813a173d7228c"
+    },
+    {
+      "path": "src/core/orchestrator.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "854b6832cb081ec0f9470c51099cb81884dab8b6",
+      "size": 48670,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/854b6832cb081ec0f9470c51099cb81884dab8b6"
+    },
+    {
+      "path": "src/core/pipeline.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6f2efe04ece5f7dacc3d48f20873a4034b6c9701",
+      "size": 7132,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6f2efe04ece5f7dacc3d48f20873a4034b6c9701"
+    },
+    {
+      "path": "src/llm",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b0c567ac432f69c0935794ea456be357535d0874",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/b0c567ac432f69c0935794ea456be357535d0874"
+    },
+    {
+      "path": "src/llm/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb9be5f0665161cd51998bf54765388a5eeba00d",
+      "size": 82,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bb9be5f0665161cd51998bf54765388a5eeba00d"
+    },
+    {
+      "path": "src/llm/client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7009951366cdecc4455297ea8ed5b2cdbcef8acb",
+      "size": 2122,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/7009951366cdecc4455297ea8ed5b2cdbcef8acb"
+    },
+    {
+      "path": "src/llm/provider_client_base.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8aeb72c3ba57a4cfa75cb78c07ac8c78c76a6f4",
+      "size": 15429,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a8aeb72c3ba57a4cfa75cb78c07ac8c78c76a6f4"
+    },
+    {
+      "path": "src/llm/providers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "73bc00560d8d45fda252a5d1b5184c991b0edf36",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/73bc00560d8d45fda252a5d1b5184c991b0edf36"
+    },
+    {
+      "path": "src/llm/providers/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ee3aedd0c42dee51ab883c790482a793d6baeb4d",
+      "size": 843,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ee3aedd0c42dee51ab883c790482a793d6baeb4d"
+    },
+    {
+      "path": "src/llm/providers/archived",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "11c9d256fcbf3fba9052a7c4a0616533946a25d5",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/11c9d256fcbf3fba9052a7c4a0616533946a25d5"
+    },
+    {
+      "path": "src/llm/providers/archived/claude_newapi_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "72814465914c5fbfa70c1a80841e6befd17cc46c",
+      "size": 8879,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/72814465914c5fbfa70c1a80841e6befd17cc46c"
+    },
+    {
+      "path": "src/llm/providers/archived/deepseek_newapi_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b8bf916af16ac6f8e16c46d234c3a411c8db50e0",
+      "size": 8770,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b8bf916af16ac6f8e16c46d234c3a411c8db50e0"
+    },
+    {
+      "path": "src/llm/providers/archived/gpt_openai_response_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "64be17e78f5f44eaaf931c68647066f6f3bc7a02",
+      "size": 11362,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/64be17e78f5f44eaaf931c68647066f6f3bc7a02"
+    },
+    {
+      "path": "src/llm/providers/archived/qwen_sglang_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bd365238f3742a89aee6cf7dc2503bd79666f85c",
+      "size": 6448,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bd365238f3742a89aee6cf7dc2503bd79666f85c"
+    },
+    {
+      "path": "src/llm/providers/claude_anthropic_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eecbcbf344ffed780eb653c03cf7056d252fc9e6",
+      "size": 9689,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/eecbcbf344ffed780eb653c03cf7056d252fc9e6"
+    },
+    {
+      "path": "src/llm/providers/claude_openrouter_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8935cc1a9fb05115cecb69779e72746387928573",
+      "size": 16867,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/8935cc1a9fb05115cecb69779e72746387928573"
+    },
+    {
+      "path": "src/llm/providers/deepseek_openrouter_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "052a56dd5234314f802abb755e3fa1bc8d95fa99",
+      "size": 18603,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/052a56dd5234314f802abb755e3fa1bc8d95fa99"
+    },
+    {
+      "path": "src/llm/providers/gpt5_openai_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0c378ab16b3c8d2acac81d3da55fe1f9b8022490",
+      "size": 16715,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/0c378ab16b3c8d2acac81d3da55fe1f9b8022490"
+    },
+    {
+      "path": "src/llm/providers/gpt_openai_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ee9657fd222d7e014ebbeee45319becb9e3ee49",
+      "size": 10606,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/4ee9657fd222d7e014ebbeee45319becb9e3ee49"
+    },
+    {
+      "path": "src/llm/providers/mirothinker_sglang_client.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a4dcca0f9058c1bb062e43bcfb3b702031289046",
+      "size": 13090,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a4dcca0f9058c1bb062e43bcfb3b702031289046"
+    },
+    {
+      "path": "src/llm/util.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b8dedb2df7269608cf36e4411971eb3c52245c30",
+      "size": 767,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b8dedb2df7269608cf36e4411971eb3c52245c30"
+    },
+    {
+      "path": "src/logging",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "df1b3f0ce51692f62bc4fc8ce4243020235313c8",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/df1b3f0ce51692f62bc4fc8ce4243020235313c8"
+    },
+    {
+      "path": "src/logging/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb9be5f0665161cd51998bf54765388a5eeba00d",
+      "size": 82,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bb9be5f0665161cd51998bf54765388a5eeba00d"
+    },
+    {
+      "path": "src/logging/logger.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ae95f9dc5df079e427c5ea9dd8f7fada4cc624da",
+      "size": 9331,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/ae95f9dc5df079e427c5ea9dd8f7fada4cc624da"
+    },
+    {
+      "path": "src/logging/task_tracer.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6a561fe51ddfc217584d1179d11352e42a31ccb5",
+      "size": 4035,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6a561fe51ddfc217584d1179d11352e42a31ccb5"
+    },
+    {
+      "path": "src/py.typed",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "src/tool",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2a9df51a5a18e7487f8656cf1dc265f15d3edbe4",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/2a9df51a5a18e7487f8656cf1dc265f15d3edbe4"
+    },
+    {
+      "path": "src/tool/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb9be5f0665161cd51998bf54765388a5eeba00d",
+      "size": 82,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bb9be5f0665161cd51998bf54765388a5eeba00d"
+    },
+    {
+      "path": "src/tool/manager.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2d542c23aefb6aacd50c3cecd666a59685e243ae",
+      "size": 25057,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/2d542c23aefb6aacd50c3cecd666a59685e243ae"
+    },
+    {
+      "path": "src/tool/mcp_servers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2f95b3eb30325d4371c178123c7e940e7689afe3",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/2f95b3eb30325d4371c178123c7e940e7689afe3"
+    },
+    {
+      "path": "src/tool/mcp_servers/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb9be5f0665161cd51998bf54765388a5eeba00d",
+      "size": 82,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bb9be5f0665161cd51998bf54765388a5eeba00d"
+    },
+    {
+      "path": "src/tool/mcp_servers/audio_mcp_server.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "b0f948bcb5e622df1ff63edeb73136099427478d",
+      "size": 12104,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b0f948bcb5e622df1ff63edeb73136099427478d"
+    },
+    {
+      "path": "src/tool/mcp_servers/audio_mcp_server_os.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0ad6de2d479884cf94415b506e08945f632d2447",
+      "size": 8259,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/0ad6de2d479884cf94415b506e08945f632d2447"
+    },
+    {
+      "path": "src/tool/mcp_servers/browser_session.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "c6b6f27bbe147cb810e99aa46f7ccdad55d09abd",
+      "size": 3383,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c6b6f27bbe147cb810e99aa46f7ccdad55d09abd"
+    },
+    {
+      "path": "src/tool/mcp_servers/miroapi_serper_mcp_server.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "95fd25b131881f8f648492a6d8aabb2064cbac28",
+      "size": 5238,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/95fd25b131881f8f648492a6d8aabb2064cbac28"
+    },
+    {
+      "path": "src/tool/mcp_servers/python_server.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "dbaaa5ea97dc52623cd13355a4e0e9d811414269",
+      "size": 19332,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/dbaaa5ea97dc52623cd13355a4e0e9d811414269"
+    },
+    {
+      "path": "src/tool/mcp_servers/reading_mcp_server.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5e70fa155fa033f74570a13ba197555a93e7327e",
+      "size": 6273,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/5e70fa155fa033f74570a13ba197555a93e7327e"
+    },
+    {
+      "path": "src/tool/mcp_servers/reasoning_mcp_server.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "6411ceac318b8a8d08017e309b450e9ea4d04308",
+      "size": 4839,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/6411ceac318b8a8d08017e309b450e9ea4d04308"
+    },
+    {
+      "path": "src/tool/mcp_servers/reasoning_mcp_server_os.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "22e90f9c68a0473de8b1dcf20049cbfec2ee6316",
+      "size": 3610,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/22e90f9c68a0473de8b1dcf20049cbfec2ee6316"
+    },
+    {
+      "path": "src/tool/mcp_servers/searching_mcp_server.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4187e4a1d8c8990be7efa69950987eb5e1121fe9",
+      "size": 26629,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/4187e4a1d8c8990be7efa69950987eb5e1121fe9"
+    },
+    {
+      "path": "src/tool/mcp_servers/utils",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1d002e634a27c760318c336c172b7c3949f0ddbf",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/1d002e634a27c760318c336c172b7c3949f0ddbf"
+    },
+    {
+      "path": "src/tool/mcp_servers/utils/smart_request.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "728856a776a74b413f555515a8cd801ed37efaba",
+      "size": 8169,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/728856a776a74b413f555515a8cd801ed37efaba"
+    },
+    {
+      "path": "src/tool/mcp_servers/utils/url_unquote.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c6cdb31fa853052b24511240b30ddc38047bd25d",
+      "size": 3392,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c6cdb31fa853052b24511240b30ddc38047bd25d"
+    },
+    {
+      "path": "src/tool/mcp_servers/vision_mcp_server.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "a60a4e3a5c9bb8470cc08f4eb68f92700cfc653f",
+      "size": 24498,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a60a4e3a5c9bb8470cc08f4eb68f92700cfc653f"
+    },
+    {
+      "path": "src/tool/mcp_servers/vision_mcp_server_os.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f9eb6ea823752436c270895cd3a98e480c5b5c45",
+      "size": 4262,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/f9eb6ea823752436c270895cd3a98e480c5b5c45"
+    },
+    {
+      "path": "src/utils",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "77c5097ea7f89c9ff8715c71d7f08f0983644f9e",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/77c5097ea7f89c9ff8715c71d7f08f0983644f9e"
+    },
+    {
+      "path": "src/utils/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb9be5f0665161cd51998bf54765388a5eeba00d",
+      "size": 82,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/bb9be5f0665161cd51998bf54765388a5eeba00d"
+    },
+    {
+      "path": "src/utils/io_utils.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "44a493940dcf118c99a83fb21ec2796ac58b2ac5",
+      "size": 6666,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/44a493940dcf118c99a83fb21ec2796ac58b2ac5"
+    },
+    {
+      "path": "src/utils/parsing_utils.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "027319f76f5f19b5203b212701af37546289fe1a",
+      "size": 39607,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/027319f76f5f19b5203b212701af37546289fe1a"
+    },
+    {
+      "path": "src/utils/summary_utils.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e68a39ff4827eed70451191be52fd1ca632c2f0c",
+      "size": 29136,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/e68a39ff4827eed70451191be52fd1ca632c2f0c"
+    },
+    {
+      "path": "src/utils/tool_utils.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5333883a70e79b6e3b7614e0e922032b6042764",
+      "size": 3635,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/d5333883a70e79b6e3b7614e0e922032b6042764"
+    },
+    {
+      "path": "utils",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0ad1875d48769a112ae3fd06ef0b781e33664e36",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/0ad1875d48769a112ae3fd06ef0b781e33664e36"
+    },
+    {
+      "path": "utils/calculate_average_score.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "d5d8320546f7dbb1dfab599b947e8a7657c3673e",
+      "size": 4180,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/d5d8320546f7dbb1dfab599b947e8a7657c3673e"
+    },
+    {
+      "path": "utils/calculate_score_from_log.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "cf9a37d5827a0d63913c27afed867a19163929bf",
+      "size": 2769,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/cf9a37d5827a0d63913c27afed867a19163929bf"
+    },
+    {
+      "path": "utils/eval_answer_from_log.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fc239b1f66e532feb63704a714297b95f8bd5fd9",
+      "size": 2533,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/fc239b1f66e532feb63704a714297b95f8bd5fd9"
+    },
+    {
+      "path": "utils/eval_utils.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "de7e799e9d5b055730aa20a2e4fbdeb157a5bd21",
+      "size": 22357,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/de7e799e9d5b055730aa20a2e4fbdeb157a5bd21"
+    },
+    {
+      "path": "utils/extract_futurex_results.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b133a10e401127945b553230561608885a936332",
+      "size": 11182,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/b133a10e401127945b553230561608885a936332"
+    },
+    {
+      "path": "utils/prepare_benchmark",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d2a045a02d026dc29fc045ed164dad4ca9cf7f17",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/d2a045a02d026dc29fc045ed164dad4ca9cf7f17"
+    },
+    {
+      "path": "utils/prepare_benchmark/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "utils/prepare_benchmark/__init__.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "size": 0,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "utils/prepare_benchmark/common.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c456f01231ff0a4d944d3c4b8ac1a837201b4bcf",
+      "size": 644,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c456f01231ff0a4d944d3c4b8ac1a837201b4bcf"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_browsecomp.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c83a62bc1df874914c2ef3fb1aea539deb228a17",
+      "size": 2464,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c83a62bc1df874914c2ef3fb1aea539deb228a17"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_finsearchcomp.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "139389b82e087d234935131593ebba493e7a736b",
+      "size": 2500,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/139389b82e087d234935131593ebba493e7a736b"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_frames.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fd048d2ed1931c57a8621493b538034c019f0418",
+      "size": 822,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/fd048d2ed1931c57a8621493b538034c019f0418"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_futurex.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a93b7591341d60aaa9fa8ee5201c86f320bb7edd",
+      "size": 1695,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a93b7591341d60aaa9fa8ee5201c86f320bb7edd"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_gaia.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7aa83bbec648e4852ddc25a14c4e5481b377c6fa",
+      "size": 1143,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/7aa83bbec648e4852ddc25a14c4e5481b377c6fa"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_gaia_text_only.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a4f0ef0aad48c05f541af6d53939e070c27758c0",
+      "size": 961,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a4f0ef0aad48c05f541af6d53939e070c27758c0"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_hle.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "79da8fda12bdd0448fbf6a21cd2428d15ac22010",
+      "size": 2904,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/79da8fda12bdd0448fbf6a21cd2428d15ac22010"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_hle_text_only.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "263d1d3b7ca662b0a73e74e592f121d9125b92ec",
+      "size": 875,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/263d1d3b7ca662b0a73e74e592f121d9125b92ec"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_webwalkerqa.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a12386c413e2f32f094dad6417e28f2d2658fa33",
+      "size": 876,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/a12386c413e2f32f094dad6417e28f2d2658fa33"
+    },
+    {
+      "path": "utils/prepare_benchmark/gen_xbench_ds.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "35b099e553073622c68906605b019b7ee2688625",
+      "size": 1362,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/35b099e553073622c68906605b019b7ee2688625"
+    },
+    {
+      "path": "utils/prepare_benchmark/main.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1af6b9fdb07f100ba7d58448e20a820365c7c656",
+      "size": 4984,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/1af6b9fdb07f100ba7d58448e20a820365c7c656"
+    },
+    {
+      "path": "utils/progress_check",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2ab9c6d3d1f0ab1427fe9b74409aa249fbf90096",
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/trees/2ab9c6d3d1f0ab1427fe9b74409aa249fbf90096"
+    },
+    {
+      "path": "utils/progress_check/check_finsearchcomp_progress.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "110458259d749ef59d1d755adf5a1fec4570ae11",
+      "size": 13281,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/110458259d749ef59d1d755adf5a1fec4570ae11"
+    },
+    {
+      "path": "utils/progress_check/check_futurex_progress.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cc3c02c7ffe7440e7e0a7088f778e51a6f89bcc3",
+      "size": 7739,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/cc3c02c7ffe7440e7e0a7088f778e51a6f89bcc3"
+    },
+    {
+      "path": "utils/progress_check/check_gaia_progress.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c81e5df8e87ee6ffe63a08fcba3c1c31fb2c9de",
+      "size": 5698,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/5c81e5df8e87ee6ffe63a08fcba3c1c31fb2c9de"
+    },
+    {
+      "path": "utils/progress_check/check_xbench_progress.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "763751205ccef01183a28f4375fdc150813c3c5b",
+      "size": 7790,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/763751205ccef01183a28f4375fdc150813c3c5b"
+    },
+    {
+      "path": "utils/trace_single_task.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8626e868efa59d8703ecd3411dc3c0e3d94c495d",
+      "size": 2603,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/8626e868efa59d8703ecd3411dc3c0e3d94c495d"
+    },
+    {
+      "path": "utils/util_aggregate_results_xlsx.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "32df656fd8564373aa81de282f2940d3f6064495",
+      "size": 16863,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/32df656fd8564373aa81de282f2940d3f6064495"
+    },
+    {
+      "path": "utils/util_llm_parallel_thinking.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c7113e6ae17244d6c1fb0ec885e6e929325b4b75",
+      "size": 27162,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/c7113e6ae17244d6c1fb0ec885e6e929325b4b75"
+    },
+    {
+      "path": "utils/util_llm_simple_voting.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "795864d0973af749befdfaf08935a35a92f5388c",
+      "size": 16498,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/795864d0973af749befdfaf08935a35a92f5388c"
+    },
+    {
+      "path": "utils/util_statistics_hle_text_only.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7f2230eb8242d08905af5d778073677490a91f25",
+      "size": 3319,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/7f2230eb8242d08905af5d778073677490a91f25"
+    },
+    {
+      "path": "uv.lock",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "51cca8325698d80d460c54cdbcb2a5cb7f0c3d6c",
+      "size": 384264,
+      "url": "https://api.github.com/repos/MiroMindAI/MiroFlow/git/blobs/51cca8325698d80d460c54cdbcb2a5cb7f0c3d6c"
+    }
+  ]
+}

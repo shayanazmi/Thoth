@@ -1,0 +1,213 @@
+"""Centralized configuration for Open Deep Research.
+
+Loads settings from odr-config.json with fallback to defaults.
+Auto-creates odr-config.json from odr-config.example.json on first run.
+"""
+
+import json
+import copy
+import shutil
+from pathlib import Path
+
+CONFIG_DIR = Path(__file__).parent
+CONFIG_PATH = CONFIG_DIR / "odr-config.json"
+EXAMPLE_PATH = CONFIG_DIR / "odr-config.example.json"
+
+DEFAULTS = {
+    "agent": {
+        "search_agent_max_steps": 20,
+        "manager_agent_max_steps": 12,
+        "planning_interval": 4,
+        "verbosity_level": 2,
+    },
+    "model": {
+        "providers": [
+            {"provider": "openai", "api_key": "", "base_url": ""},
+            {"provider": "deepseek", "api_key": "", "base_url": ""},
+            {"provider": "anthropic", "api_key": "", "base_url": ""},
+        ],
+        "default_model_id": "o1",
+        "max_completion_tokens": 32768,
+        "reasoning_effort": "high",
+        "retry_max_attempts": 5,
+        "retry_wait_seconds": 30,
+    },
+    "search": {
+        # Order matters: first provider is primary, rest are tried as fallbacks in list order.
+        "providers": [
+            {"provider": "DDGS", "key": ""},
+            {"provider": "TAVILY", "key": ""},
+            {"provider": "SERPAPI", "key": ""},
+            {"provider": "META_SOTA", "key": ""},
+            {"provider": "BOCHA", "key": ""},
+        ],
+        "max_results": 10,
+    },
+    "browser": {
+        "viewport_size": 5120,
+        "request_timeout": 300,
+    },
+    "limits": {
+        "text_limit": 100000,
+        "max_field_length": 50000,
+    },
+    "compaction": {
+        # Two-layer LLM-based observation compaction. See scripts/compaction.py.
+        # Token counts use tiktoken (cl100k_base fallback for non-OpenAI models).
+        "enabled": True,
+        # null = use the agent's main model. Override to a cheaper model id
+        # (e.g. "deepseek-chat") to reduce summarization cost/latency.
+        "summarizer_model_id": None,
+        # Layer 1: per-step summary
+        "summary_threshold_tokens": 1000,
+        "summary_max_tokens": 600,
+        "summary_input_cap_tokens": 6000,
+        # Layer 2: plan-boundary gap consolidation
+        "plan_keep_back": 3,
+        "gap_summary_max_tokens": 500,
+        # On compaction LLM failure, retry this many times before falling back
+        # to head+tail truncation. Default 10 mirrors Claude Code's budget.
+        "max_retries": 10,
+        # Layer 3: context-budget trimmer (hard overflow fuse) + source ledger.
+        # All limits below are default + floor, never a hard ceiling.
+        "l3_enabled": True,
+        # Trigger trimming when API input_tokens > model_context_window - reserve.
+        "context_reserve_tokens": 20000,
+        # Fallback window for models not in model_routing._MODEL_INFO.
+        "default_context_window": 128000,
+        # Hysteresis: when trimming fires, cut down to (budget - this) so it fires
+        # rarely (minimizing prefix-cache churn).
+        "trim_headroom_tokens": 40000,
+        # Most-recent steps never trimmed (keep recent findings + full URLs intact).
+        "keep_last_k": 4,
+        # Head/tail target size for an old observation after its URLs are harvested.
+        "l3_observation_max_tokens": 300,
+        # Per-step URL extraction cap during harvest (raises the old hardcoded 30).
+        "ledger_harvest_cap": 50,
+        # Soft cap on rendered ledger entries; referenced [S#] are never evicted.
+        "ledger_max_entries": 200,
+        # Token cap on the rendered ledger block (titles dropped, then truncated).
+        "ledger_render_max_tokens": 4000,
+    },
+    "resume": {
+        # Warm-restart resume. Prior findings from an interrupted session are
+        # reconstructed, URL-harvested into a source ledger, LLM-summarized (reusing
+        # compaction.summarizer_model_id), and injected into a fresh run. See
+        # build_resume_context in run.py. All limits are default + floor, never a
+        # hard ceiling; token counts use tiktoken.
+        # Below this many tokens, inject the reconstructed findings raw and skip the
+        # summarizer call entirely — a small session needs no compression.
+        "summarize_threshold_tokens": 4000,
+        # Reserve subtracted from the SUMMARIZER model's window when trimming the
+        # raw findings to fit as summarizer input (keeps the summarize call itself
+        # from overflowing). Summary output length is the model's own max_output.
+        "summarizer_input_reserve_tokens": 20000,
+        # Reserve subtracted from the RESUMED model's window to bound the injected
+        # context, leaving room for continued research + the final report.
+        "inject_reserve_tokens": 40000,
+    },
+    "other_keys": {
+        "hf_token": "",
+    },
+    "models": [
+        {"id": "o1", "name": "OpenAI o1", "description": "Advanced reasoning model"},
+        {
+            "id": "gpt-4-turbo",
+            "name": "GPT-4 Turbo",
+            "description": "Fast and powerful",
+        },
+        {
+            "id": "gpt-4.1-mini",
+            "name": "GPT-4.1 Mini",
+            "description": "Lightweight and efficient",
+        },
+        {
+            "id": "gpt-4.1-nano",
+            "name": "GPT-4.1 Nano",
+            "description": "Ultra-lightweight model",
+        },
+        {
+            "id": "gpt-4o-mini",
+            "name": "GPT-4o Mini",
+            "description": "Efficient and cost-effective",
+        },
+        {
+            "id": "deepseek/deepseek-chat",
+            "name": "DeepSeek Chat",
+            "description": "Fast chat model from DeepSeek",
+        },
+        {
+            "id": "deepseek/deepseek-reasoner",
+            "name": "DeepSeek Reasoner",
+            "description": "Reasoning model from DeepSeek",
+        },
+        {
+            "id": "ollama/mistral",
+            "name": "Ollama Mistral",
+            "description": "Local model",
+        },
+        {
+            "id": "claude-sonnet-4-20250514",
+            "name": "Claude Sonnet 4",
+            "description": "Anthropic model",
+        },
+        {
+            "id": "claude-3-5-haiku-20241022",
+            "name": "Claude 3.5 Haiku",
+            "description": "Fast Anthropic model",
+        },
+    ],
+}
+
+
+def _deep_merge(base, override):
+    """Deep merge override into base. Returns a new dict.
+    Lists are replaced entirely (not merged element-wise)."""
+    result = copy.deepcopy(base)
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = copy.deepcopy(value)
+    return result
+
+
+def load_config():
+    """Load config from odr-config.json, deep-merged with defaults.
+    Auto-creates odr-config.json from example if it doesn't exist."""
+    if not CONFIG_PATH.exists():
+        if EXAMPLE_PATH.exists():
+            shutil.copy2(EXAMPLE_PATH, CONFIG_PATH)
+        else:
+            save_config(DEFAULTS)
+
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            user_config = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        user_config = {}
+
+    return _deep_merge(DEFAULTS, user_config)
+
+
+def save_config(data):
+    """Write config data to odr-config.json."""
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+
+def get_config(key_path, config=None):
+    """Access config value via dot-notation path.
+    e.g. get_config("agent.search_agent_max_steps")
+    """
+    if config is None:
+        config = load_config()
+    keys = key_path.split(".")
+    value = config
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return None
+    return value

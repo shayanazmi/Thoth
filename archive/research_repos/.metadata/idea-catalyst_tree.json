@@ -1,0 +1,181 @@
+{
+  "repo_name": "idea-catalyst",
+  "full_name": "pkargupta/idea_catalyst",
+  "default_branch": "main",
+  "repo_size_kb": 58268,
+  "description": "Idea-Catalyst is a metacognition-driven framework for helping humans and LLMs boost their creativity during the scientific brainstorming process.",
+  "tree": [
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3969847eecd393ba919463af100985351b18e948",
+      "size": 3864,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/3969847eecd393ba919463af100985351b18e948"
+    },
+    {
+      "path": "classes.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5520dc4dd8ccd256d1ddeeafbf7c84b89a7d798",
+      "size": 10377,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/a5520dc4dd8ccd256d1ddeeafbf7c84b89a7d798"
+    },
+    {
+      "path": "data",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "07af15fa9532ec7990a90cad79753e2fa6313192",
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/trees/07af15fa9532ec7990a90cad79753e2fa6313192"
+    },
+    {
+      "path": "data/cross-domain-inspiration-relations.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "43e0024942364b048ca664f10a4ccd4a13b96eac",
+      "size": 3283734,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/43e0024942364b048ca664f10a4ccd4a13b96eac"
+    },
+    {
+      "path": "evaluation",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bdfde29fcfae778cecd69e767470af022a415cb5",
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/trees/bdfde29fcfae778cecd69e767470af022a415cb5"
+    },
+    {
+      "path": "evaluation/ablations",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0d8ca1df6ae4786489871fd3bf127769b61c5209",
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/trees/0d8ca1df6ae4786489871fd3bf127769b61c5209"
+    },
+    {
+      "path": "evaluation/ablations/ablation_classes.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a18c01639fcb211c525172ab847a992a22195536",
+      "size": 10482,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/a18c01639fcb211c525172ab847a992a22195536"
+    },
+    {
+      "path": "evaluation/ablations/ablation_prompts.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c88066eafd4c33a0dc7dbacac3ec53bd701a48d3",
+      "size": 47990,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/c88066eafd4c33a0dc7dbacac3ec53bd701a48d3"
+    },
+    {
+      "path": "evaluation/ablations/no_decomp_ablation.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ff348df22362863c91c762cf0c89412c0e980a9",
+      "size": 33373,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/4ff348df22362863c91c762cf0c89412c0e980a9"
+    },
+    {
+      "path": "evaluation/baselines.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7883ae2c801341c405201c5db4e438bc82cf780",
+      "size": 32162,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/e7883ae2c801341c405201c5db4e438bc82cf780"
+    },
+    {
+      "path": "evaluation/direct_comparison_eval.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8522d8e65f7def9aa708f13442b53e89b83f421",
+      "size": 20281,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/a8522d8e65f7def9aa708f13442b53e89b83f421"
+    },
+    {
+      "path": "evaluation/eval_vllm.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c15478c081b9612030e50878c360c719208f13ef",
+      "size": 23324,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/c15478c081b9612030e50878c360c719208f13ef"
+    },
+    {
+      "path": "evaluation/process_abstracts.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "049d4ade94f7e014c3e7176cb73b95eda05e1574",
+      "size": 14554,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/049d4ade94f7e014c3e7176cb73b95eda05e1574"
+    },
+    {
+      "path": "evaluation/processed_abstracts.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6fa161d21a6f0c7161e6e964d814607dfac36a0e",
+      "size": 6874397,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/6fa161d21a6f0c7161e6e964d814607dfac36a0e"
+    },
+    {
+      "path": "figures",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f79134590695d4206378ac5f285642f0854d87ad",
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/trees/f79134590695d4206378ac5f285642f0854d87ad"
+    },
+    {
+      "path": "figures/framework_diagram.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b2f364ddd52c714d34cf60af68ead71a3b947a96",
+      "size": 134558,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/b2f364ddd52c714d34cf60af68ead71a3b947a96"
+    },
+    {
+      "path": "figures/readme_image.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "274e4b7b5e300b64b7bc9b175e82316a14bd1cfa",
+      "size": 1584061,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/274e4b7b5e300b64b7bc9b175e82316a14bd1cfa"
+    },
+    {
+      "path": "inspiration_pred.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ea439e544569f3f9e989895844d361bdf5628124",
+      "size": 40210,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/ea439e544569f3f9e989895844d361bdf5628124"
+    },
+    {
+      "path": "prompts.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3dbf2d4ba72cb861e58545533c58302ceb78aead",
+      "size": 51323,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/3dbf2d4ba72cb861e58545533c58302ceb78aead"
+    },
+    {
+      "path": "requirements.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1bf3e2ca0be9123c8ca829fc6d348407ade493fe",
+      "size": 108,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/1bf3e2ca0be9123c8ca829fc6d348407ade493fe"
+    },
+    {
+      "path": "search.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7343b255a92424c5666ef08632cb85f8a363a1c6",
+      "size": 3067,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/7343b255a92424c5666ef08632cb85f8a363a1c6"
+    },
+    {
+      "path": "utils.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f27fa19bfa1a558b5de288b3930399cda588b5c9",
+      "size": 15656,
+      "url": "https://api.github.com/repos/pkargupta/idea_catalyst/git/blobs/f27fa19bfa1a558b5de288b3930399cda588b5c9"
+    }
+  ]
+}

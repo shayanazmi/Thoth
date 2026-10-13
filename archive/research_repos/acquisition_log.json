@@ -1,0 +1,1154 @@
+[
+  {
+    "repo": "mirothinker",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 56579,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "libs/miroflow-tools/src/miroflow_tools/manager.py",
+    "type": ".py",
+    "size_bytes": 16822,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "libs/miroflow-tools/src/miroflow_tools/mcp_servers/reading_mcp_server.py",
+    "type": ".py",
+    "size_bytes": 3291,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "libs/miroflow-tools/src/miroflow_tools/mcp_servers/searching_google_mcp_server.py",
+    "type": ".py",
+    "size_bytes": 27481,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "libs/miroflow-tools/src/miroflow_tools/mcp_servers/reasoning_mcp_server.py",
+    "type": ".py",
+    "size_bytes": 1626,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "libs/miroflow-tools/src/miroflow_tools/dev_mcp_servers/task_planner.py",
+    "type": ".py",
+    "size_bytes": 9304,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "libs/miroflow-tools/src/miroflow_tools/dev_mcp_servers/jina_scrape_llm_summary.py",
+    "type": ".py",
+    "size_bytes": 31990,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/conf/config.yaml",
+    "type": ".yaml",
+    "size_bytes": 319,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/conf/agent/multi_agent.yaml",
+    "type": ".yaml",
+    "size_bytes": 708,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/conf/agent/mirothinker_1.7_keep5_max200.yaml",
+    "type": ".yaml",
+    "size_bytes": 758,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/llm/base_client.py",
+    "type": ".py",
+    "size_bytes": 14434,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/llm/factory.py",
+    "type": ".py",
+    "size_bytes": 2221,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/core/answer_generator.py",
+    "type": ".py",
+    "size_bytes": 22823,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/core/pipeline.py",
+    "type": ".py",
+    "size_bytes": 7550,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/core/orchestrator.py",
+    "type": ".py",
+    "size_bytes": 47022,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/core/stream_handler.py",
+    "type": ".py",
+    "size_bytes": 6523,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/core/tool_executor.py",
+    "type": ".py",
+    "size_bytes": 12126,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/config/settings.py",
+    "type": ".py",
+    "size_bytes": 17392,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/io/output_formatter.py",
+    "type": ".py",
+    "size_bytes": 6504,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/io/input_handler.py",
+    "type": ".py",
+    "size_bytes": 54137,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/utils/prompt_utils.py",
+    "type": ".py",
+    "size_bytes": 14301,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "mirothinker",
+    "path": "apps/miroflow-agent/src/utils/parsing_utils.py",
+    "type": ".py",
+    "size_bytes": 14928,
+    "downloaded": true,
+    "relevance": "Dynamic reasoning loop, orchestrator, MCP server tools, and keep-k context compression."
+  },
+  {
+    "repo": "faros",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 14442,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/models/plan_package.py",
+    "type": ".py",
+    "size_bytes": 19132,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/faros/memory/research_memory.py",
+    "type": ".py",
+    "size_bytes": 10776,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/faros/runtime/state_store.py",
+    "type": ".py",
+    "size_bytes": 6187,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/faros/runtime/orchestrator.py",
+    "type": ".py",
+    "size_bytes": 33314,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/faros/runtime/agent_executor.py",
+    "type": ".py",
+    "size_bytes": 3185,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/faros/runtime/graph_builder.py",
+    "type": ".py",
+    "size_bytes": 2717,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/faros/registry/agent_registry.py",
+    "type": ".py",
+    "size_bytes": 8533,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/modules/paper/skills/plan_evidence.py",
+    "type": ".py",
+    "size_bytes": 14263,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/modules/idea/bfts_search.py",
+    "type": ".py",
+    "size_bytes": 44009,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/modules/review/mismatch_scorer.py",
+    "type": ".py",
+    "size_bytes": 11718,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/services/code_agent_loop.py",
+    "type": ".py",
+    "size_bytes": 23139,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/services/plan_package_builder.py",
+    "type": ".py",
+    "size_bytes": 78571,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/services/plan_package_reviewers.py",
+    "type": ".py",
+    "size_bytes": 23747,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/services/search_service.py",
+    "type": ".py",
+    "size_bytes": 44396,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/services/plan_package_validator.py",
+    "type": ".py",
+    "size_bytes": 23896,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "faros",
+    "path": "backend/app/services/plan_package_service.py",
+    "type": ".py",
+    "size_bytes": 93142,
+    "downloaded": true,
+    "relevance": "Blueprint-driven AutoResearch runtime, graph builder, research memory, plan package service, and peer review."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 36293,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "AGENTS.md",
+    "type": ".md",
+    "size_bytes": 1138,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "paper-reading/context/2026-08-07-15-15-paper-fetch-sop-design.md",
+    "type": ".md",
+    "size_bytes": 7418,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "paper-reading/context/2026-08-07-14-08-sop-graph-coverage-audit.md",
+    "type": ".md",
+    "size_bytes": 23769,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "paper-reading/context/2026-08-07-10-26-sop-menu-final.md",
+    "type": ".md",
+    "size_bytes": 15232,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "paper-reading/context/2026-08-06-16-35-single-paper-reading-sop-research.md",
+    "type": ".md",
+    "size_bytes": 54655,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "paper-reading/context/2026-08-07-23-01-sop-io-contract-simulation.md",
+    "type": ".md",
+    "size_bytes": 14489,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "ladder-foundry/skills/optimization-loop/SKILL.md",
+    "type": ".md",
+    "size_bytes": 8798,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "dsh-plugin/src/index.js",
+    "type": ".js",
+    "size_bytes": 1715,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "cli/src/copy.js",
+    "type": ".js",
+    "size_bytes": 962,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "cli/src/install.js",
+    "type": ".js",
+    "size_bytes": 798,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "skills/biological-strategy-extraction/prompt.md",
+    "type": ".md",
+    "size_bytes": 2129,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "skills/biological-strategy-extraction/SKILL.md",
+    "type": ".md",
+    "size_bytes": 1018,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "skills/gap-synthesis-strategy/SKILL.md",
+    "type": ".md",
+    "size_bytes": 2409,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "skills/constraint-identification-sop/prompt.md",
+    "type": ".md",
+    "size_bytes": 2755,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "skills/constraint-identification-sop/SKILL.md",
+    "type": ".md",
+    "size_bytes": 1573,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "skills/evolution-strategy/SKILL.md",
+    "type": ".md",
+    "size_bytes": 3015,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "skills/mitigation-design-sop/prompt.md",
+    "type": ".md",
+    "size_bytes": 2221,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "de-anthropocentric",
+    "path": "skills/mitigation-design-sop/SKILL.md",
+    "type": ".md",
+    "size_bytes": 1448,
+    "downloaded": true,
+    "relevance": "Non-linear pure-markdown skill hierarchy (Campaign/Strategy/Tactic/SOP) and ontology synthesis."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "config.yaml",
+    "type": ".yaml",
+    "size_bytes": 707,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 27278,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "SOUL.md",
+    "type": ".md",
+    "size_bytes": 3704,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "scripts/validate_skill_frontmatter.py",
+    "type": ".py",
+    "size_bytes": 1344,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "scripts/audit_public_distribution.py",
+    "type": ".py",
+    "size_bytes": 1966,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "skills/research-intelligence/SKILL.md",
+    "type": ".md",
+    "size_bytes": 10054,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "skills/research-intelligence/templates/source-ledger.md",
+    "type": ".md",
+    "size_bytes": 549,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "skills/research-intelligence/templates/research-brief.md",
+    "type": ".md",
+    "size_bytes": 744,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "hermes-researcher",
+    "path": "skills/markitdown-document-ingestion/SKILL.md",
+    "type": ".md",
+    "size_bytes": 4688,
+    "downloaded": true,
+    "relevance": "Skill-driven research intelligence, source ledger, evidence grading, and privacy-safe ingestion."
+  },
+  {
+    "repo": "open-deep-research",
+    "path": "db.py",
+    "type": ".py",
+    "size_bytes": 16268,
+    "downloaded": true,
+    "relevance": "Web research application, smolagents process-based architecture, dynamic model routing, and streaming."
+  },
+  {
+    "repo": "open-deep-research",
+    "path": "web_app.py",
+    "type": ".py",
+    "size_bytes": 43308,
+    "downloaded": true,
+    "relevance": "Web research application, smolagents process-based architecture, dynamic model routing, and streaming."
+  },
+  {
+    "repo": "open-deep-research",
+    "path": "config.py",
+    "type": ".py",
+    "size_bytes": 7844,
+    "downloaded": true,
+    "relevance": "Web research application, smolagents process-based architecture, dynamic model routing, and streaming."
+  },
+  {
+    "repo": "open-deep-research",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 25958,
+    "downloaded": true,
+    "relevance": "Web research application, smolagents process-based architecture, dynamic model routing, and streaming."
+  },
+  {
+    "repo": "open-deep-research",
+    "path": "scripts/model_routing.py",
+    "type": ".py",
+    "size_bytes": 13695,
+    "downloaded": true,
+    "relevance": "Web research application, smolagents process-based architecture, dynamic model routing, and streaming."
+  },
+  {
+    "repo": "open-deep-research",
+    "path": "scripts/run_agents.py",
+    "type": ".py",
+    "size_bytes": 3955,
+    "downloaded": true,
+    "relevance": "Web research application, smolagents process-based architecture, dynamic model routing, and streaming."
+  },
+  {
+    "repo": "open-deep-research",
+    "path": "scripts/anthropic_model.py",
+    "type": ".py",
+    "size_bytes": 8512,
+    "downloaded": true,
+    "relevance": "Web research application, smolagents process-based architecture, dynamic model routing, and streaming."
+  },
+  {
+    "repo": "research-proof",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 7677,
+    "downloaded": true,
+    "relevance": "Claim falsification engine, frozen verifiers, proof ledger contracts, and adversarial check harness."
+  },
+  {
+    "repo": "research-proof",
+    "path": "plugins/research-proof-plugin/skills/research-proof/SKILL.md",
+    "type": ".md",
+    "size_bytes": 8092,
+    "downloaded": true,
+    "relevance": "Claim falsification engine, frozen verifiers, proof ledger contracts, and adversarial check harness."
+  },
+  {
+    "repo": "research-proof",
+    "path": "plugins/research-proof-plugin/skills/research-proof/references/proof-ledger-template.md",
+    "type": ".md",
+    "size_bytes": 780,
+    "downloaded": true,
+    "relevance": "Claim falsification engine, frozen verifiers, proof ledger contracts, and adversarial check harness."
+  },
+  {
+    "repo": "research-proof",
+    "path": "plugins/research-proof-plugin/skills/research-proof/references/eval-harness-architecture.md",
+    "type": ".md",
+    "size_bytes": 7160,
+    "downloaded": true,
+    "relevance": "Claim falsification engine, frozen verifiers, proof ledger contracts, and adversarial check harness."
+  },
+  {
+    "repo": "research-proof",
+    "path": "plugins/research-proof-plugin/skills/research-proof/references/behavioral-run-protocol.md",
+    "type": ".md",
+    "size_bytes": 1988,
+    "downloaded": true,
+    "relevance": "Claim falsification engine, frozen verifiers, proof ledger contracts, and adversarial check harness."
+  },
+  {
+    "repo": "research-proof",
+    "path": "plugins/research-proof-plugin/skills/research-proof/references/backtest-cases.md",
+    "type": ".md",
+    "size_bytes": 1904,
+    "downloaded": true,
+    "relevance": "Claim falsification engine, frozen verifiers, proof ledger contracts, and adversarial check harness."
+  },
+  {
+    "repo": "research-proof",
+    "path": "plugins/research-proof-plugin/skills/research-proof/references/proof-methods.md",
+    "type": ".md",
+    "size_bytes": 1813,
+    "downloaded": true,
+    "relevance": "Claim falsification engine, frozen verifiers, proof ledger contracts, and adversarial check harness."
+  },
+  {
+    "repo": "research-proof",
+    "path": "examples/fuzzy-claim-proof-ledger.md",
+    "type": ".md",
+    "size_bytes": 4091,
+    "downloaded": true,
+    "relevance": "Claim falsification engine, frozen verifiers, proof ledger contracts, and adversarial check harness."
+  },
+  {
+    "repo": "miroflow",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 10980,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "config/agent_browsecomp-en_mirothinker.yaml",
+    "type": ".yaml",
+    "size_bytes": 1530,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "config/agent_prompts/sub_worker.py",
+    "type": ".py",
+    "size_bytes": 25098,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "config/agent_prompts/main_agent_prompt_deepseek.py",
+    "type": ".py",
+    "size_bytes": 10516,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "utils/util_llm_simple_voting.py",
+    "type": ".py",
+    "size_bytes": 16498,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "utils/util_llm_parallel_thinking.py",
+    "type": ".py",
+    "size_bytes": 27162,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/core/pipeline.py",
+    "type": ".py",
+    "size_bytes": 7132,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/core/orchestrator.py",
+    "type": ".py",
+    "size_bytes": 48670,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/utils/summary_utils.py",
+    "type": ".py",
+    "size_bytes": 29136,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/utils/parsing_utils.py",
+    "type": ".py",
+    "size_bytes": 39607,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/tool/manager.py",
+    "type": ".py",
+    "size_bytes": 25057,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/tool/mcp_servers/python_server.py",
+    "type": ".py",
+    "size_bytes": 19332,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/tool/mcp_servers/reading_mcp_server.py",
+    "type": ".py",
+    "size_bytes": 6273,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/tool/mcp_servers/searching_mcp_server.py",
+    "type": ".py",
+    "size_bytes": 26629,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "miroflow",
+    "path": "src/tool/mcp_servers/reasoning_mcp_server.py",
+    "type": ".py",
+    "size_bytes": 4839,
+    "downloaded": true,
+    "relevance": "Graph-based workflow engine, parallel thinking loops, simple voting, MCP manager, and multi-agent coordination."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 6264,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/idea-creator.md",
+    "type": ".md",
+    "size_bytes": 11729,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/experiment-auditor.md",
+    "type": ".md",
+    "size_bytes": 5326,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/experiment-scientist.md",
+    "type": ".md",
+    "size_bytes": 14303,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/idea-reviewer.md",
+    "type": ".md",
+    "size_bytes": 11603,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/env-validator.md",
+    "type": ".md",
+    "size_bytes": 1715,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/proposal-reviewer.md",
+    "type": ".md",
+    "size_bytes": 6894,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/experiment-reviewer.md",
+    "type": ".md",
+    "size_bytes": 10804,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/proposal-refiner.md",
+    "type": ".md",
+    "size_bytes": 7332,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/idea-refiner.md",
+    "type": ".md",
+    "size_bytes": 7818,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/deep-lit-reader.md",
+    "type": ".md",
+    "size_bytes": 10102,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "agents/experiment-coder.md",
+    "type": ".md",
+    "size_bytes": 17638,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "skills_aris/reviewer-protocol.md",
+    "type": ".md",
+    "size_bytes": 6758,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "autoresearch-factory",
+    "path": "skills_aris/pipeline-meta.md",
+    "type": ".md",
+    "size_bytes": 4768,
+    "downloaded": true,
+    "relevance": "Multi-agent hypothesis-to-experiment pipeline (Agon), coder/reviewer/auditor loops, and protocol validation."
+  },
+  {
+    "repo": "luxas",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 25356,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "package.json",
+    "type": ".json",
+    "size_bytes": 1254,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "patches/pi-agent-core-no-tool-retry-guard.sh",
+    "type": ".sh",
+    "size_bytes": 11149,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "schemas/extraction_schema.json",
+    "type": ".json",
+    "size_bytes": 1677,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "notes/pi-agent-core-length-behavior.md",
+    "type": ".md",
+    "size_bytes": 5100,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "scripts/smoke_cache_pin.mts",
+    "type": ".mts",
+    "size_bytes": 5571,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "scripts/smoke_active_agents_lock.mts",
+    "type": ".mts",
+    "size_bytes": 3820,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "scripts/spike_real_length_recovery.mts",
+    "type": ".mts",
+    "size_bytes": 11704,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "scripts/invoke_meta_agent.mts",
+    "type": ".mts",
+    "size_bytes": 2687,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "scripts/spike_pi_agent_core_length.mts",
+    "type": ".mts",
+    "size_bytes": 19157,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "scripts/smoke_subagent_exit.mts",
+    "type": ".mts",
+    "size_bytes": 9057,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "scripts/spike_real_compaction.mts",
+    "type": ".mts",
+    "size_bytes": 20583,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "luxas",
+    "path": "skills/figure/SKILL.md",
+    "type": ".md",
+    "size_bytes": 5144,
+    "downloaded": true,
+    "relevance": "Lightweight autonomous research colleague, Pi agent runtime patching, figure generator, and manuscript compiler."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "inspiration_pred.py",
+    "type": ".py",
+    "size_bytes": 40210,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "prompts.py",
+    "type": ".py",
+    "size_bytes": 51323,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "README.md",
+    "type": ".md",
+    "size_bytes": 3864,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "utils.py",
+    "type": ".py",
+    "size_bytes": 15656,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "search.py",
+    "type": ".py",
+    "size_bytes": 3067,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "classes.py",
+    "type": ".py",
+    "size_bytes": 10377,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "evaluation/baselines.py",
+    "type": ".py",
+    "size_bytes": 32162,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "evaluation/direct_comparison_eval.py",
+    "type": ".py",
+    "size_bytes": 20281,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "idea-catalyst",
+    "path": "evaluation/eval_vllm.py",
+    "type": ".py",
+    "size_bytes": 23324,
+    "downloaded": true,
+    "relevance": "Metacognitive scientific brainstorming, cross-domain inspiration prediction, and decomposition prompts."
+  },
+  {
+    "repo": "feynman",
+    "path": "AGENTS.md",
+    "type": ".md",
+    "size_bytes": 7547,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": ".feynman/SYSTEM.md",
+    "type": ".md",
+    "size_bytes": 10952,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": ".feynman/agents/reviewer.md",
+    "type": ".md",
+    "size_bytes": 3647,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": ".feynman/agents/writer.md",
+    "type": ".md",
+    "size_bytes": 3000,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": ".feynman/agents/verifier.md",
+    "type": ".md",
+    "size_bytes": 3903,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": ".feynman/agents/researcher.md",
+    "type": ".md",
+    "size_bytes": 6076,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": "prompts/lit.md",
+    "type": ".md",
+    "size_bytes": 4849,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": "prompts/review.md",
+    "type": ".md",
+    "size_bytes": 4464,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": "prompts/deepresearch.md",
+    "type": ".md",
+    "size_bytes": 11015,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": "prompts/autoresearch.md",
+    "type": ".md",
+    "size_bytes": 4187,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  },
+  {
+    "repo": "feynman",
+    "path": "outputs/.plans/code-organization-review/runtime-contracts.md",
+    "type": ".md",
+    "size_bytes": 8786,
+    "downloaded": true,
+    "relevance": "Parallel fan-out research, scoped context dispatch, citation verification, and runtime shim management."
+  }
+]
