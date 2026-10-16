@@ -330,6 +330,21 @@ def stream_research_pipeline(
                 s_copy["extracted_text"] = scraped_meta.get("extracted_text", "")
                 s_copy["scrape_status"] = scraped_meta.get("scrape_status", "success")
                 s_copy["scrape_error"] = scraped_meta.get("scrape_error")
+                s_copy["content_type"] = scraped_meta.get("content_type", s_copy.get("content_type", "unknown"))
+                s_copy["extraction_quality"] = scraped_meta.get("extraction_quality", s_copy.get("extraction_quality", "unknown"))
+                s_copy["extraction_method"] = scraped_meta.get("extraction_method", s_copy.get("extraction_method", "unknown"))
+                s_copy["extraction_warnings"] = list(scraped_meta.get("extraction_warnings") or s_copy.get("extraction_warnings") or [])
+                s_copy["retrieval_timestamp"] = scraped_meta.get("retrieval_timestamp") or s_copy.get("retrieval_timestamp")
+                s_copy["char_count"] = scraped_meta.get("char_count", 0)
+                s_copy["num_pages"] = scraped_meta.get("num_pages", 0)
+                s_copy["is_truncated"] = scraped_meta.get("is_truncated", False)
+                s_copy["passages"] = list(scraped_meta.get("passages") or [])
+
+                # If scrape failed but source has an abstract or snippet, honestly mark as snippet_only rather than full failure
+                if s_copy["scrape_status"] != "success":
+                    has_snippet = bool((s_copy.get("abstract") or s_copy.get("snippet") or "").strip())
+                    if has_snippet and s_copy["extraction_quality"] == "inaccessible":
+                        s_copy["extraction_quality"] = "snippet_only"
             cumulative_sources.append(s_copy)
 
         existing_urls = {s.get("url") for s in cumulative_sources if s.get("url")}
@@ -451,6 +466,16 @@ def stream_research_pipeline(
         if state.get("is_verified", False):
             state["is_verified"] = False
             state["integrity_status"] = "INTEGRITY_FAILED"
+
+    if not state.get("is_verified", False):
+        status_label = state.get("integrity_status", "UNVERIFIED")
+        integrity_banner = (
+            f"> [!CAUTION] Research Integrity Gate: {status_label}\n"
+            f"> **UNVERIFIED REPORT**: This research synthesis did not pass empirical claim-to-evidence verification "
+            f"or contains uncorroborated / contradicted claims. It must not be cited as established evidence.\n\n"
+        )
+        if not state.get("report", "").startswith("> [!CAUTION]"):
+            state["report"] = integrity_banner + state.get("report", "")
 
     if cancel_event and cancel_event.is_set():
         logger.info("[ORCHESTRATOR] Cancel event detected before vault persistence.")

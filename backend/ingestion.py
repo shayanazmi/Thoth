@@ -96,8 +96,13 @@ class IngestionResult:
             self.passages = create_bounded_passages(
                 self.text,
                 content_type=self.content_type,
-                source_uri=self.source_uri
+                source_uri=self.source_uri,
+                extraction_quality=self.extraction_quality
             )
+        elif self.passages and self.extraction_quality != "full":
+            for p in self.passages:
+                if isinstance(p, dict):
+                    p["extraction_quality"] = self.extraction_quality
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -123,6 +128,7 @@ def create_bounded_passages(
     content_type: str = "plain",
     source_uri: str = "",
     target_passage_chars: int = 800,
+    extraction_quality: str = "full",
 ) -> List[Dict[str, Any]]:
     """
     Partitions extracted document text into bounded, deterministically indexed passages
@@ -205,7 +211,7 @@ def create_bounded_passages(
                             "char_end": p_offset + len(chunk_text),
                             "text": chunk_text,
                             "extraction_status": "warning" if has_unreadable else "success",
-                            "extraction_quality": "partial" if has_unreadable else "full",
+                            "extraction_quality": "partial" if (has_unreadable or extraction_quality == "partial") else extraction_quality,
                             "warnings": ["Unreadable page content detected"] if has_unreadable else [],
                         })
             if passages:
@@ -231,7 +237,7 @@ def create_bounded_passages(
                 "char_end": p_offset + len(chunk_text),
                 "text": chunk_text,
                 "extraction_status": "success",
-                "extraction_quality": "full",
+                "extraction_quality": extraction_quality,
                 "warnings": [],
             })
             p_offset += len(chunk_text) + 2
@@ -252,7 +258,7 @@ def create_bounded_passages(
             "char_end": p_offset + len(chunk_text),
             "text": chunk_text,
             "extraction_status": "success",
-            "extraction_quality": "full",
+            "extraction_quality": extraction_quality,
             "warnings": [],
         })
 

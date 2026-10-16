@@ -46,6 +46,17 @@ def _clean_source_id(source_id: str) -> Tuple[str, Optional[str]]:
     return sid, None
 
 
+def _stem(w: str) -> str:
+    """Deterministic light stemmer for English inflections."""
+    w = w.lower()
+    for sfx in ("ations", "ation", "ated", "tions", "tion", "ing", "ies", "ed", "es", "s"):
+        if w.endswith(sfx) and len(w) - len(sfx) >= 3:
+            if sfx == "ies":
+                return w[:-3] + "y"
+            return w[:-len(sfx)]
+    return w
+
+
 def _resolve_source_record(source_id: str, cumulative_sources: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """Resolve a source ID to its matching record in cumulative_sources."""
     if not source_id or not cumulative_sources:
@@ -78,11 +89,16 @@ def _resolve_source_record(source_id: str, cumulative_sources: List[Dict[str, An
 
 def verify_passage_locator(
     source_id: str,
-    cumulative_sources: List[Dict[str, Any]]
+    cumulative_sources: List[Dict[str, Any]],
+    claim_text: Optional[str] = None,
+    quoted_evidence: Optional[str] = None
 ) -> Tuple[bool, Optional[str]]:
     """
     If source_id specifies a passage or page locator (e.g. 'src-paper:p1-2'),
-    verifies that the locator exists in the retained source passages.
+    verifies that:
+      1. The locator exists in the retained source passages.
+      2. If quoted_evidence is provided, the quote occurs in that specific cited passage.
+      3. If claim_text is provided, the cited passage contains substantive evidence for the claim.
     """
     base_sid, locator = _clean_source_id(source_id)
     if not locator:
@@ -92,18 +108,49 @@ def verify_passage_locator(
         return False, f"Source '{base_sid}' not found."
     passages = record.get("passages") or []
     if not passages:
-        return True, None  # Document level only
+        return False, f"Passage or page locator '{locator}' cited, but source '{base_sid}' has no indexed passages or page structure."
+
     p_ids = [p.get("passage_id") for p in passages if isinstance(p, dict) and p.get("passage_id")]
-    if locator in p_ids:
-        return True, None
-    # Check page numbers
     page_match = re.match(r"(?:p|page)?\s*(\d+)", locator, flags=re.IGNORECASE)
-    if page_match:
-        pg_num = int(page_match.group(1))
-        pages_present = [p.get("page_num") for p in passages if isinstance(p, dict) and p.get("page_num") is not None]
-        if pg_num in pages_present:
-            return True, None
-    return False, f"Passage or page locator '{locator}' not found in source '{base_sid}' (available: {p_ids[:5]})."
+    pg_num = int(page_match.group(1)) if page_match else None
+
+    matching_passages = []
+    if locator in p_ids:
+        matching_passages = [p for p in passages if isinstance(p, dict) and p.get("passage_id") == locator]
+    elif pg_num is not None:
+        matching_passages = [p for p in passages if isinstance(p, dict) and p.get("page_num") == pg_num]
+
+    if not matching_passages:
+        return False, f"Passage or page locator '{locator}' not found in source '{base_sid}' (available: {p_ids[:5]})."
+
+    # Verify passage-level content match if quoted evidence or claim text provided
+    passage_combined_text = " ".join(p.get("text", "") for p in matching_passages)
+    norm_passage = normalize_text(passage_combined_text)
+
+    if quoted_evidence and quoted_evidence.strip():
+        norm_q = normalize_text(quoted_evidence)
+        if norm_q not in norm_passage:
+            doc_text = normalize_text(record.get("extracted_text") or "")
+            if norm_q in doc_text:
+                return False, f"Passage mismatch for '{source_id}': quoted evidence appears elsewhere in '{base_sid}', but is absent from cited passage/page '{locator}'."
+            else:
+                return False, f"Quoted evidence not found in cited passage '{locator}'."
+
+    if claim_text and not quoted_evidence:
+        stop_words = {
+            "the", "and", "for", "that", "this", "with", "from", "were", "been",
+            "have", "more", "such", "than", "their", "will", "would", "about",
+            "these", "those", "also", "into", "some", "only", "other", "there"
+        }
+        c_words = [w for w in re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", normalize_text(claim_text)) if w not in stop_words]
+        c_stems = {_stem(w) for w in c_words}
+        p_words = [w for w in re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", norm_passage) if w not in stop_words]
+        p_stems = {_stem(w) for w in p_words}
+        overlap = c_stems.intersection(p_stems)
+        if len(c_stems) >= 3 and len(overlap) < 1:
+            return False, f"Passage mismatch for '{source_id}': cited passage '{locator}' does not contain relevant content for the claim."
+
+    return True, None
 
 
 def verify_source_identity(
@@ -510,15 +557,16 @@ def evaluate_claim_support(
                 corpus_parts.append(text_part)
     combined_source = " \n ".join(corpus_parts)
     norm_source = normalize_text(combined_source)
-    norm_claim = normalize_text(claim_text)
+    clean_claim = re.sub(r"\[\[.*?\]\]", "", claim_text).strip()
+    norm_claim = normalize_text(clean_claim or claim_text)
 
     # Check snippet-only source overclaim
-    if quality == "snippet_only" and not has_text:
-        if re.search(r"\b(full\s+text\s+review|detailed\s+(?:protocol|methodology|clinical\s+trial)|comprehensive\s+(?:meta-analysis|histological|cohort|review))\b", norm_claim):
+    if quality in ("snippet_only", "abstract_only") or not has_text:
+        if re.search(r"\b(full\s+text(?:\s+review)?|detailed\s+(?:protocol|methodology|clinical\s+trial)|comprehensive\s+(?:meta-analysis|histological|cohort|review|full-text)|entire\s+(?:dataset|paper|study|document|cohort))\b", norm_claim) or ("full-text" in norm_claim or "full text" in norm_claim):
             return (
                 "INSUFFICIENT",
-                "Claim asserts full-document analysis, but source was only available as a search snippet/abstract.",
-                {"reason_code": "snippet_overclaim"}
+                "Claim asserts comprehensive full-text review or detailed analysis, but only a search snippet/abstract was available.",
+                {"reason_code": "snippet_full_text_overclaim"}
             )
 
     # 2. Split source into candidate sentences for localized analysis
@@ -531,20 +579,76 @@ def evaluate_claim_support(
         "be", "been", "have", "has", "had", "we", "our", "their", "they", "its"
     }
 
-    def _stem(w: str) -> str:
-        w = w.lower()
-        for sfx in ("ations", "ation", "ated", "tions", "tion", "ing", "ies", "ed", "es", "s"):
-            if w.endswith(sfx) and len(w) - len(sfx) >= 3:
-                if sfx == "ies":
-                    return w[:-3] + "y"
-                return w[:-len(sfx)]
-        return w
-
     raw_claim_words = re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", norm_claim)
     claim_words = {w for w in raw_claim_words if w not in stop_words}
     if not claim_words:
         claim_words = set(re.findall(r"\b[a-zA-Z0-9_\-]{2,}\b", norm_claim))
     claim_stems = {_stem(w) for w in claim_words}
+
+    # 2. Check quoted evidence if provided (Adversarial quote distortion, overgeneralization, and causal leaps)
+    if quoted_evidence:
+        norm_q = normalize_text(quoted_evidence)
+        words_q = re.findall(r"\w+", norm_q)
+        words_src = re.findall(r"\w+", norm_source)
+        matched_q = (norm_q in norm_source)
+        if not matched_q and len(words_q) >= 4:
+            seq_len = min(len(words_q), 6)
+            target_seq = words_q[:seq_len]
+            for i in range(len(words_src) - seq_len + 1):
+                if words_src[i:i + seq_len] == target_seq:
+                    matched_q = True
+                    break
+        if not matched_q:
+            return (
+                "INSUFFICIENT",
+                "Quoted evidence was not found within retained source text.",
+                {"quoted_evidence": quoted_evidence}
+            )
+
+        # Adversarial check 2a: Overgeneralization from preliminary / in-vitro / animal model to clinical human cure
+        prelim_pattern = re.compile(r"\b(in[- ]vitro|cell\s+culture|murine|mouse|mice|rats?|preliminary|pilot|hypothetical|exploratory|computational\s+simulation|simulated)\b", re.IGNORECASE)
+        clinical_claim_pattern = re.compile(r"\b(cures?|curative|clinical\s+remission|clinical\s+efficacy|effective\s+treatment\s+in\s+humans?|human\s+patients?|demonstrated\s+in\s+patients?)\b", re.IGNORECASE)
+        if prelim_pattern.search(norm_q) and clinical_claim_pattern.search(norm_claim):
+            has_clinical_trial_proof = bool(re.search(r"\b(phase\s+[123]\s+clinical\s+trial|randomized\s+controlled\s+trial\s+(?:demonstrated|showed|confirmed))\b", norm_source))
+            if not has_clinical_trial_proof:
+                return (
+                    "INSUFFICIENT",
+                    f"Unsupported overgeneralization: quoted passage reports in-vitro or preliminary findings ('{quoted_evidence[:90]}...'), but claim asserts clinical efficacy in humans.",
+                    {"reason_code": "quote_overgeneralization", "quoted_evidence": quoted_evidence}
+                )
+
+        # Adversarial check 2b: Direction / Outcome contradiction between quote and claim
+        quote_neg = re.compile(r"\b(no\s+(?:statistically\s+)?significant|failed\s+to|decreased|reduced|inhibited|ineffective|unsuccessful|not\s+supported)\b", re.IGNORECASE)
+        claim_pos = re.compile(r"\b(significantly\s+(?:increased|improved|boosted|enhanced)|demonstrated\s+superior\s+efficacy|effective\s+cure|proved\s+therapeutic)\b", re.IGNORECASE)
+        if quote_neg.search(norm_q) and claim_pos.search(norm_claim):
+            return (
+                "CONTRADICTED",
+                f"Contradictory claim: claim asserts positive effect/improvement, but quoted evidence explicitly reports negative or null outcome: '{quoted_evidence[:100]}'",
+                {"reason_code": "quote_direction_contradiction", "quoted_evidence": quoted_evidence}
+            )
+
+        # Adversarial check 2c: Causal leap from observational correlation
+        quote_corr = re.compile(r"\b(correlated\s+with|associated\s+with|observational|may\s+suggest|conjectured|hypothesized)\b", re.IGNORECASE)
+        claim_causal = re.compile(r"\b(conclusively\s+proves|proved\s+to\s+cause|causes?|definitive\s+causal\s+mechanism|establishes\s+causation)\b", re.IGNORECASE)
+        if quote_corr.search(norm_q) and claim_causal.search(norm_claim):
+            return (
+                "INSUFFICIENT",
+                f"Unsupported causal claim: quoted evidence only establishes observational correlation/association ('{quoted_evidence[:90]}...'), not causation.",
+                {"reason_code": "causal_leap", "quoted_evidence": quoted_evidence}
+            )
+
+        # Adversarial check 2d: Extrapolated / Hallucinated key predicates
+        words_claim_substantive = {w for w in claim_stems if len(w) >= 4 and w not in stop_words}
+        words_q_stems = {_stem(w) for w in re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", norm_q)}
+        missing_from_quote = words_claim_substantive - words_q_stems
+        if len(missing_from_quote) >= 3:
+            missing_from_source = {w for w in missing_from_quote if w not in norm_source}
+            if len(missing_from_source) >= 2:
+                return (
+                    "INSUFFICIENT",
+                    f"Quoted passage does not establish material assertions of the claim (unsupported terms: {list(missing_from_source)[:3]}).",
+                    {"reason_code": "unsupported_interpretation", "quoted_evidence": quoted_evidence}
+                )
 
     claim_has_negation = bool(re.search(
         r"\b(no|not|never|neither|nor|failed|fails|failure|unsupported|disproved?|refuted?|contradicts?|ineffective|insignificant)\b",
@@ -587,6 +691,14 @@ def evaluate_claim_support(
         r"\bcorrelation\s+does\s+not\s+(?:imply|prove|demonstrate)\s+causation\b",
         r"\bnot\s+causally\s+linked\b",
         r"\bonly\s+(?:a\s+)?correlation\b",
+        r"\b(?:clinical\s+translation\s+)?has\s+not\s+been\s+(?:attempted|tested|proven|demonstrated|verified|evaluated)\b",
+        r"\b(?:clinical\s+translation\s+)?have\s+not\s+been\s+(?:attempted|tested|proven|demonstrated|verified|evaluated)\b",
+        r"\bhas\s+not\s+been\s+attempted\b",
+        r"\b(?:completely\s+)?unverified\b",
+        r"\bunproven\b",
+        r"\bnot\s+(?:yet\s+)?proven\b",
+        r"\bnot\s+established\b",
+        r"\bcausation\s+is\s+not\s+established\b",
     ]
 
     out_of_context_patterns = [
@@ -703,71 +815,19 @@ def evaluate_claim_support(
             {"type": "missing_metrics"}
         )
 
-    # 4. Check quoted evidence if provided (Adversarial quote stuffing & distortion checks)
-    if quoted_evidence:
-        norm_q = normalize_text(quoted_evidence)
-        words_q = re.findall(r"\w+", norm_q)
-        words_src = re.findall(r"\w+", norm_source)
-        matched_q = (norm_q in norm_source)
-        if not matched_q and len(words_q) >= 4:
-            seq_len = min(len(words_q), 6)
-            target_seq = words_q[:seq_len]
-            for i in range(len(words_src) - seq_len + 1):
-                if words_src[i:i + seq_len] == target_seq:
-                    matched_q = True
-                    break
-        if not matched_q:
-            return (
-                "INSUFFICIENT",
-                "Quoted evidence was not found within retained source text.",
-                {"quoted_evidence": quoted_evidence}
-            )
+    # 4. Check if key substantive domain terms in the claim are completely absent from the source
+    source_words = set(re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", norm_source))
+    source_stems = {_stem(w) for w in source_words if w not in stop_words}
+    substantive_claim_stems = {s for s in claim_stems if len(s) >= 4 and s not in stop_words}
+    missing_from_entire_source = {s for s in substantive_claim_stems if s not in source_stems}
+    if len(missing_from_entire_source) >= 2 or (len(substantive_claim_stems) >= 3 and len(missing_from_entire_source) / len(substantive_claim_stems) >= 0.4):
+        return (
+            "INSUFFICIENT",
+            f"Source text provides insufficient substantive evidence: key claim terms {list(missing_from_entire_source)[:3]} do not appear in source.",
+            {"reason_code": "missing_claim_predicates", "missing_terms": list(missing_from_entire_source)}
+        )
 
-        # Adversarial check 4a: Overgeneralization from preliminary / in-vitro / animal model to clinical human cure
-        prelim_pattern = re.compile(r"\b(in[- ]vitro|cell\s+culture|murine|mouse|mice|rats?|preliminary|pilot|hypothetical|exploratory|computational\s+simulation|simulated)\b", re.IGNORECASE)
-        clinical_claim_pattern = re.compile(r"\b(cures?|curative|clinical\s+remission|clinical\s+efficacy|effective\s+treatment\s+in\s+humans?|human\s+patients?|demonstrated\s+in\s+patients?)\b", re.IGNORECASE)
-        if prelim_pattern.search(norm_q) and clinical_claim_pattern.search(norm_claim):
-            if not re.search(r"\b(clinical\s+trial|phase\s+[123]|human\s+patients?)\b", norm_source):
-                return (
-                    "INSUFFICIENT",
-                    f"Unsupported overgeneralization: quoted passage reports in-vitro or preliminary findings ('{quoted_evidence[:90]}...'), but claim asserts clinical efficacy in humans.",
-                    {"reason_code": "quote_overgeneralization", "quoted_evidence": quoted_evidence}
-                )
-
-        # Adversarial check 4b: Direction / Outcome contradiction between quote and claim
-        quote_neg = re.compile(r"\b(no\s+(?:statistically\s+)?significant|failed\s+to|decreased|reduced|inhibited|ineffective|unsuccessful|not\s+supported)\b", re.IGNORECASE)
-        claim_pos = re.compile(r"\b(significantly\s+(?:increased|improved|boosted|enhanced)|demonstrated\s+superior\s+efficacy|effective\s+cure|proved\s+therapeutic)\b", re.IGNORECASE)
-        if quote_neg.search(norm_q) and claim_pos.search(norm_claim):
-            return (
-                "CONTRADICTED",
-                f"Contradictory claim: claim asserts positive effect/improvement, but quoted evidence explicitly reports negative or null outcome: '{quoted_evidence[:100]}'",
-                {"reason_code": "quote_direction_contradiction", "quoted_evidence": quoted_evidence}
-            )
-
-        # Adversarial check 4c: Causal leap from observational correlation
-        quote_corr = re.compile(r"\b(correlated\s+with|associated\s+with|observational|may\s+suggest|conjectured|hypothesized)\b", re.IGNORECASE)
-        claim_causal = re.compile(r"\b(conclusively\s+proves|proved\s+to\s+cause|causes?|definitive\s+causal\s+mechanism|establishes\s+causation)\b", re.IGNORECASE)
-        if quote_corr.search(norm_q) and claim_causal.search(norm_claim):
-            return (
-                "INSUFFICIENT",
-                f"Unsupported causal claim: quoted evidence only establishes observational correlation/association ('{quoted_evidence[:90]}...'), not causation.",
-                {"reason_code": "causal_leap", "quoted_evidence": quoted_evidence}
-            )
-
-        # Adversarial check 4d: Extrapolated / Hallucinated key predicates
-        words_claim_substantive = {w for w in claim_stems if len(w) >= 4 and w not in stop_words}
-        words_q_stems = {_stem(w) for w in re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", norm_q)}
-        missing_from_quote = words_claim_substantive - words_q_stems
-        if len(missing_from_quote) >= 3:
-            missing_from_source = {w for w in missing_from_quote if w not in norm_source}
-            if len(missing_from_source) >= 2:
-                return (
-                    "INSUFFICIENT",
-                    f"Quoted passage does not establish material assertions of the claim (unsupported terms: {list(missing_from_source)[:3]}).",
-                    {"reason_code": "unsupported_interpretation", "quoted_evidence": quoted_evidence}
-                )
-
-    # 5. Check sufficiency of lexical and semantic overlap across full source
+    # 5a. Check sufficiency of lexical and semantic overlap across full source
     overlap_ratio = (max_overlap / len(claim_stems)) if claim_stems else 0.0
     if max_overlap < 2 or overlap_ratio < 0.25:
         return (
@@ -876,6 +936,34 @@ def audit_report_integrity(
         disposition = "retain" if is_valid else "remove"
         provenance_verified = True
 
+        # Check claim correspondence with published report text (Claim drift / desynchronization defense)
+        norm_report = normalize_text(report_text)
+        norm_c = normalize_text(claim_text)
+        claim_in_report = (norm_c in norm_report)
+        if not claim_in_report and len(norm_report) > 100:
+            stop_words = {
+                "the", "and", "for", "that", "this", "with", "from", "were", "been",
+                "have", "more", "such", "than", "their", "will", "would", "about",
+                "these", "those", "also", "into", "some", "only", "other", "there"
+            }
+            c_words = [w for w in re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", norm_c) if w not in stop_words]
+            c_stems = {_stem(w) for w in c_words}
+            report_sentences = re.split(r"(?<=[.!?])\s+", norm_report)
+            for s in report_sentences:
+                s_words = [w for w in re.findall(r"\b[a-zA-Z0-9_\-]{3,}\b", s) if w not in stop_words]
+                s_stems = {_stem(w) for w in s_words}
+                shared = c_stems.intersection(s_stems)
+                if len(c_stems) > 0 and len(shared) >= max(2, int(len(c_stems) * 0.4)):
+                    claim_in_report = True
+                    break
+
+        if not claim_in_report and len(norm_report) > 100:
+            current_status = "UNRESOLVED"
+            is_valid = False
+            disposition = "unresolved"
+            reason = f"Claim text does not correspond to any published sentence in the report (claim drift)."
+            provenance_errors.append(f"[{claim_id}] Claim drift: audited claim not present in published report text.")
+
         # 1. Deterministic check: Source identity
         primary_sid = s_ids[0] if s_ids else ""
         rec = _resolve_source_record(primary_sid, cumulative_sources) if primary_sid else None
@@ -909,7 +997,12 @@ def audit_report_integrity(
 
         # 2b. Deterministic check: Passage locator validity
         if primary_sid:
-            loc_ok, loc_err = verify_passage_locator(primary_sid, cumulative_sources)
+            loc_ok, loc_err = verify_passage_locator(
+                primary_sid,
+                cumulative_sources,
+                claim_text=claim_text,
+                quoted_evidence=quoted_evidence
+            )
             if not loc_ok:
                 provenance_verified = False
                 current_status = "UNSUPPORTED"
@@ -987,6 +1080,29 @@ def audit_report_integrity(
             elif has_contra:
                 sup_status = "CONTRADICTED"
                 sup_reason = next(re for _, st, re in cited_evals if st == "CONTRADICTED")
+
+        # Check for omitted contradictions across other retrieved sources in cumulative_sources (Cherry-picking defense)
+        if current_status in ("DIRECTLY_SUPPORTED", "QUALIFIED_SUPPORT", "SUPPORTED") or sup_status in ("SUPPORTED", "QUALIFIED_SUPPORT", "INSUFFICIENT"):
+            for other_src in cumulative_sources:
+                other_id = other_src.get("id") or ""
+                clean_other_id, _ = _clean_source_id(other_id)
+                cited_clean_sids = [clean_s for sid in s_ids for clean_s, _ in [_clean_source_id(sid)]]
+                if clean_other_id in cited_clean_sids:
+                    continue  # Already evaluated
+
+                other_text = (other_src.get("extracted_text") or other_src.get("abstract") or other_src.get("snippet") or "")
+                if not other_text.strip():
+                    continue
+
+                other_status, other_reason, _ = evaluate_claim_support(
+                    claim_text=claim_text,
+                    source_record=other_src,
+                    quoted_evidence=None
+                )
+                if other_status == "CONTRADICTED":
+                    sup_status = "CONTRADICTED"
+                    sup_reason = f"Omitted contradictory evidence in retrieved source '{clean_other_id}': {other_reason}"
+                    break
 
         if sup_status == "CONTRADICTED":
             current_status = "CONTRADICTED"

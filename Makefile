@@ -62,7 +62,7 @@ dev-web:
 
 test:
 	@echo "Running core unit, db, schema, and API adapter test suites..."
-	@$(PYTEST) backend/tests/test_pure_functions.py backend/tests/test_db.py backend/tests/test_ui_adapter.py backend/tests/test_schemas.py backend/tests/test_dispatcher.py backend/tests/test_all_ten_frameworks.py backend/tests/test_claim_evidence_integrity.py backend/tests/test_document_ingestion.py backend/tests/test_research_mandate_and_approval.py backend/tests/test_audit_forensic_invariants.py backend/tests/test_task_lifecycle_persistence.py backend/tests/test_evidence_provenance_and_verification.py -v
+	@$(PYTEST) backend/tests/test_pure_functions.py backend/tests/test_db.py backend/tests/test_ui_adapter.py backend/tests/test_schemas.py backend/tests/test_dispatcher.py backend/tests/test_all_ten_frameworks.py backend/tests/test_claim_evidence_integrity.py backend/tests/test_document_ingestion.py backend/tests/test_research_mandate_and_approval.py backend/tests/test_audit_forensic_invariants.py backend/tests/test_task_lifecycle_persistence.py backend/tests/test_evidence_provenance_and_verification.py backend/tests/test_evidence_audit_and_correctness_gate.py backend/tests/test_idea_hypothesis_lifecycle.py -v
 
 test-all:
 	@echo "Running all pytest test suites..."

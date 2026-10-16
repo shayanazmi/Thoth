@@ -47,6 +47,7 @@ class ResearchBrief(BaseModel):
     approval_status: str = Field(default=BriefApprovalStatus.PENDING_APPROVAL, description="PENDING_APPROVAL, APPROVED, REJECTED, STALE")
     approved_version: Optional[int] = Field(default=None, description="Exact version explicitly approved by the user")
     approved_at: Optional[str] = Field(default=None, description="ISO timestamp of user approval")
+    idea_id: Optional[str] = Field(default=None, description="Linked promoted idea artifact ID")
     created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
@@ -80,6 +81,7 @@ class ResearchBrief(BaseModel):
         thinker_context: Optional[Dict[str, Any]] = None,
         unresolved_questions: Optional[List[str]] = None,
         session_id: str = "",
+        idea_id: Optional[str] = None,
     ) -> "ResearchBrief":
         return cls(
             session_id=session_id,
@@ -92,6 +94,7 @@ class ResearchBrief(BaseModel):
             selection_criteria=list(mandate.constraints),
             thinker_context=thinker_context,
             unresolved_questions=list(unresolved_questions or []),
+            idea_id=idea_id,
             approval_status=BriefApprovalStatus.PENDING_APPROVAL,
             version=1,
         )
@@ -256,11 +259,12 @@ def prepare_research_brief(
     selection_criteria: Optional[List[str]] = None,
     unresolved_questions: Optional[List[str]] = None,
     session_id: str = "",
+    idea_id: Optional[str] = None,
     db_path: Optional[str] = None,
 ) -> ResearchBrief:
     """
     Synthesize an editable ResearchBrief from conversation, thinker sparring,
-    or explicit user query without launching formal research.
+    promoted research idea, or explicit user query without launching formal research.
     """
     db_path = _resolve_db_path(db_path)
     clean_topic = (topic or "").strip()
@@ -322,7 +326,39 @@ def prepare_research_brief(
             if len(active_unresolved) >= 3:
                 break
 
-    # 6. Formulate research question and objectives
+    # 6. Inherit and enforce promotion barrier from linked research idea
+    if idea_id:
+        from backend.conversation.idea import get_idea, IdeaStatus
+        linked_idea = get_idea(idea_id, db_path=db_path)
+        if not linked_idea:
+            raise ValueError(f"Linked research idea '{idea_id}' not found.")
+        if linked_idea.status == IdeaStatus.TENTATIVE:
+            raise ValueError(
+                f"Promotion Barrier: Cannot build research brief from tentative idea '{idea_id}'. "
+                "The user must explicitly promote the idea first."
+            )
+        if linked_idea.hypothesis and linked_idea.hypothesis not in active_hypotheses:
+            active_hypotheses.insert(0, linked_idea.hypothesis)
+        if not thinker_context and linked_idea.thinker_id:
+            i_tid = linked_idea.thinker_id.lower()
+            if i_tid in ARCHETYPE_DEFINITIONS:
+                meta = ARCHETYPE_DEFINITIONS[i_tid]
+                thinker_context = {
+                    "thinker_id": i_tid,
+                    "thinker_name": meta.get("name", i_tid.title()),
+                    "archetype": meta.get("archetype", ""),
+                    "tradition": meta.get("tradition", ""),
+                    "perspective": meta.get("perspective", meta.get("description", "")),
+                    "description": meta.get("description", ""),
+                    "unresolved_objections": list(linked_idea.unresolved_objections),
+                }
+        for obj in linked_idea.unresolved_objections:
+            if obj not in active_unresolved:
+                active_unresolved.append(obj)
+        if (not resolved_topic or resolved_topic == "Untitled Research Idea") and linked_idea.title:
+            resolved_topic = linked_idea.title
+
+    # 7. Formulate research question and objectives
     if research_question and research_question.strip():
         research_q = research_question.strip()
     elif active_hypotheses:
@@ -351,6 +387,7 @@ def prepare_research_brief(
         selection_criteria=active_criteria,
         thinker_context=thinker_context,
         unresolved_questions=active_unresolved[:3],
+        idea_id=idea_id,
         approval_status=BriefApprovalStatus.PENDING_APPROVAL,
     )
 
@@ -360,6 +397,13 @@ def prepare_research_brief(
         save_brief_db(brief.to_dict(), db_path=db_path)
     except Exception:
         pass
+
+    if idea_id:
+        try:
+            from backend.conversation.idea import attach_idea_to_brief
+            attach_idea_to_brief(idea_id, brief.brief_id, db_path=db_path)
+        except Exception:
+            pass
 
     return brief
 
@@ -381,7 +425,7 @@ def update_research_brief(
     substantive_keys = {
         "topic", "research_question", "objectives", "hypotheses",
         "context_and_assumptions", "search_scope", "selection_criteria",
-        "thinker_context", "unresolved_questions"
+        "thinker_context", "unresolved_questions", "idea_id"
     }
 
     substantive_change = False

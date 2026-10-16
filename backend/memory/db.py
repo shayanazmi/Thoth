@@ -103,8 +103,52 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                 approved_version INTEGER,
                 approved_at TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                idea_id TEXT DEFAULT NULL
             );
+        """)
+
+        try:
+            conn.execute("ALTER TABLE research_briefs ADD COLUMN idea_id TEXT DEFAULT NULL;")
+        except sqlite3.OperationalError:
+            pass
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS research_ideas (
+                idea_id TEXT PRIMARY KEY,
+                session_id TEXT DEFAULT '',
+                title TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                hypothesis TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('TENTATIVE', 'PROMOTED', 'REVISED', 'ABANDONED')),
+                thinker_id TEXT DEFAULT '',
+                thinker_critique TEXT DEFAULT '',
+                unresolved_objections_json TEXT NOT NULL DEFAULT '[]',
+                parent_idea_id TEXT DEFAULT NULL,
+                revision_version INTEGER NOT NULL DEFAULT 1,
+                revision_notes TEXT DEFAULT '',
+                brief_id TEXT DEFAULT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (parent_idea_id) REFERENCES research_ideas(idea_id) ON DELETE SET NULL,
+                FOREIGN KEY (brief_id) REFERENCES research_briefs(brief_id) ON DELETE SET NULL
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ideas_session ON research_ideas(session_id);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ideas_parent ON research_ideas(parent_idea_id);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ideas_brief ON research_ideas(brief_id);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ideas_status ON research_ideas(status);
         """)
 
         conn.execute("""
@@ -336,9 +380,9 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
                 brief_id, session_id, topic, version, research_question,
                 objectives_json, hypotheses_json, assumptions_json, search_scope,
                 selection_criteria_json, thinker_context_json, unresolved_questions_json,
-                approval_status, approved_version, approved_at, created_at, updated_at
+                approval_status, approved_version, approved_at, created_at, updated_at, idea_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(brief_id) DO UPDATE SET
                 session_id=excluded.session_id,
                 topic=excluded.topic,
@@ -354,7 +398,8 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
                 approval_status=excluded.approval_status,
                 approved_version=excluded.approved_version,
                 approved_at=excluded.approved_at,
-                updated_at=excluded.updated_at;
+                updated_at=excluded.updated_at,
+                idea_id=COALESCE(excluded.idea_id, research_briefs.idea_id);
         """, (
             brief_data["brief_id"],
             brief_data.get("session_id", ""),
@@ -373,6 +418,7 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
             brief_data.get("approved_at"),
             brief_data.get("created_at"),
             brief_data.get("updated_at"),
+            brief_data.get("idea_id"),
         ))
     return get_brief_db(brief_data["brief_id"], db_path=db_path)
 
@@ -393,6 +439,7 @@ def get_brief_db(brief_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict
     d["selection_criteria"] = json.loads(d.get("selection_criteria_json") or "[]")
     d["thinker_context"] = json.loads(d.get("thinker_context_json") or "{}") or None
     d["unresolved_questions"] = json.loads(d.get("unresolved_questions_json") or "[]")
+    d["idea_id"] = d.get("idea_id")
     return d
 
 
@@ -415,8 +462,153 @@ def list_briefs_db(session_id: Optional[str] = None, limit: int = 50, db_path: s
         d["selection_criteria"] = json.loads(d.get("selection_criteria_json") or "[]")
         d["thinker_context"] = json.loads(d.get("thinker_context_json") or "{}") or None
         d["unresolved_questions"] = json.loads(d.get("unresolved_questions_json") or "[]")
+        d["idea_id"] = d.get("idea_id")
         results.append(d)
     return results
+
+
+def save_idea_db(idea_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
+    import json
+    import datetime
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    conn = get_connection(db_path)
+    with conn:
+        conn.execute("""
+            INSERT INTO research_ideas (
+                idea_id, session_id, title, description, hypothesis, status,
+                thinker_id, thinker_critique, unresolved_objections_json,
+                parent_idea_id, revision_version, revision_notes, brief_id,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(idea_id) DO UPDATE SET
+                session_id=excluded.session_id,
+                title=excluded.title,
+                description=excluded.description,
+                hypothesis=excluded.hypothesis,
+                status=excluded.status,
+                thinker_id=excluded.thinker_id,
+                thinker_critique=excluded.thinker_critique,
+                unresolved_objections_json=excluded.unresolved_objections_json,
+                parent_idea_id=excluded.parent_idea_id,
+                revision_version=excluded.revision_version,
+                revision_notes=excluded.revision_notes,
+                brief_id=excluded.brief_id,
+                updated_at=excluded.updated_at;
+        """, (
+            idea_data["idea_id"],
+            idea_data.get("session_id", ""),
+            idea_data["title"],
+            idea_data.get("description", ""),
+            idea_data["hypothesis"],
+            idea_data.get("status", "TENTATIVE"),
+            idea_data.get("thinker_id", ""),
+            idea_data.get("thinker_critique", ""),
+            json.dumps(idea_data.get("unresolved_objections", [])),
+            idea_data.get("parent_idea_id"),
+            idea_data.get("revision_version", 1),
+            idea_data.get("revision_notes", ""),
+            idea_data.get("brief_id"),
+            idea_data.get("created_at", now_iso),
+            idea_data.get("updated_at", now_iso),
+        ))
+    return get_idea_db(idea_data["idea_id"], db_path=db_path)
+
+
+def get_idea_db(idea_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM research_ideas WHERE idea_id = ?;", (idea_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["unresolved_objections"] = json.loads(d.get("unresolved_objections_json") or "[]")
+    return d
+
+
+def list_ideas_db(
+    session_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    db_path: str = DEFAULT_DB_PATH
+) -> list:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    query = "SELECT * FROM research_ideas WHERE 1=1"
+    params = []
+    if session_id:
+        query += " AND session_id = ?"
+        params.append(session_id)
+    if status:
+        query += " AND status = ?"
+        params.append(status)
+    query += " ORDER BY updated_at DESC LIMIT ?"
+    params.append(limit)
+
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    results = []
+    for r in rows:
+        d = dict(r)
+        d["unresolved_objections"] = json.loads(d.get("unresolved_objections_json") or "[]")
+        results.append(d)
+    return results
+
+
+def get_idea_history_db(idea_id: str, db_path: str = DEFAULT_DB_PATH) -> list:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM research_ideas WHERE idea_id = ?;", (idea_id,))
+    row = cursor.fetchone()
+    if not row:
+        return []
+
+    curr = dict(row)
+    root_id = curr["idea_id"]
+    visited_ancestors = {root_id}
+    while curr.get("parent_idea_id"):
+        parent_id = curr["parent_idea_id"]
+        if parent_id in visited_ancestors:
+            break
+        visited_ancestors.add(parent_id)
+        cursor.execute("SELECT * FROM research_ideas WHERE idea_id = ?;", (parent_id,))
+        p_row = cursor.fetchone()
+        if not p_row:
+            break
+        curr = dict(p_row)
+        root_id = curr["idea_id"]
+
+    family_ids = [root_id]
+    to_visit = [root_id]
+    seen = {root_id}
+    while to_visit:
+        pid = to_visit.pop(0)
+        cursor.execute("SELECT idea_id FROM research_ideas WHERE parent_idea_id = ? ORDER BY revision_version ASC, created_at ASC;", (pid,))
+        children = cursor.fetchall()
+        for ch in children:
+            cid = ch["idea_id"]
+            if cid not in seen:
+                seen.add(cid)
+                family_ids.append(cid)
+                to_visit.append(cid)
+
+    placeholders = ",".join("?" for _ in family_ids)
+    cursor.execute(f"SELECT * FROM research_ideas WHERE idea_id IN ({placeholders}) ORDER BY revision_version ASC, created_at ASC;", family_ids)
+    rows = cursor.fetchall()
+    history = []
+    for r in rows:
+        d = dict(r)
+        d["unresolved_objections"] = json.loads(d.get("unresolved_objections_json") or "[]")
+        history.append(d)
+    return history
 
 
 def save_task_db(task_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
