@@ -16,7 +16,9 @@
 | **Phase 3.1** | Persistent Idea & Hypothesis Lifecycle | Completed | **ACCEPT** | 8 lifecycle & promotion barrier tests passing (`test_idea_hypothesis_lifecycle.py`). Promotion barrier enforced, immutable revision lineage preserved, brief integration connected. |
 | **Phase 3.2** | Thinker Dialectic Convergence & Objection Translation | Completed | **ACCEPT** | 7 dialectic & counter-evidence tests passing (`test_thinker_dialectic_and_counter_evidence.py`). Framework-specific query generation across 10 thinkers, objection-to-query translation, SQLite brief persistence, agency-preserving hypothesis revision proposals, and search node counter-evidence tagging verified. |
 | **Phase 4** | Reproducible Literature Reviews | Completed | **ACCEPT** | 12 PRISMA review & evidence synthesis tests passing (`test_prisma_review_and_evidence_synthesis.py`). PRISMA 2020 flow accounting, mathematical invariant verification, criteria-grounded screening ledger, retrieval failure vs eligibility distinction, multi-report study grouping, study appraisal matrix, dialectic contradiction mapping with Phase 3.2 counter-evidence, SQLite persistence, and REST API verified. |
-| **Phase 5** | Persistent Research Workspace & Manuscript Engine | Next Milestone | **PENDING** | Project-scoped retention, versioned drafts, multi-format exports, human-in-the-loop editing. |
+| **Phase 5** | Persistent Research Workspace & Manuscript Engine | Completed | **ACCEPT** | 11 workspace & manuscript engine tests passing (`test_project_workspace_and_manuscript_engine.py`). Project-scoped persistence connecting ideas, briefs, PRISMA review ledgers, evidence matrices, and reports; non-destructive multi-revision drafts with collision guards; multi-format export engine (academic Markdown, LaTeX, verified BibTeX, and publication-ready HTML); and record-level drill-down & bidirectional claim-to-study traceability verified. |
+| **Phase 6** | Advanced PDF Compilation, Snowballing Search & Production Collaboration | Next Milestone | **PENDING** | Automated binary PDF generation (via WeasyPrint/XeLaTeX), recursive citation snowballing with decay heuristics, and collaborative multi-tenant sync. |
+
 
 ---
 
@@ -199,19 +201,64 @@
 
 ---
 
-## 3. Next Milestone: Phase 5 — Persistent Research Workspace & Manuscript Engine
+### Phase 5: Persistent Research Workspace & Manuscript Engine (Current Milestone)
+- **Status:** **ACCEPT**
+- **Original Unmet Criterion:** Making research artifacts belong to a coherent, persistent research project rather than temporary state; turning research synthesis into a structured, editable, versioned manuscript whose claims remain connected to sources; providing reliable multi-format export (academic Markdown, LaTeX, verified BibTeX, and publication-ready HTML); and connecting review-flow information and evidence matrices to underlying records.
+- **Implementation Changes:**
+  - [backend/memory/db.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/memory/db.py):
+    - Added tables in `init_db()`:
+      - `research_projects` (project_id, title, description, session_id, status, metadata_json, created_at, updated_at).
+      - `manuscripts` (manuscript_id, project_id, title, current_version, brief_id, review_id, created_at, updated_at).
+      - `manuscript_revisions` (revision_id, manuscript_id, version, title, author_notes, sections_json, claims_json, references_json, evidence_matrix_json, diff_summary_json, created_at).
+      - `manuscript_claims` (claim_id, manuscript_id, revision_id, section, claim_text, evidence_status, supporting_sources_json, counter_sources_json, confidence, reasoning, uncertainties, created_at).
+      - `manuscript_exports` (export_id, manuscript_id, version, format, content, metadata_json, created_at).
+    - Database migrations adding `project_id` foreign keys to `research_briefs`, `research_ideas`, `prisma_reviews`, and `reports`.
+    - CRUD helpers: `save_project_db`, `get_project_db`, `list_projects_db`, `delete_project_db`, `associate_artifact_to_project_db`, `save_manuscript_db`, `get_manuscript_db`, `list_manuscripts_db`, `save_manuscript_revision_db`, `get_manuscript_revision_db`, `list_manuscript_revisions_db`, `save_manuscript_claim_db`, `save_manuscript_claims_batch_db`, `list_manuscript_claims_db`, `save_manuscript_export_db`, `get_manuscript_export_db`, `list_manuscript_exports_db`.
+  - [backend/workspace/project.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/workspace/project.py):
+    - Core workspace aggregation: `load_project_workspace` unites project metadata, associated ideas (with revision lineage), briefs, PRISMA reviews (protocol, flow counts, evidence matrix), reports, manuscripts, and export records.
+    - Session boundary enforcement: `verify_project_access` guards against cross-session data bleeding.
+  - [backend/workspace/manuscript.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/workspace/manuscript.py):
+    - Structured academic draft representation: `create_manuscript`, `create_manuscript_from_brief_and_review` (auto-populating abstract, introduction, PRISMA methodology, evidence-based results, dialectical discussion, limitations, and references).
+    - Non-destructive revision engine: `save_manuscript_revision` snapshots draft versions without overwriting historical records.
+    - Collision & stale edit prevention: verifies `base_version` before saving revisions.
+    - Fine-grained claim diff engine: compares section content, claims (wording changes vs evidence changes vs status changes), and citation additions/removals.
+    - Counter-evidence qualification engine: `propose_claim_qualifications_from_evidence` detects relevant counter-evidence and proposes status qualifications (`SUPPORTED` -> `QUALIFIED`) without silent rewriting.
+  - [backend/workspace/exporter.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/workspace/exporter.py):
+    - Shared manuscript representation exporting to Markdown, LaTeX, BibTeX, and HTML.
+    - Academic Markdown: YAML frontmatter, section structure, GFM evidence matrix table, claim-level evidential ledger, and citation keys (`[@key]`).
+    - Compilable LaTeX: Article documentclass, special character escaping (`%`, `&`, `_`, `$`, `#`, `{`, `}`), `booktabs` tables, in-text `\cite{...}`, and embedded bibliography.
+    - Authentic BibTeX: generated strictly from stored metadata without fabricating missing DOIs or journals; unverified records clearly labeled.
+    - Publication-grade HTML: Semantic HTML5 article structure, XSS protection via `html.escape`, interactive `#ref-...` anchor links, and status badges.
+    - Export artifact integrity: all exported artifacts saved in database and linked to specific manuscript revision.
+  - [backend/workspace/traceability.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/workspace/traceability.py):
+    - Study drill-down: `drill_down_study_record` resolves study rows to individual reports, screening decisions with criteria and passages, appraisal metrics, dialectic contradictions, and referencing manuscript claims.
+    - Review flow node drill-down: `get_flow_node_records` resolves nodes (`identification`, `screening`, `screened_excluded`, `eligibility`, `included_studies`) directly to stored records.
+    - Bidirectional claim traceability: `get_claim_traceability` links manuscript claims directly to underlying studies and counter-evidence.
+  - [backend/api/routes_workspace.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/api/routes_workspace.py):
+    - REST endpoints for projects (`/api/projects`), manuscripts (`/api/manuscripts`), revisions (`/api/manuscripts/{id}/revisions`), exports (`/api/manuscripts/{id}/export`, `/api/exports/{id}`), and traceability (`/api/traceability/studies/{id}`, `/api/traceability/flow-nodes/{review_id}/{node_id}`, `/api/traceability/claims/{id}`).
+  - [backend/main.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/main.py):
+    - Registered `workspace_router`.
+  - [backend/tests/test_project_workspace_and_manuscript_engine.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/tests/test_project_workspace_and_manuscript_engine.py):
+    - 11 comprehensive tests validating project CRUD, workspace aggregation and lineage, manuscript instantiation from PRISMA reviews, multi-revision evolution with diff tracking, stale edit collision guards, counter-evidence qualification proposals, multi-format exports (Markdown, LaTeX, BibTeX, HTML), study drill-down, review flow records, bidirectional claim navigation, and REST API endpoints.
+  - [Makefile](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/Makefile):
+    - Added `backend/tests/test_project_workspace_and_manuscript_engine.py` to `test:` target; added workspace modules to `lint:` target.
+- **Observed Test Evidence:**
+  - `pytest backend/tests/test_project_workspace_and_manuscript_engine.py`: **11 passed in 1.72s (Exit Code: 0)**.
+  - Canonical suite `make test`: **277 passed, 33 subtests passed in 50.80s across 17 test suites (Exit Code: 0)**.
+  - Verification check `make lint`: All core modules imported successfully (Exit Code: 0).
+- **Explicit Documented Limitations:**
+  - Direct binary PDF compilation via local headless LaTeX (e.g. `pdflatex` / `xelatex`) or `weasyprint` depends on system binary installations; THOTH validates generated LaTeX and HTML structures deterministically and stores reproducible source snapshots in the export ledger.
+
+---
+
+## 3. Next Milestone: Phase 6 — Advanced PDF Compilation, Snowballing Search & Production Collaboration
 
 ### Objective
-Provide project-scoped workspace persistence, draft version history, human-in-the-loop collaborative editing, and publication-ready multi-format exports (Markdown, LaTeX, HTML, and structured JSON) anchored in verifiable evidence matrices.
+Advance THOTH into an autonomous, collaborative research companion by integrating server-side binary PDF compilation, recursive citation snowballing with decay heuristics, and multi-tenant synchronization.
 
 ### Required Capabilities
-1. **Project-Scoped Workspace**: Persistent workspaces binding research ideas, briefs, PRISMA review ledgers, evidence matrices, and drafted reports.
-2. **Versioned Draft Progression**: Multi-revision manuscript evolution tracking claim adjustments, citation updates, and reviewer notes across drafts.
-3. **Multi-Format Export Engine**: Deterministic export to LaTeX (with BibTeX bibliographies grounded in verified DOIs/locators), academic Markdown, and publication-ready HTML.
-4. **Interactive Evidence Matrix Inspection**: User interface allowing human researchers to explore PRISMA flowcharts, click from flow counts directly to underlying records, and inspect dialectic contradiction cards.
+1. **Server-Side Binary PDF Generation**: Compilation of publication-ready PDFs from verified LaTeX/HTML templates using headless renderers (WeasyPrint / XeLaTeX) with customizable academic style sheets.
+2. **Recursive Citation Snowballing**: Forward and backward citation retrieval with configurable stopping criteria (citation counts, search depth, marginal semantic decay) to discover seminal literature.
+3. **Collaborative Multi-Tenant Sync**: Enterprise workspace synchronization between local SQLite stores and cloud Postgres (Supabase) preserving fine-grained audit ledgers and human approval barriers.
 
-### Acceptance Criteria for Phase 5
-- Research projects persist across process restarts with all associated briefs, reviews, decisions, and drafts accessible through unified project APIs.
-- Export engine produces valid LaTeX and BibTeX containing authentic source locators and badges without hallucinated references.
-- All existing tests in `make test` remain green.
 

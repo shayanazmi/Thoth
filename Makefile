@@ -62,7 +62,7 @@ dev-web:
 
 test:
 	@echo "Running core unit, db, schema, and API adapter test suites..."
-	@$(PYTEST) backend/tests/test_pure_functions.py backend/tests/test_db.py backend/tests/test_ui_adapter.py backend/tests/test_schemas.py backend/tests/test_dispatcher.py backend/tests/test_all_ten_frameworks.py backend/tests/test_claim_evidence_integrity.py backend/tests/test_document_ingestion.py backend/tests/test_research_mandate_and_approval.py backend/tests/test_audit_forensic_invariants.py backend/tests/test_task_lifecycle_persistence.py backend/tests/test_evidence_provenance_and_verification.py backend/tests/test_evidence_audit_and_correctness_gate.py backend/tests/test_idea_hypothesis_lifecycle.py backend/tests/test_thinker_dialectic_and_counter_evidence.py backend/tests/test_prisma_review_and_evidence_synthesis.py -v
+	@$(PYTEST) backend/tests/test_pure_functions.py backend/tests/test_db.py backend/tests/test_ui_adapter.py backend/tests/test_schemas.py backend/tests/test_dispatcher.py backend/tests/test_all_ten_frameworks.py backend/tests/test_claim_evidence_integrity.py backend/tests/test_document_ingestion.py backend/tests/test_research_mandate_and_approval.py backend/tests/test_audit_forensic_invariants.py backend/tests/test_task_lifecycle_persistence.py backend/tests/test_evidence_provenance_and_verification.py backend/tests/test_evidence_audit_and_correctness_gate.py backend/tests/test_idea_hypothesis_lifecycle.py backend/tests/test_thinker_dialectic_and_counter_evidence.py backend/tests/test_prisma_review_and_evidence_synthesis.py backend/tests/test_project_workspace_and_manuscript_engine.py -v
 
 test-all:
 	@echo "Running all pytest test suites..."
@@ -79,7 +79,9 @@ eval:
 lint:
 	@echo "Validating Python syntax and imports..."
 	@$(PYTHON) -m py_compile backend/main.py
-	@$(PYTHON) -c "import backend.main; import backend.core.config; print('All core modules imported successfully.')"
+	@$(PYTHON) -m py_compile backend/workspace/project.py backend/workspace/manuscript.py backend/workspace/exporter.py backend/workspace/traceability.py backend/api/routes_workspace.py
+	@$(PYTHON) -c "import backend.main; import backend.core.config; import backend.workspace; print('All core modules imported successfully.')"
+
 
 migrate:
 	@echo "Migrating SQLite db/store.db to Supabase Postgres..."

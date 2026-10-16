@@ -253,6 +253,114 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             CREATE INDEX IF NOT EXISTS idx_screening_stage_disp ON screening_decisions(stage, disposition);
         """)
 
+        # Phase 5: Projects, Manuscripts, Revisions, Claims, and Exports
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS research_projects (
+                project_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                session_id TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'ARCHIVED', 'COMPLETED')),
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_projects_session ON research_projects(session_id);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON research_projects(updated_at DESC);
+        """)
+
+        # Add project_id columns to existing entities if not present
+        for tbl in ["research_briefs", "research_ideas", "prisma_reviews", "reports"]:
+            try:
+                conn.execute(f"ALTER TABLE {tbl} ADD COLUMN project_id TEXT DEFAULT NULL;")
+            except sqlite3.OperationalError:
+                pass
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS manuscripts (
+                manuscript_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                current_version INTEGER NOT NULL DEFAULT 1,
+                brief_id TEXT DEFAULT NULL,
+                review_id TEXT DEFAULT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES research_projects(project_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_manuscripts_project ON manuscripts(project_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS manuscript_revisions (
+                revision_id TEXT PRIMARY KEY,
+                manuscript_id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                author_notes TEXT DEFAULT '',
+                sections_json TEXT NOT NULL DEFAULT '{}',
+                claims_json TEXT NOT NULL DEFAULT '[]',
+                references_json TEXT NOT NULL DEFAULT '[]',
+                evidence_matrix_json TEXT NOT NULL DEFAULT '{}',
+                diff_summary_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (manuscript_id) REFERENCES manuscripts(manuscript_id) ON DELETE CASCADE,
+                UNIQUE (manuscript_id, version)
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_revisions_manuscript ON manuscript_revisions(manuscript_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS manuscript_claims (
+                claim_id TEXT PRIMARY KEY,
+                manuscript_id TEXT NOT NULL,
+                revision_id TEXT NOT NULL,
+                section TEXT NOT NULL,
+                claim_text TEXT NOT NULL,
+                evidence_status TEXT NOT NULL DEFAULT 'UNVERIFIED' CHECK (evidence_status IN ('SUPPORTED', 'QUALIFIED', 'CHALLENGED', 'UNVERIFIED')),
+                supporting_sources_json TEXT NOT NULL DEFAULT '[]',
+                counter_sources_json TEXT NOT NULL DEFAULT '[]',
+                confidence REAL DEFAULT 0.0,
+                reasoning TEXT DEFAULT '',
+                uncertainties TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (manuscript_id) REFERENCES manuscripts(manuscript_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claims_manuscript ON manuscript_claims(manuscript_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS manuscript_exports (
+                export_id TEXT PRIMARY KEY,
+                manuscript_id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                format TEXT NOT NULL CHECK (format IN ('markdown', 'latex', 'bibtex', 'html')),
+                content TEXT NOT NULL,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (manuscript_id) REFERENCES manuscripts(manuscript_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_exports_manuscript_version ON manuscript_exports(manuscript_id, version, format);
+        """)
+
     return conn
 
 def save_session(
@@ -1136,16 +1244,24 @@ def get_prisma_review_db(
 
 def list_prisma_reviews_db(
     session_id: Optional[str] = None,
+    limit: Optional[int] = None,
     db_path: str = DEFAULT_DB_PATH,
 ) -> List[Dict[str, Any]]:
     import json
     init_db(db_path)
     conn = get_connection(db_path)
     cursor = conn.cursor()
+    query = "SELECT * FROM prisma_reviews"
+    params = []
     if session_id:
-        cursor.execute("SELECT * FROM prisma_reviews WHERE session_id = ? ORDER BY created_at DESC;", (session_id,))
-    else:
-        cursor.execute("SELECT * FROM prisma_reviews ORDER BY created_at DESC;")
+        query += " WHERE session_id = ?"
+        params.append(session_id)
+    query += " ORDER BY created_at DESC"
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+    query += ";"
+    cursor.execute(query, tuple(params))
     rows = cursor.fetchall()
     out = []
     for r in rows:
@@ -1314,4 +1430,553 @@ def update_screening_decision_db(
             WHERE decision_id = ?;
         """, (disposition, reviewer_type, new_rationale, now_iso, decision_id))
         return cursor.rowcount > 0
+
+
+# ==========================================
+# Phase 5: Projects, Manuscripts, Revisions, Claims, Exports
+# ==========================================
+
+def save_project_db(
+    project_id: str,
+    title: str,
+    description: str = "",
+    session_id: str = "",
+    status: str = "ACTIVE",
+    metadata: Optional[dict] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    meta_json = json.dumps(metadata or {})
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT created_at FROM research_projects WHERE project_id = ?;", (project_id,))
+        row = cursor.fetchone()
+        created_at = row["created_at"] if row else now_iso
+
+        cursor.execute("""
+            INSERT INTO research_projects (project_id, title, description, session_id, status, metadata_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(project_id) DO UPDATE SET
+                title = excluded.title,
+                description = excluded.description,
+                session_id = excluded.session_id,
+                status = excluded.status,
+                metadata_json = excluded.metadata_json,
+                updated_at = excluded.updated_at;
+        """, (project_id, title, description, session_id, status, meta_json, created_at, now_iso))
+
+    return {
+        "project_id": project_id,
+        "title": title,
+        "description": description,
+        "session_id": session_id,
+        "status": status,
+        "metadata": metadata or {},
+        "created_at": created_at,
+        "updated_at": now_iso,
+    }
+
+
+def get_project_db(project_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM research_projects WHERE project_id = ?;", (project_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["metadata"] = json.loads(d.get("metadata_json") or "{}")
+    except Exception:
+        d["metadata"] = {}
+    return d
+
+
+def list_projects_db(
+    session_id: Optional[str] = None,
+    status: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+
+    query = "SELECT * FROM research_projects WHERE 1=1"
+    params = []
+    if session_id:
+        query += " AND session_id = ?"
+        params.append(session_id)
+    if status:
+        query += " AND status = ?"
+        params.append(status)
+    query += " ORDER BY updated_at DESC;"
+
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["metadata"] = json.loads(d.get("metadata_json") or "{}")
+        except Exception:
+            d["metadata"] = {}
+        out.append(d)
+    return out
+
+
+def delete_project_db(project_id: str, db_path: str = DEFAULT_DB_PATH) -> bool:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM research_projects WHERE project_id = ?;", (project_id,))
+        return cursor.rowcount > 0
+
+
+def associate_artifact_to_project_db(
+    artifact_type: str,
+    artifact_id: str,
+    project_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> bool:
+    init_db(db_path)
+    conn = get_connection(db_path)
+
+    table_map = {
+        "brief": ("research_briefs", "brief_id"),
+        "idea": ("research_ideas", "idea_id"),
+        "prisma_review": ("prisma_reviews", "review_id"),
+        "report": ("reports", "report_id"),
+    }
+
+    if artifact_type not in table_map:
+        raise ValueError(f"Unsupported artifact type '{artifact_type}' for project association.")
+
+    tbl, id_col = table_map[artifact_type]
+
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute(f"UPDATE {tbl} SET project_id = ? WHERE {id_col} = ?;", (project_id, artifact_id))
+        return cursor.rowcount > 0
+
+
+def save_manuscript_db(
+    manuscript_id: str,
+    project_id: str,
+    title: str,
+    current_version: int = 1,
+    brief_id: Optional[str] = None,
+    review_id: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT created_at FROM manuscripts WHERE manuscript_id = ?;", (manuscript_id,))
+        row = cursor.fetchone()
+        created_at = row["created_at"] if row else now_iso
+
+        cursor.execute("""
+            INSERT INTO manuscripts (manuscript_id, project_id, title, current_version, brief_id, review_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(manuscript_id) DO UPDATE SET
+                title = excluded.title,
+                current_version = excluded.current_version,
+                brief_id = excluded.brief_id,
+                review_id = excluded.review_id,
+                updated_at = excluded.updated_at;
+        """, (manuscript_id, project_id, title, current_version, brief_id, review_id, created_at, now_iso))
+
+    return {
+        "manuscript_id": manuscript_id,
+        "project_id": project_id,
+        "title": title,
+        "current_version": current_version,
+        "brief_id": brief_id,
+        "review_id": review_id,
+        "created_at": created_at,
+        "updated_at": now_iso,
+    }
+
+
+def get_manuscript_db(manuscript_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM manuscripts WHERE manuscript_id = ?;", (manuscript_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    return dict(row)
+
+
+def list_manuscripts_db(project_id: Optional[str] = None, db_path: str = DEFAULT_DB_PATH) -> list[dict]:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    if project_id:
+        cursor.execute("SELECT * FROM manuscripts WHERE project_id = ? ORDER BY updated_at DESC;", (project_id,))
+    else:
+        cursor.execute("SELECT * FROM manuscripts ORDER BY updated_at DESC;")
+    return [dict(r) for r in cursor.fetchall()]
+
+
+def save_manuscript_revision_db(
+    revision_id: str,
+    manuscript_id: str,
+    version: int,
+    title: str,
+    author_notes: str = "",
+    sections: Optional[dict] = None,
+    claims: Optional[list] = None,
+    references: Optional[list] = None,
+    evidence_matrix: Optional[dict] = None,
+    diff_summary: Optional[dict] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    sections_json = json.dumps(sections or {})
+    claims_json = json.dumps(claims or [])
+    refs_json = json.dumps(references or [])
+    ev_json = json.dumps(evidence_matrix or {})
+    diff_json = json.dumps(diff_summary or {})
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO manuscript_revisions (
+                revision_id, manuscript_id, version, title, author_notes,
+                sections_json, claims_json, references_json, evidence_matrix_json, diff_summary_json, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(manuscript_id, version) DO UPDATE SET
+                title = excluded.title,
+                author_notes = excluded.author_notes,
+                sections_json = excluded.sections_json,
+                claims_json = excluded.claims_json,
+                references_json = excluded.references_json,
+                evidence_matrix_json = excluded.evidence_matrix_json,
+                diff_summary_json = excluded.diff_summary_json;
+        """, (revision_id, manuscript_id, version, title, author_notes,
+              sections_json, claims_json, refs_json, ev_json, diff_json, now_iso))
+
+        # Update current_version on manuscript
+        cursor.execute("""
+            UPDATE manuscripts
+            SET current_version = MAX(current_version, ?), updated_at = ?
+            WHERE manuscript_id = ?;
+        """, (version, now_iso, manuscript_id))
+
+    return {
+        "revision_id": revision_id,
+        "manuscript_id": manuscript_id,
+        "version": version,
+        "title": title,
+        "author_notes": author_notes,
+        "sections": sections or {},
+        "claims": claims or [],
+        "references": references or [],
+        "evidence_matrix": evidence_matrix or {},
+        "diff_summary": diff_summary or {},
+        "created_at": now_iso,
+    }
+
+
+def get_manuscript_revision_db(manuscript_id: str, version: int, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM manuscript_revisions WHERE manuscript_id = ? AND version = ?;
+    """, (manuscript_id, version))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    for field, default in [
+        ("sections_json", "{}"),
+        ("claims_json", "[]"),
+        ("references_json", "[]"),
+        ("evidence_matrix_json", "{}"),
+        ("diff_summary_json", "{}"),
+    ]:
+        key = field.replace("_json", "")
+        try:
+            d[key] = json.loads(d.get(field) or default)
+        except Exception:
+            d[key] = json.loads(default)
+    return d
+
+
+def list_manuscript_revisions_db(manuscript_id: str, db_path: str = DEFAULT_DB_PATH) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT revision_id, manuscript_id, version, title, author_notes, diff_summary_json, created_at
+        FROM manuscript_revisions
+        WHERE manuscript_id = ?
+        ORDER BY version ASC;
+    """, (manuscript_id,))
+    rows = cursor.fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["diff_summary"] = json.loads(d.get("diff_summary_json") or "{}")
+        except Exception:
+            d["diff_summary"] = {}
+        out.append(d)
+    return out
+
+
+def save_manuscript_claim_db(
+    claim_id: str,
+    manuscript_id: str,
+    revision_id: str,
+    section: str,
+    claim_text: str,
+    evidence_status: str = "UNVERIFIED",
+    supporting_sources: Optional[list] = None,
+    counter_sources: Optional[list] = None,
+    confidence: float = 0.0,
+    reasoning: str = "",
+    uncertainties: str = "",
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    supp_json = json.dumps(supporting_sources or [])
+    counter_json = json.dumps(counter_sources or [])
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO manuscript_claims (
+                claim_id, manuscript_id, revision_id, section, claim_text,
+                evidence_status, supporting_sources_json, counter_sources_json,
+                confidence, reasoning, uncertainties, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(claim_id) DO UPDATE SET
+                revision_id = excluded.revision_id,
+                section = excluded.section,
+                claim_text = excluded.claim_text,
+                evidence_status = excluded.evidence_status,
+                supporting_sources_json = excluded.supporting_sources_json,
+                counter_sources_json = excluded.counter_sources_json,
+                confidence = excluded.confidence,
+                reasoning = excluded.reasoning,
+                uncertainties = excluded.uncertainties;
+        """, (claim_id, manuscript_id, revision_id, section, claim_text,
+              evidence_status, supp_json, counter_json, confidence, reasoning, uncertainties, now_iso))
+
+    return {
+        "claim_id": claim_id,
+        "manuscript_id": manuscript_id,
+        "revision_id": revision_id,
+        "section": section,
+        "claim_text": claim_text,
+        "evidence_status": evidence_status,
+        "supporting_sources": supporting_sources or [],
+        "counter_sources": counter_sources or [],
+        "confidence": confidence,
+        "reasoning": reasoning,
+        "uncertainties": uncertainties,
+        "created_at": now_iso,
+    }
+
+
+def save_manuscript_claims_batch_db(claims: list[dict], db_path: str = DEFAULT_DB_PATH) -> bool:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        for c in claims:
+            supp_json = json.dumps(c.get("supporting_sources") or [])
+            counter_json = json.dumps(c.get("counter_sources") or [])
+            cursor.execute("""
+                INSERT INTO manuscript_claims (
+                    claim_id, manuscript_id, revision_id, section, claim_text,
+                    evidence_status, supporting_sources_json, counter_sources_json,
+                    confidence, reasoning, uncertainties, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(claim_id) DO UPDATE SET
+                    revision_id = excluded.revision_id,
+                    section = excluded.section,
+                    claim_text = excluded.claim_text,
+                    evidence_status = excluded.evidence_status,
+                    supporting_sources_json = excluded.supporting_sources_json,
+                    counter_sources_json = excluded.counter_sources_json,
+                    confidence = excluded.confidence,
+                    reasoning = excluded.reasoning,
+                    uncertainties = excluded.uncertainties;
+            """, (
+                c["claim_id"], c["manuscript_id"], c.get("revision_id", ""), c.get("section", ""),
+                c.get("claim_text", ""), c.get("evidence_status", "UNVERIFIED"),
+                supp_json, counter_json, c.get("confidence", 0.0),
+                c.get("reasoning", ""), c.get("uncertainties", ""), now_iso
+            ))
+        return True
+
+
+def list_manuscript_claims_db(
+    manuscript_id: str,
+    revision_id: Optional[str] = None,
+    section: Optional[str] = None,
+    evidence_status: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+
+    query = "SELECT * FROM manuscript_claims WHERE manuscript_id = ?"
+    params = [manuscript_id]
+    if revision_id:
+        query += " AND revision_id = ?"
+        params.append(revision_id)
+    if section:
+        query += " AND section = ?"
+        params.append(section)
+    if evidence_status:
+        query += " AND evidence_status = ?"
+        params.append(evidence_status)
+    query += " ORDER BY created_at ASC;"
+
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["supporting_sources"] = json.loads(d.get("supporting_sources_json") or "[]")
+        except Exception:
+            d["supporting_sources"] = []
+        try:
+            d["counter_sources"] = json.loads(d.get("counter_sources_json") or "[]")
+        except Exception:
+            d["counter_sources"] = []
+        out.append(d)
+    return out
+
+
+def save_manuscript_export_db(
+    export_id: str,
+    manuscript_id: str,
+    version: int,
+    format: str,
+    content: str,
+    metadata: Optional[dict] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    meta_json = json.dumps(metadata or {})
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO manuscript_exports (
+                export_id, manuscript_id, version, format, content, metadata_json, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(export_id) DO UPDATE SET
+                content = excluded.content,
+                metadata_json = excluded.metadata_json;
+        """, (export_id, manuscript_id, version, format, content, meta_json, now_iso))
+
+    return {
+        "export_id": export_id,
+        "manuscript_id": manuscript_id,
+        "version": version,
+        "format": format,
+        "content": content,
+        "metadata": metadata or {},
+        "created_at": now_iso,
+    }
+
+
+def get_manuscript_export_db(export_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM manuscript_exports WHERE export_id = ?;", (export_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["metadata"] = json.loads(d.get("metadata_json") or "{}")
+    except Exception:
+        d["metadata"] = {}
+    return d
+
+
+def list_manuscript_exports_db(
+    manuscript_id: str,
+    version: Optional[int] = None,
+    format: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+
+    query = "SELECT * FROM manuscript_exports WHERE manuscript_id = ?"
+    params = [manuscript_id]
+    if version is not None:
+        query += " AND version = ?"
+        params.append(version)
+    if format:
+        query += " AND format = ?"
+        params.append(format)
+    query += " ORDER BY created_at DESC;"
+
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["metadata"] = json.loads(d.get("metadata_json") or "{}")
+        except Exception:
+            d["metadata"] = {}
+        out.append(d)
+    return out
+
 
