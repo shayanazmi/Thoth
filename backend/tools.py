@@ -17,25 +17,27 @@ def web_search(query: str) -> str:
         for r in results.get("results", [])
     )
 
-from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
+from backend.ingestion import ingest_document, IngestionResult
 
-@retry(
-    retry=retry_if_exception_type(requests.exceptions.RequestException),
-    stop=stop_after_attempt(3),
-    wait=wait_random_exponential(min=1, max=5),
-    reraise=True
-)
 def _scrape_url_with_retry(url: str) -> str:
-    resp = requests.get(url, timeout=6, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-    if resp.status_code in (429, 503):
-        raise requests.exceptions.RequestException(f"HTTP {resp.status_code} Rate Limited/Unavailable")
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
-    for tag in soup(["script", "style", "nav", "footer"]):
-        tag.decompose()
-    return soup.get_text(separator=" ", strip=True)[:3000]
+    res = ingest_document(url)
+    if res.status == "success":
+        return res.text
+    elif res.status == "empty":
+        return ""
+    else:
+        err = res.error_message or "Unknown extraction failure"
+        return f"Could not scrape URL: {err}"
 
-@tool(description="")
+def scrape_url_structured(url: str, max_chars: int = 15000) -> IngestionResult:
+    """
+    Structured scraping interface returning the complete IngestionResult,
+    preserving content_type, num_pages, char_count, is_truncated, passages,
+    extraction_quality, extraction_method, and extraction_warnings.
+    """
+    return ingest_document(url, max_chars=max_chars)
+
+@tool(description="Scrapes and extracts readable text from web pages and scholarly PDF documents.")
 def scrape_url(url: str) -> str:
     try:
         return _scrape_url_with_retry(url)

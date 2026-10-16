@@ -29,6 +29,7 @@ requests>=2.31.0
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
 html5lib>=1.1
+pypdf>=4.2.0
 
 # Data Science & Embeddings
 sentence-transformers>=2.7.0

@@ -520,34 +520,105 @@ def scrape_node(state: ResearchState) -> dict:
                 "added_in_turn": 0,
                 "extracted_text": "",
                 "scrape_status": "pending",
-                "scrape_error": None
+                "scrape_error": None,
+                "content_type": "unknown",
+                "extraction_quality": "unknown",
+                "extraction_method": "unknown",
+                "extraction_warnings": [],
+                "retrieval_timestamp": None,
+                "char_count": 0,
+                "num_pages": 0,
+                "is_truncated": False,
+                "passages": []
             }
             cumulative_sources.append(new_record)
             sources_by_url[url] = new_record
 
         target_source = sources_by_url[url]
+        now_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        target_source.setdefault("retrieval_timestamp", now_ts)
+        target_source.setdefault("extraction_warnings", [])
         try:
             scrape_res = scrape_url.invoke({"url": url})
-            if isinstance(scrape_res, str) and (scrape_res.startswith("Could not scrape URL:") or scrape_res.startswith("(Failed to scrape:")):
-                target_source["extracted_text"] = ""
-                target_source["scrape_status"] = "failed"
-                target_source["scrape_error"] = str(scrape_res)
-                scraped_content += f"\n\n--- Source: {url} ---\n(Failed to scrape: {scrape_res})"
-            elif not scrape_res or not str(scrape_res).strip():
-                target_source["extracted_text"] = ""
-                target_source["scrape_status"] = "empty"
-                target_source["scrape_error"] = "Empty content extracted"
-                scraped_content += f"\n\n--- Source: {url} ---\n(Empty content)"
+            if hasattr(scrape_res, "extraction_quality"):
+                target_source["content_type"] = scrape_res.content_type
+                target_source["scrape_status"] = scrape_res.status
+                target_source["scrape_error"] = scrape_res.error_message
+                target_source["extraction_quality"] = scrape_res.extraction_quality
+                target_source["extraction_method"] = scrape_res.extraction_method
+                target_source["extraction_warnings"] = list(scrape_res.extraction_warnings)
+                target_source["retrieval_timestamp"] = scrape_res.retrieval_timestamp or now_ts
+                target_source["char_count"] = scrape_res.char_count
+                target_source["num_pages"] = scrape_res.num_pages
+                target_source["is_truncated"] = scrape_res.is_truncated
+                target_source["passages"] = scrape_res.passages
+                target_source["extracted_text"] = scrape_res.text
+                if scrape_res.status == "success":
+                    trunc_note = " [Partial Extraction - Truncated]" if scrape_res.is_truncated else ""
+                    scraped_content += f"\n\n--- Source: {url} ({scrape_res.content_type.upper()}{trunc_note}) ---\n{scrape_res.text}"
+                elif scrape_res.status == "empty":
+                    scraped_content += f"\n\n--- Source: {url} ---\n(Empty content extracted)"
+                else:
+                    scraped_content += f"\n\n--- Source: {url} ---\n(Failed to scrape: {scrape_res.error_message})"
             else:
-                extracted = str(scrape_res)[:3000]
-                target_source["extracted_text"] = extracted
-                target_source["scrape_status"] = "success"
-                target_source["scrape_error"] = None
-                scraped_content += f"\n\n--- Source: {url} ---\n{extracted}"
+                res_str = str(scrape_res or "")
+                if res_str.startswith("Could not scrape URL:") or res_str.startswith("(Failed to scrape:"):
+                    target_source["extracted_text"] = ""
+                    target_source["scrape_status"] = "failed"
+                    target_source["scrape_error"] = res_str
+                    has_snippet = bool((target_source.get("abstract") or target_source.get("snippet") or "").strip())
+                    target_source["extraction_quality"] = "snippet_only" if has_snippet else "inaccessible"
+                    target_source["extraction_warnings"] = [res_str]
+                    scraped_content += f"\n\n--- Source: {url} ---\n(Failed to scrape: {res_str})"
+                elif not res_str.strip():
+                    target_source["extracted_text"] = ""
+                    target_source["scrape_status"] = "empty"
+                    target_source["scrape_error"] = "Empty content extracted"
+                    has_snippet = bool((target_source.get("abstract") or target_source.get("snippet") or "").strip())
+                    target_source["extraction_quality"] = "snippet_only" if has_snippet else "empty"
+                    target_source["extraction_warnings"] = ["Empty content extracted"]
+                    scraped_content += f"\n\n--- Source: {url} ---\n(Empty content)"
+                else:
+                    raw_len = len(res_str)
+                    is_truncated = raw_len > 12000
+                    if is_truncated:
+                        extracted = res_str[:12000].rsplit(" ", 1)[0] + "... [Text truncated at character budget]"
+                        extraction_quality = "partial"
+                        warnings_list = ["Document text truncated at character budget"]
+                    else:
+                        extracted = res_str
+                        extraction_quality = "full"
+                        warnings_list = []
+
+                    content_type = "pdf" if ("[Page " in extracted or url.lower().endswith(".pdf") or "/pdf/" in url.lower()) else "html"
+                    num_pages = len(re.findall(r"\[Page\s+(\d+)\]", extracted)) if content_type == "pdf" else (1 if extracted else 0)
+
+                    target_source["extracted_text"] = extracted
+                    target_source["scrape_status"] = "success"
+                    target_source["scrape_error"] = None
+                    target_source["content_type"] = content_type
+                    target_source["extraction_quality"] = extraction_quality
+                    target_source["extraction_method"] = "pypdf" if content_type == "pdf" else "beautifulsoup"
+                    target_source["extraction_warnings"] = warnings_list
+                    target_source["char_count"] = len(extracted)
+                    target_source["num_pages"] = num_pages
+                    target_source["is_truncated"] = is_truncated
+
+                    from backend.ingestion import create_bounded_passages
+                    target_source["passages"] = create_bounded_passages(
+                        extracted,
+                        content_type=content_type,
+                        source_uri=url
+                    )
+                    trunc_note = " [Partial Extraction - Truncated]" if is_truncated else ""
+                    scraped_content += f"\n\n--- Source: {url} ({content_type.upper()}{trunc_note}) ---\n{extracted}"
         except Exception as e:
             target_source["extracted_text"] = ""
             target_source["scrape_status"] = "failed"
             target_source["scrape_error"] = str(e)
+            has_snippet = bool((target_source.get("abstract") or target_source.get("snippet") or "").strip())
+            target_source["extraction_quality"] = "snippet_only" if has_snippet else "inaccessible"
+            target_source["extraction_warnings"] = [str(e)]
             scraped_content += f"\n\n--- Source: {url} ---\n(Failed to scrape: {e})"
 
     print("\nScraped Content length:", len(scraped_content))
@@ -590,16 +661,48 @@ def writer_node(state: ResearchState) -> dict:
         pmid_str = f"PMID: {s['pmid']}" if s.get("pmid") else ""
         id_str = " | ".join(filter(None, [doi_str, arxiv_str, pmid_str]))
         id_line = f"Identifiers: {id_str}\n" if id_str else ""
-        ev = (s.get("extracted_text") or s.get("abstract") or s.get("snippet") or "").strip()
-        ev_sample = f"Evidence Excerpt:\n{ev[:1200]}" if ev else "(No substantive text extracted)"
+        passages = s.get("passages") or []
+        quality = s.get("extraction_quality") or "unknown"
+        status = s.get("scrape_status") or "unscraped"
+        num_pages = s.get("num_pages", 0)
+        page_info = f" ({num_pages} pages)" if num_pages > 0 else ""
+        trunc_info = " [PARTIALLY EXTRACTED / TRUNCATED]" if s.get("is_truncated") else ""
+
+        if quality == "full":
+            access_banner = f"Access Status: FULL TEXT{page_info}"
+        elif quality == "partial":
+            access_banner = f"Access Status: PARTIAL EXCERPT{page_info}{trunc_info}"
+        elif quality == "snippet_only":
+            access_banner = "Access Status: SEARCH SNIPPET / ABSTRACT ONLY (Full text was NOT retrieved)"
+        elif quality == "inaccessible":
+            access_banner = f"Access Status: INACCESSIBLE (Full-text retrieval failed: {s.get('scrape_error') or 'Inaccessible'})"
+        elif quality == "empty":
+            access_banner = "Access Status: EMPTY (Document yielded zero readable text)"
+        else:
+            access_banner = f"Access Status: {status.upper()}"
+
+        if passages:
+            from backend.ingestion import select_representative_passages, format_passages_for_context
+            selected = select_representative_passages(passages, max_chars=1600, max_passages=3)
+            formatted = format_passages_for_context(selected, max_chars=1600)
+            ev_sample = f"Evidence Passages (with provenance locators):\n{formatted}"
+        elif s.get("extracted_text"):
+            ev = s["extracted_text"].strip()
+            ev_sample = f"Evidence Excerpt:\n{ev[:1200]}"
+        elif s.get("abstract") or s.get("snippet"):
+            snip = (s.get("abstract") or s.get("snippet")).strip()
+            ev_sample = f"Search Snippet Only (Do NOT represent as full-text review):\n{snip[:800]}"
+        else:
+            ev_sample = "(No substantive text or snippet available)"
+
         source_cat_lines.append(
-            f"[{sid}] {title} ({dt})\nAuthors: {auth}\nURL: {url}\n{id_line}{ev_sample}"
+            f"[{sid}] {title} ({dt})\nAuthors: {auth}\nURL: {url}\n{access_banner}\n{id_line}{ev_sample}"
         )
     source_cat_text = "\n\n---\n\n".join(source_cat_lines) if source_cat_lines else "(No sources available)"
 
     raw_research = (
         f"SEARCH RESULTS:\n{state.get('search_results', '')}\n\n"
-        f"SOURCE CATALOGUE (Cite using [[src-id]]):\n{source_cat_text}\n\n"
+        f"SOURCE CATALOGUE (Cite using [[src-id]] or locator [[src-id:passage_id]]):\n{source_cat_text}\n\n"
         f"DETAILED SCRAPED CONTENT:\n{state.get('scraped_content', '')}"
     )
     if vault_notes_text:
@@ -615,6 +718,26 @@ def writer_node(state: ResearchState) -> dict:
         research_combined += f"\n\nPRIOR RESEARCH SUMMARY:\n{session_ctx['summary']}"
     if session_ctx["recent_turns"]:
         research_combined += f"\n\nRECENT CONVERSATION TURNS:\n{session_ctx['recent_turns']}"
+
+    brief = state.get("brief") or {}
+    thinker_ctx = state.get("thinker_context") or brief.get("thinker_context")
+    if thinker_ctx and isinstance(thinker_ctx, dict) and thinker_ctx.get("thinker_name"):
+        t_name = thinker_ctx.get("thinker_name")
+        t_arch = thinker_ctx.get("archetype", "")
+        t_desc = thinker_ctx.get("description", "")
+        research_combined += f"\n\nINTELLECTUAL RIGOUR PERSPECTIVE ({t_name} - {t_arch}):\n{t_desc}"
+    if state.get("hypotheses"):
+        hyps_str = "\n".join(f"- {h}" for h in state["hypotheses"])
+        research_combined += f"\n\nCENTRAL RESEARCH HYPOTHESES TO TEST:\n{hyps_str}"
+    if state.get("selection_criteria"):
+        crit_str = "\n".join(f"- {c}" for c in state["selection_criteria"])
+        research_combined += f"\n\nSELECTION & FALSIFICATION CRITERIA:\n{crit_str}"
+    unresolved_q = state.get("unresolved_questions") or brief.get("unresolved_questions")
+    if unresolved_q and isinstance(unresolved_q, list) and len(unresolved_q) > 0:
+        clean_unresolved = [str(q).strip() for q in unresolved_q if q and str(q).strip()]
+        if clean_unresolved:
+            unres_str = "\n".join(f"- {q}" for q in clean_unresolved)
+            research_combined += f"\n\nUNRESOLVED QUESTIONS & COMPETING PERSPECTIVES TO EXAMINE (Investigate as unverified inquiries, not established facts):\n{unres_str}"
 
     prior_feedback = ""
     if state.get("verifier_feedback"):
@@ -653,10 +776,16 @@ def verifier_node(state: ResearchState) -> dict:
         extracted_text = (s.get("extracted_text") or "").strip()
         abstract = (s.get("abstract") or s.get("snippet") or "").strip()
 
+        passages = s.get("passages") or []
         evidence_parts = []
         if abstract:
             evidence_parts.append(f"Abstract / Summary:\n{abstract[:1000]}")
-        if extracted_text:
+        if passages:
+            from backend.ingestion import select_representative_passages, format_passages_for_context
+            selected = select_representative_passages(passages, max_chars=2000, max_passages=4)
+            formatted = format_passages_for_context(selected, max_chars=2000)
+            evidence_parts.append(f"Evidence Passages (with locators):\n{formatted}")
+        elif extracted_text:
             if not abstract or extracted_text[:200] != abstract[:200]:
                 evidence_parts.append(f"Extracted Content:\n{extracted_text[:1500]}")
 
@@ -668,6 +797,20 @@ def verifier_node(state: ResearchState) -> dict:
             content_text = f"(No substantive text or abstract available for this source. Scrape status: {status}{err})"
 
         meta_lines = []
+        quality = s.get("extraction_quality") or "unknown"
+        if quality == "full":
+            pages_desc = f" ({s.get('num_pages')} pages)" if s.get("num_pages") else ""
+            meta_lines.append(f"Access Status: FULL TEXT{pages_desc}")
+        elif quality == "partial":
+            pages_desc = f" ({s.get('num_pages')} pages)" if s.get("num_pages") else ""
+            meta_lines.append(f"Access Status: PARTIAL EXCERPT{pages_desc}")
+        elif quality == "snippet_only":
+            meta_lines.append("Access Status: SEARCH SNIPPET / ABSTRACT ONLY (Full text was NOT retrieved)")
+        elif quality == "inaccessible":
+            meta_lines.append(f"Access Status: INACCESSIBLE (Retrieval failed: {s.get('scrape_error') or 'Inaccessible'})")
+        elif quality == "empty":
+            meta_lines.append("Access Status: EMPTY (Document yielded zero readable text)")
+
         if s.get("authors"):
             meta_lines.append(f"Authors: {', '.join(s['authors'][:5])}")
         if s.get("published_date"):
@@ -736,7 +879,8 @@ def verifier_node(state: ResearchState) -> dict:
             "verification_status": c.verification_status,
             "disposition": c.disposition,
             "quoted_evidence": c.quoted_evidence,
-            "provenance_verified": c.provenance_verified
+            "provenance_verified": c.provenance_verified,
+            "support_status": c.support_status
         })
 
     verifier_log = raw_response if isinstance(raw_response, str) else json.dumps(integrity_audit.model_dump(), indent=2)

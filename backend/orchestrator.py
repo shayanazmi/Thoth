@@ -56,7 +56,14 @@ def create_initial_state(
     max_retries: int = 2,
     initial_turns: Optional[List[Dict[str, Any]]] = None,
     initial_summary: str = "",
+    brief: Any = None,
 ) -> Dict[str, Any]:
+    if hasattr(brief, "to_dict"):
+        brief_data = brief.to_dict()
+    elif isinstance(brief, dict):
+        brief_data = dict(brief)
+    else:
+        brief_data = {}
     return {
         "topic": topic,
         "role": role,
@@ -81,7 +88,12 @@ def create_initial_state(
         "circular_replan_warnings": [],
         "integrity_status": "PENDING",
         "integrity_result": {},
-        "is_verified": False
+        "is_verified": False,
+        "brief": brief_data,
+        "thinker_context": brief_data.get("thinker_context") or {},
+        "hypotheses": brief_data.get("hypotheses") or [],
+        "selection_criteria": brief_data.get("selection_criteria") or [],
+        "unresolved_questions": brief_data.get("unresolved_questions") or [],
     }
 
 @observe(type="tool", description="Concurrently scrapes and extracts readable text from candidate URLs")
@@ -91,6 +103,7 @@ async def concurrent_scrape_urls(urls: List[str], dispatcher: Dispatcher = pipel
 
     async def fetch_single_url(url: str):
         domain = _extract_domain(url)
+        now_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
         source_info = {
             "url": url,
             "domain": domain,
@@ -98,31 +111,99 @@ async def concurrent_scrape_urls(urls: List[str], dispatcher: Dispatcher = pipel
             "added_in_turn": 0,
             "extracted_text": "",
             "scrape_status": "pending",
-            "scrape_error": None
+            "scrape_error": None,
+            "content_type": "unknown",
+            "extraction_quality": "unknown",
+            "extraction_method": "unknown",
+            "extraction_warnings": [],
+            "retrieval_timestamp": now_ts,
+            "char_count": 0,
+            "num_pages": 0,
+            "is_truncated": False,
+            "passages": []
         }
         try:
             res = await dispatcher.call(scrape_url.invoke, {"url": url})
-            if isinstance(res, str) and (res.startswith("Could not scrape URL:") or res.startswith("(Failed to scrape:")):
+            if hasattr(res, "extraction_quality"):
+                source_info["content_type"] = res.content_type
+                source_info["scrape_status"] = res.status
+                source_info["scrape_error"] = res.error_message
+                source_info["extraction_quality"] = res.extraction_quality
+                source_info["extraction_method"] = res.extraction_method
+                source_info["extraction_warnings"] = list(res.extraction_warnings)
+                source_info["retrieval_timestamp"] = res.retrieval_timestamp or now_ts
+                source_info["char_count"] = res.char_count
+                source_info["num_pages"] = res.num_pages
+                source_info["is_truncated"] = res.is_truncated
+                source_info["passages"] = res.passages
+                source_info["extracted_text"] = res.text
+                if res.status == "success":
+                    trunc_note = " [Partial Extraction - Truncated]" if res.is_truncated else ""
+                    text_content = f"\n\n--- Source: {url} ({res.content_type.upper()}{trunc_note}) ---\n{res.text}"
+                elif res.status == "empty":
+                    text_content = f"\n\n--- Source: {url} ---\n(Empty content extracted)"
+                elif res.status == "unsupported":
+                    text_content = f"\n\n--- Source: {url} ---\n(Unsupported content format: {res.error_message})"
+                else:
+                    text_content = f"\n\n--- Source: {url} ---\n(Failed to scrape: {res.error_message})"
+                return source_info, text_content
+
+            res_str = str(res or "")
+            if res_str.startswith("Could not scrape URL:") or res_str.startswith("(Failed to scrape:"):
                 source_info["extracted_text"] = ""
                 source_info["scrape_status"] = "failed"
-                source_info["scrape_error"] = str(res)
-                text_content = f"\n\n--- Source: {url} ---\n(Failed to scrape: {res})"
-            elif not res or not str(res).strip():
+                source_info["scrape_error"] = res_str
+                source_info["extraction_quality"] = "inaccessible"
+                source_info["extraction_warnings"] = [res_str]
+                text_content = f"\n\n--- Source: {url} ---\n(Failed to scrape: {res_str})"
+            elif not res_str.strip():
                 source_info["extracted_text"] = ""
                 source_info["scrape_status"] = "empty"
                 source_info["scrape_error"] = "Empty content extracted"
+                source_info["extraction_quality"] = "empty"
+                source_info["extraction_warnings"] = ["Empty content extracted"]
                 text_content = f"\n\n--- Source: {url} ---\n(Empty content)"
             else:
-                extracted = str(res)[:3000]
+                raw_len = len(res_str)
+                is_truncated = raw_len > 12000
+                if is_truncated:
+                    extracted = res_str[:12000].rsplit(" ", 1)[0] + "... [Text truncated at character budget]"
+                    extraction_quality = "partial"
+                    warnings_list = ["Document text truncated at character budget"]
+                else:
+                    extracted = res_str
+                    extraction_quality = "full"
+                    warnings_list = []
+
+                content_type = "pdf" if ("[Page " in extracted or url.lower().endswith(".pdf") or "/pdf/" in url.lower()) else "html"
+                num_pages = len(re.findall(r"\[Page\s+(\d+)\]", extracted)) if content_type == "pdf" else (1 if extracted else 0)
+
                 source_info["extracted_text"] = extracted
                 source_info["scrape_status"] = "success"
                 source_info["scrape_error"] = None
-                text_content = f"\n\n--- Source: {url} ---\n{extracted}"
+                source_info["content_type"] = content_type
+                source_info["extraction_quality"] = extraction_quality
+                source_info["extraction_method"] = "pypdf" if content_type == "pdf" else "beautifulsoup"
+                source_info["extraction_warnings"] = warnings_list
+                source_info["char_count"] = len(extracted)
+                source_info["num_pages"] = num_pages
+                source_info["is_truncated"] = is_truncated
+
+                from backend.ingestion import create_bounded_passages
+                source_info["passages"] = create_bounded_passages(
+                    extracted,
+                    content_type=content_type,
+                    source_uri=url
+                )
+                trunc_note = " [Partial Extraction - Truncated]" if is_truncated else ""
+                text_content = f"\n\n--- Source: {url} ({content_type.upper()}{trunc_note}) ---\n{extracted}"
             return source_info, text_content
         except Exception as e:
             source_info["extracted_text"] = ""
             source_info["scrape_status"] = "failed"
             source_info["scrape_error"] = str(e)
+            source_info["extraction_quality"] = "inaccessible"
+            source_info["extraction_warnings"] = [str(e)]
             return source_info, f"\n\n--- Source: {url} ---\n(Failed to scrape: {e})"
 
     logger.info(f"[ORCHESTRATOR CONCURRENCY] Fanning out concurrent scrape requests for {len(urls)} URLs...")
@@ -185,7 +266,8 @@ def stream_research_pipeline(
     initial_turns: Optional[List[Dict[str, Any]]] = None,
     initial_summary: str = "",
     cancel_event=None,
-    dispatcher: Dispatcher = pipeline_dispatcher
+    dispatcher: Dispatcher = pipeline_dispatcher,
+    brief: Optional[Dict[str, Any]] = None,
 ) -> Generator[tuple[str, Dict[str, Any], Dict[str, Any]], None, None]:
     state = create_initial_state(
         topic=topic,
@@ -196,13 +278,16 @@ def stream_research_pipeline(
         min_score=min_score,
         max_retries=max_retries,
         initial_turns=initial_turns,
-        initial_summary=initial_summary
+        initial_summary=initial_summary,
+        brief=brief,
     )
 
     act_phase_start = time.time()
 
     if cancel_event and cancel_event.is_set():
         logger.info("[ORCHESTRATOR] Cancel event detected before search.")
+        state["cancelled"] = True
+        yield "cancelled", {"cancelled": True, "reason": "Task cancelled."}, dict(state)
         return
 
     logger.info(f"[ORCHESTRATOR - PLAN] Initiating search for topic: '{topic}'")
@@ -212,6 +297,8 @@ def stream_research_pipeline(
 
     if cancel_event and cancel_event.is_set():
         logger.info("[ORCHESTRATOR] Cancel event detected before snowball.")
+        state["cancelled"] = True
+        yield "cancelled", {"cancelled": True, "reason": "Task cancelled."}, dict(state)
         return
 
     logger.info(f"[ORCHESTRATOR - SNOWBALL] Expanding citation graph and recommendations for '{topic}'...")
@@ -221,6 +308,8 @@ def stream_research_pipeline(
 
     if cancel_event and cancel_event.is_set():
         logger.info("[ORCHESTRATOR] Cancel event detected before scrape.")
+        state["cancelled"] = True
+        yield "cancelled", {"cancelled": True, "reason": "Task cancelled."}, dict(state)
         return
 
     existing_sources = state.get("cumulative_sources", [])

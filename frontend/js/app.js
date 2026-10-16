@@ -384,6 +384,16 @@ class ThothApp {
       this.activeAbortController.abort();
       this.activeAbortController = null;
     }
+    const currentId = this.currentState?.task_id || this.currentState?.brief?.brief_id;
+    if (currentId) {
+      this._getHeaders().then(headers => {
+        fetch(this._resolveUrl('/api/research/cancel'), {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({ task_id: currentId, brief_id: currentId })
+        }).catch(() => {});
+      });
+    }
     this.setGenerating(false);
     this.showToast('Generation cancelled', 'alert-circle');
   }
@@ -485,6 +495,8 @@ class ThothApp {
       if (data.escalation_proposal && data.escalation_proposal.is_ready_for_research) {
         const p = data.escalation_proposal;
         const encodedTopic = encodeURIComponent(p.crystallized_topic || text);
+        const encodedHyp = encodeURIComponent(p.testable_hypothesis || '');
+        const encodedThinker = encodeURIComponent(data.thinker_id || '');
         contentHtml += `
           <div class="escalation-action-card">
             <div class="escalation-header">
@@ -493,7 +505,7 @@ class ThothApp {
             </div>
             <div class="escalation-topic"><strong>Target Topic:</strong> ${p.crystallized_topic}</div>
             <div class="escalation-hypothesis"><strong>Hypothesis:</strong> ${p.testable_hypothesis}</div>
-            <button class="btn-launch-escalated-research" onclick="window.app.launchEscalatedResearch('${encodedTopic}', '${data.thinker_id}')">
+            <button class="btn-launch-escalated-research" onclick="window.app.launchEscalatedResearch('${encodedTopic}', '${encodedThinker}', '${encodedHyp}')">
               <i data-lucide="rocket" style="width:14px;height:14px;"></i>
               <span>${p.action_pill_label || 'Launch Deep Research'}</span>
             </button>
@@ -516,11 +528,38 @@ class ThothApp {
     }
   }
 
-  launchEscalatedResearch(encodedTopic, thinkerId) {
+  launchEscalatedResearch(encodedTopic, thinkerId, encodedHyp) {
     const topic = decodeURIComponent(encodedTopic);
-    this.showToast(`Escalating to Deep Research with ${thinkerId} rigour!`, 'check-circle');
+    const thinker = decodeURIComponent(thinkerId || '');
+    const hypothesis = decodeURIComponent(encodedHyp || '');
+    this.showToast(`Preparing research brief with ${thinker || 'Thinker'} rigour...`, 'sparkles');
     this.setMode('deep_research');
-    this.startResearch(topic, true, true);
+    this.startResearch(topic, true, true, { thinker_id: thinker, hypothesis: hypothesis });
+  }
+
+  approveAndLaunchBrief(briefId, version, encodedTopic) {
+    const topic = decodeURIComponent(encodedTopic || this.activeTopic || '');
+    this.showToast('Approving research brief...', 'check-circle');
+    this._getHeaders().then(headers => {
+      fetch(this._resolveUrl('/api/research/brief/approve'), {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ brief_id: decodeURIComponent(briefId), version: parseInt(version) })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.brief) {
+          this.showToast('Research Brief approved! Launching research...', 'rocket');
+          this.startResearch(topic, false, true, { brief_id: data.brief.brief_id });
+        } else {
+          this.showToast(data.error || 'Failed to approve brief', 'alert-triangle');
+        }
+      })
+      .catch(err => {
+        console.error('Approval error:', err);
+        this.showToast('Approval request failed: ' + err.message, 'alert-triangle');
+      });
+    });
   }
 
   handleHeroLaunch() {
@@ -622,7 +661,7 @@ class ThothApp {
     }
   }
 
-  startResearch(topic, shouldAppendUser = true, inheritContext = true) {
+  startResearch(topic, shouldAppendUser = true, inheritContext = true, extraMeta = {}) {
     this.activeTopic = topic;
     this.setGenerating(true);
     this.activeAbortController = new AbortController();
@@ -652,7 +691,10 @@ class ThothApp {
       scrape_top_n: this.scrapeTopN || 15,
       min_score: 6.5,
       chat_turns: (inheritContext && this.currentState?.chat_turns) ? this.currentState.chat_turns : [],
-      conversation_summary: (inheritContext && this.currentState?.conversation_summary) ? this.currentState.conversation_summary : ''
+      conversation_summary: (inheritContext && this.currentState?.conversation_summary) ? this.currentState.conversation_summary : '',
+      thinker_id: extraMeta?.thinker_id || this.activeThinker || undefined,
+      hypothesis: extraMeta?.hypothesis || undefined,
+      brief_id: extraMeta?.brief_id || undefined
     };
 
     this._getHeaders().then(headers => {
@@ -734,6 +776,110 @@ class ThothApp {
     });
   }
 
+  renderBriefHtml(brief, reason) {
+    if (!brief || !brief.brief_id) {
+      return `
+        <div class="brief-card" style="padding:16px;border-radius:var(--radius-lg);background:hsl(var(--card));border:1px solid hsl(var(--border));box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;">
+          <div style="font-weight:600;font-size:0.95rem;color:hsl(var(--destructive));"><i data-lucide="shield-alert" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>Research Approval Barrier</div>
+          <p style="font-size:0.85rem;color:hsl(var(--muted-foreground));margin-top:6px;">${reason || 'Formal research requires an explicit, approved Research Brief.'}</p>
+        </div>
+      `;
+    }
+
+    const version = brief.version || 1;
+    const briefId = brief.brief_id;
+    const status = brief.approval_status || 'pending_approval';
+    const isApproved = status === 'approved';
+    const topic = brief.topic || this.activeTopic || '';
+    const safeTopic = topic.replace(/'/g, "\\'");
+
+    let objectivesHtml = '';
+    if (brief.objectives && brief.objectives.length > 0) {
+      objectivesHtml = `
+        <div style="margin-top:8px;">
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:hsl(var(--muted-foreground));margin-bottom:4px;">Core Objectives</div>
+          <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:hsl(var(--foreground));">
+            ${brief.objectives.map(obj => `<li style="margin-bottom:2px;">${obj}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+    let hypothesesHtml = '';
+    if (brief.hypotheses && brief.hypotheses.length > 0) {
+      hypothesesHtml = `
+        <div style="margin-top:8px;">
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:hsl(var(--muted-foreground));margin-bottom:4px;">Working Hypotheses</div>
+          <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:hsl(var(--foreground));">
+            ${brief.hypotheses.map(hyp => `<li style="margin-bottom:2px;">${hyp}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+    let thinkerHtml = '';
+    if (brief.thinker_context && Object.keys(brief.thinker_context).length > 0) {
+      const tc = brief.thinker_context;
+      thinkerHtml = `
+        <div style="margin-top:8px;padding:8px 12px;border-radius:var(--radius-sm);background:hsl(var(--muted)/0.4);border-left:3px solid hsl(var(--primary));">
+          <div style="font-size:0.75rem;font-weight:600;color:hsl(var(--primary));margin-bottom:2px;"><i data-lucide="compass" style="width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i>Philosophical Sparring Lens: ${tc.thinker_name || tc.thinker_id || 'Thinker'} (${tc.archetype || 'Methodological Rigour'})</div>
+          <div style="font-size:0.82rem;color:hsl(var(--foreground));">${tc.perspective || ''}</div>
+          ${tc.unresolved_objections && tc.unresolved_objections.length > 0 ? `
+            <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));margin-top:4px;"><strong>Open Objections:</strong> ${tc.unresolved_objections.join('; ')}</div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    let scopeCriteriaHtml = '';
+    if ((brief.search_scope && brief.search_scope.length > 0) || (brief.selection_criteria && brief.selection_criteria.length > 0)) {
+      scopeCriteriaHtml = `
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:12px;font-size:0.8rem;color:hsl(var(--muted-foreground));">
+          ${brief.search_scope && brief.search_scope.length > 0 ? `<div><strong>Search Scope:</strong> ${brief.search_scope.join(', ')}</div>` : ''}
+          ${brief.selection_criteria && brief.selection_criteria.length > 0 ? `<div><strong>Criteria:</strong> ${brief.selection_criteria.join('; ')}</div>` : ''}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="brief-mandate-card" style="padding:16px;border-radius:var(--radius-lg);background:hsl(var(--card));border:1px solid hsl(var(--border));box-shadow:0 4px 12px rgba(0,0,0,0.05);margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border-bottom:1px solid hsl(var(--border));padding-bottom:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i data-lucide="file-text" style="width:18px;height:18px;color:hsl(var(--primary));"></i>
+            <span style="font-weight:600;font-size:0.95rem;color:hsl(var(--foreground));">Research Mandate & Brief</span>
+            <span style="font-size:0.7rem;padding:2px 6px;border-radius:999px;background:hsl(var(--muted));color:hsl(var(--muted-foreground));">v${version}</span>
+          </div>
+          <span style="font-size:0.75rem;padding:2px 8px;border-radius:999px;font-weight:500;background:${isApproved ? 'hsl(142 76% 36% / 0.15)' : 'hsl(38 92% 50% / 0.15)'};color:${isApproved ? 'hsl(142 76% 36%)' : 'hsl(38 92% 40%)'};">
+            ${isApproved ? 'Approved' : 'Pending Approval'}
+          </span>
+        </div>
+
+        <div style="font-size:0.9rem;font-weight:500;color:hsl(var(--foreground));margin-bottom:6px;">
+          <strong>Question:</strong> ${brief.research_question || topic}
+        </div>
+
+        ${objectivesHtml}
+        ${hypothesesHtml}
+        ${thinkerHtml}
+        ${scopeCriteriaHtml}
+
+        <div style="margin-top:14px;padding-top:10px;border-top:1px dashed hsl(var(--border));display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));display:flex;align-items:center;gap:4px;">
+            <i data-lucide="shield-check" style="width:14px;height:14px;color:hsl(var(--primary));"></i>
+            Formal literature search & synthesis only begins upon explicit approval.
+          </div>
+          ${!isApproved ? `
+            <button type="button" class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:pointer;border-radius:var(--radius-md);" onclick="window.app.approveAndLaunchBrief('${briefId}', ${version}, '${safeTopic}')">
+              <i data-lucide="check" style="width:14px;height:14px;"></i> Approve & Launch Deep Research
+            </button>
+          ` : `
+            <span style="font-size:0.8rem;color:hsl(142 76% 36%);font-weight:600;"><i data-lucide="check-circle" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i>Approved (v${version})</span>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
   handlePipelineEvent(event, msgId) {
     const { node = '', update = {}, state = {} } = event || {};
 
@@ -766,6 +912,42 @@ class ThothApp {
         `;
         if (window.lucide) lucide.createIcons();
       }
+      this.scrollToBottom();
+      return;
+    }
+
+    if (node === 'approval_barrier') {
+      const brief = update.brief || (state && state.brief) || {};
+      const reason = update.barrier_reason || 'Formal research requires an explicit, approved Research Brief.';
+      if (contentBody) {
+        contentBody.innerHTML = this.renderBriefHtml(brief, reason);
+        if (window.lucide) lucide.createIcons();
+      }
+      const cotAccordion = msgContainer.querySelector('.cot-accordion');
+      if (cotAccordion) cotAccordion.style.display = 'none';
+      this.scrollToBottom();
+      return;
+    }
+
+    if (node === 'duplicate_execution_rejected') {
+      const errorMsg = update.error || (state && state.error) || 'A research task is already active or completed for this brief version.';
+      if (contentBody) {
+        contentBody.innerHTML = `
+          <div class="duplicate-execution-card" style="padding:14px;border-radius:var(--radius-md);background:hsl(var(--destructive)/0.08);border:1px solid hsl(var(--destructive)/0.3);margin-bottom:8px;">
+            <div style="font-weight:600;font-size:0.92rem;margin-bottom:6px;color:hsl(var(--destructive));display:flex;align-items:center;gap:6px;">
+              <i data-lucide="alert-triangle" style="width:16px;height:16px;"></i>
+              <span>Execution Request Rejected</span>
+            </div>
+            <div style="font-size:0.875rem;color:hsl(var(--foreground));line-height:1.5;">
+              ${errorMsg}
+            </div>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+      }
+      const cotAccordion = msgContainer.querySelector('.cot-accordion');
+      if (cotAccordion) cotAccordion.style.display = 'none';
+      this.showToast(errorMsg, 'alert-triangle');
       this.scrollToBottom();
       return;
     }

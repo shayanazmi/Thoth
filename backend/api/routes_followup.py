@@ -18,12 +18,18 @@ logger = logging.getLogger("ThothWebServer")
 router = APIRouter(tags=["Follow-up & Multi-turn Dialogue"])
 
 def _get_direct_chat_chain():
+    from unittest.mock import Mock
+    if isinstance(direct_chat_chain, Mock):
+        return direct_chat_chain
     ws = sys.modules.get("web_server")
     if ws and hasattr(ws, "direct_chat_chain"):
         return ws.direct_chat_chain
     return direct_chat_chain
 
 def _get_stream_followup_turn():
+    from unittest.mock import Mock
+    if isinstance(stream_followup_turn, Mock):
+        return stream_followup_turn
     ws = sys.modules.get("web_server")
     if ws and hasattr(ws, "stream_followup_turn"):
         return ws.stream_followup_turn

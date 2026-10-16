@@ -37,6 +37,14 @@ logger = get_logger("ThothApp")
 async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info(f"Initializing Thoth Research Intelligence Service (env={settings.ENVIRONMENT})...")
+    # Initialize SQLite database schema idempotently
+    from backend.memory.db import init_db
+    init_db()
+    # Startup reconciliation: reconcile abandoned tasks from prior process sessions
+    from backend.conversation.brief import task_manager
+    orphaned_count = task_manager.reconcile_orphaned_tasks()
+    if orphaned_count > 0:
+        logger.warning(f"[RECOVERY] Reconciled {orphaned_count} abandoned/interrupted research task(s) into FAILED_ORPHANED state.")
     # Verify Redis connectivity in background
     try:
         await cache_manager.get_client()

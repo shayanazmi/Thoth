@@ -182,6 +182,11 @@ class EvidencePassage(BaseModel):
     quote: str = Field(description="Exact quoted evidence passage")
     origin: str = Field(default="extracted_text", description="extracted_text, abstract, or provider_snippet")
     location: Optional[str] = Field(default=None, description="Location or section marker if available")
+    passage_id: Optional[str] = Field(default=None, description="Stable passage locator, e.g. p1-para2")
+    page_num: Optional[int] = Field(default=None, description="1-indexed page number if from paginated document")
+    char_start: Optional[int] = Field(default=None, description="Character start offset within the document")
+    char_end: Optional[int] = Field(default=None, description="Character end offset within the document")
+    extraction_status: Optional[str] = Field(default="success", description="success, empty, or truncated")
     provenance_verified: bool = Field(default=False, description="True if verified against retained source text")
 
 class ReportClaim(BaseModel):
@@ -190,6 +195,7 @@ class ReportClaim(BaseModel):
     claim_type: str = Field(default="factual_finding", description="factual_finding, empirical_metric, methodological_statement, theoretical_synthesis")
     source_ids: List[str] = Field(default_factory=list, description="Applicable source identifiers")
     verification_status: str = Field(default="UNRESOLVED", description="DIRECTLY_SUPPORTED, QUALIFIED_SUPPORT, UNSUPPORTED, CONTRADICTED, UNRESOLVED")
+    support_status: Optional[str] = Field(default=None, description="SUPPORTED, CONTRADICTED, INSUFFICIENT, UNVERIFIABLE")
     disposition: str = Field(default="unresolved", description="retain, qualify, remove, unresolved")
     reason: str = Field(default="", description="Explanation grounded in evidence")
     quoted_evidence: Optional[str] = Field(default="", description="Exact quote from source")

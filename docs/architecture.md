@@ -121,6 +121,31 @@ Organized following clean hexagonal / layered architecture:
   - `thoth:ratelimit:provider:{provider_name}`: Global egress throttle to prevent LLM quota exhaustion.
 - **Fail-Open Resilience:** If Redis connectivity drops, the cache layer gracefully degrades to in-memory LRU or direct upstream fetch without crashing requests.
 
+### 3.5 Research Mandate & User Approval Gate (`backend/conversation/brief.py`)
+- **Interactive Research Brief:** Bridges conversational exploration with formal research. Maintains sequential versioning, primary research question, testable hypotheses, search scope, and thinker context.
+- **Server-Side Hash Verification:** When a user approves a brief, the backend computes an immutable SHA-256 digest of the brief payload. Research execution strictly rejects client-spoofed approvals or stale brief versions.
+- **Substantive Edit Barrier:** Any change to the brief fields increments the version number, returning approval status to `PENDING_APPROVAL` and requiring re-approval.
+
+### 3.6 Durable Research Task Lifecycle (`backend/memory/db.py`)
+- **ACID State Machine:** Tasks transition through explicit states: `QUEUED` → `CLAIMED` → `RUNNING` → `COMPLETED` / `FAILED` / `CANCELLED`.
+- **Atomic Process Claims:** `claim_task_atomic_db` uses SQLite transactions to ensure only one worker claims a queued task, preventing duplicate execution across multiple processes.
+- **Cooperative Cancellation & Recovery:** Background worker checks cancellation tokens at every pipeline node boundary. On system startup, `reconcile_orphaned_tasks_db` automatically marks tasks abandoned by crashed processes as `FAILED`.
+
+### 3.7 Scholarly Evidence Ingestion Engine (`backend/ingestion.py`, `backend/tools.py`)
+- **Demarcated PDF Parsing:** Preserves page boundaries (`--- [Page N] ---`) using PyMuPDF, tracking character offsets and per-page content. Scanned or image-only PDFs are reported as empty with explicit warnings rather than hallucinated text.
+- **Boilerplate-Stripped HTML:** Extracts core main/article elements via BeautifulSoup while stripping headers, footers, forms, and navigation chrome.
+- **Honest Extraction Quality:** Explicitly badges all sources as `full`, `partial`, `snippet_only`, `inaccessible`, `empty`, or `unsupported`. Character budget expanded up to 15,000 chars without silent truncation.
+- **Bounded Passage Extraction:** Decomposes documents into identifiable passages with stable identifiers (`p{page}-{idx}`) used for inline citation and verification.
+
+### 3.8 Truth Guard & Integrity Gate (`backend/intellectual_rigour/integrity_gate.py`)
+- **Passage Locator Verification:** Verifies passage-level citations (`[[src-id:p1-1]]`) against extracted source passage catalogs.
+- **4-Stage Adversarial Quotation Defense:**
+  - *Overgeneralization Defense:* Blocks in-vitro/animal findings quoted to support human clinical cure claims.
+  - *Direction Inversion Defense:* Flags contradictory outcomes between quote and claim.
+  - *Causal Leap Defense:* Rejects causal conclusions drawn solely from observational correlations.
+  - *Predicate Drift Defense:* Rejects claims containing essential predicates unsupported by the cited quote.
+- **Deterministic Bibliography:** Generates bibliographies enriched with access quality badges (`[Full Text]`, `[Search Snippet / Abstract Only]`, `[Inaccessible]`).
+
 ---
 
 ## 4. Multi-Agent Pipeline & Epistemic Desks
@@ -128,10 +153,10 @@ Organized following clean hexagonal / layered architecture:
 ### 8-Stage Research Pipeline
 1. **Search Node:** Dispatches queries across ArXiv, Semantic Scholar, and Tavily.
 2. **Snowball Node:** Parses citations from top candidate papers to discover adjacent literature.
-3. **Scrape Node:** Fetches full text and extracts clean Markdown, enforcing strict provenance.
-4. **Writer Node:** Synthesizes multi-source findings into an evidence-backed report.
-5. **Truth Guard (Verifier):** Validates every atomic quantitative claim against extracted sources.
-6. **Critic Node:** Evaluates the draft across coherence, counterfactual depth, and rigour rubrics.
+3. **Scrape Node:** Ingests full text and extracts clean Markdown, tracking page demarcation and extraction quality (`full`, `partial`, `snippet_only`, `inaccessible`).
+4. **Writer Node:** Synthesizes multi-source findings into an evidence-backed report using structured passage locators.
+5. **Truth Guard (Verifier):** Validates every atomic quantitative claim and conducts 4-stage adversarial quote checks.
+6. **Critic Node:** Evaluates the draft across coherence, counterfactual depth, and rigour rubrics across epistemic desks.
 7. **Mindmap Node:** Extracts hierarchical concepts and relations into structured JSON.
 8. **Vault Node:** Indexes facts and cross-document relational edges in the knowledge graph.
 

@@ -1,4 +1,16 @@
 from backend.tools import web_search, scrape_url
+from backend.ingestion import (
+    ingest_document,
+    detect_content_type,
+    IngestionResult,
+    create_bounded_passages,
+    select_representative_passages,
+    format_passages_for_context,
+)
+from backend.intellectual_rigour.integrity_gate import (
+    evaluate_claim_support,
+    audit_report_integrity,
+)
 from backend.agents import (
     build_search_agent,
     build_verifier_agent,
@@ -41,6 +53,14 @@ from backend.scholarly import (
 __all__ = [
     "web_search",
     "scrape_url",
+    "ingest_document",
+    "detect_content_type",
+    "IngestionResult",
+    "create_bounded_passages",
+    "select_representative_passages",
+    "format_passages_for_context",
+    "evaluate_claim_support",
+    "audit_report_integrity",
     "build_search_agent",
     "build_verifier_agent",
     "verifier_chain",
