@@ -6,9 +6,11 @@ LaTeX with verified BibTeX entries, and publication-ready HTML.
 
 from __future__ import annotations
 
+import base64
 import datetime
 import html
 import json
+import os
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -30,6 +32,7 @@ class ExportFormat(str, Enum):
     LATEX = "latex"
     BIBTEX = "bibtex"
     HTML = "html"
+    PDF = "pdf"
 
 
 @dataclass
@@ -59,6 +62,7 @@ def export_manuscript(
     format_type: str,
     version: Optional[int] = None,
     save_to_db: bool = True,
+    pdf_engine: str = "auto",
     db_path: str = DEFAULT_DB_PATH,
 ) -> ExportResult:
     """
@@ -75,6 +79,8 @@ def export_manuscript(
         raise ValueError(f"Manuscript '{manuscript_id}' revision v{ver} not found.")
 
     fmt = format_type.lower()
+    export_id = f"exp_{fmt}_{uuid.uuid4().hex[:10]}"
+
     if fmt == ExportFormat.MARKDOWN.value:
         content, meta = export_to_markdown(rev)
     elif fmt == ExportFormat.LATEX.value:
@@ -83,10 +89,27 @@ def export_manuscript(
         content, meta = export_to_bibtex(rev)
     elif fmt == ExportFormat.HTML.value:
         content, meta = export_to_html(rev)
-    else:
-        raise ValueError(f"Unsupported export format '{format_type}'. Must be one of: markdown, latex, bibtex, html.")
+    elif fmt == ExportFormat.PDF.value:
+        from backend.workspace.pdf_compiler import compile_manuscript_to_pdf
+        vault_exports_dir = os.path.join(os.path.dirname(os.path.abspath(db_path)), "..", "vault", "exports")
+        os.makedirs(vault_exports_dir, exist_ok=True)
+        pdf_file_path = os.path.abspath(os.path.join(vault_exports_dir, f"{export_id}.pdf"))
 
-    export_id = f"exp_{fmt}_{uuid.uuid4().hex[:10]}"
+        pdf_bytes, pdf_meta = compile_manuscript_to_pdf(
+            revision=rev,
+            engine=pdf_engine,
+            output_path=pdf_file_path,
+        )
+        content = base64.b64encode(pdf_bytes).decode("ascii")
+        meta = {
+            "content_type": "application/pdf",
+            "encoding": "base64",
+            "file_path": pdf_file_path,
+            "filename": f"manuscript_{manuscript_id}_v{ver}.pdf",
+            **pdf_meta,
+        }
+    else:
+        raise ValueError(f"Unsupported export format '{format_type}'. Must be one of: markdown, latex, bibtex, html, pdf.")
     if save_to_db:
         save_res = save_manuscript_export_db(
             export_id=export_id,

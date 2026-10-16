@@ -349,7 +349,7 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                 export_id TEXT PRIMARY KEY,
                 manuscript_id TEXT NOT NULL,
                 version INTEGER NOT NULL,
-                format TEXT NOT NULL CHECK (format IN ('markdown', 'latex', 'bibtex', 'html')),
+                format TEXT NOT NULL CHECK (format IN ('markdown', 'latex', 'bibtex', 'html', 'pdf')),
                 content TEXT NOT NULL,
                 metadata_json TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL,
@@ -359,6 +359,122 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_exports_manuscript_version ON manuscript_exports(manuscript_id, version, format);
+        """)
+
+        # Migration helper for existing manuscript_exports table if created without 'pdf'
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='manuscript_exports';")
+            row = cursor.fetchone()
+            if row and row[0] and "'pdf'" not in row[0]:
+                conn.execute("ALTER TABLE manuscript_exports RENAME TO manuscript_exports_old;")
+                conn.execute("""
+                    CREATE TABLE manuscript_exports (
+                        export_id TEXT PRIMARY KEY,
+                        manuscript_id TEXT NOT NULL,
+                        version INTEGER NOT NULL,
+                        format TEXT NOT NULL CHECK (format IN ('markdown', 'latex', 'bibtex', 'html', 'pdf')),
+                        content TEXT NOT NULL,
+                        metadata_json TEXT NOT NULL DEFAULT '{}',
+                        created_at TEXT NOT NULL,
+                        FOREIGN KEY (manuscript_id) REFERENCES manuscripts(manuscript_id) ON DELETE CASCADE
+                    );
+                """)
+                conn.execute("INSERT INTO manuscript_exports SELECT * FROM manuscript_exports_old;")
+                conn.execute("DROP TABLE manuscript_exports_old;")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_exports_manuscript_version ON manuscript_exports(manuscript_id, version, format);")
+        except Exception:
+            pass
+
+        # Phase 6: Collaboration, Project Members, and Outbox Sync
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS project_members (
+                membership_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('OWNER', 'EDITOR', 'VIEWER')),
+                invited_at TEXT NOT NULL,
+                accepted_at TEXT DEFAULT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES research_projects(project_id) ON DELETE CASCADE,
+                UNIQUE(project_id, user_id)
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_members_project ON project_members(project_id);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_members_user ON project_members(user_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sync_outbox (
+                event_id TEXT PRIMARY KEY,
+                project_id TEXT DEFAULT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                operation TEXT NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SYNCED', 'FAILED', 'CONFLICT')),
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                error_message TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                synced_at TEXT DEFAULT NULL
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_outbox_status ON sync_outbox(status);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_outbox_project ON sync_outbox(project_id);
+        """)
+
+        # Phase 6: Recursive Citation Snowball Runs & Candidates
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS snowball_runs (
+                run_id TEXT PRIMARY KEY,
+                review_id TEXT DEFAULT NULL,
+                brief_id TEXT DEFAULT NULL,
+                config_json TEXT NOT NULL DEFAULT '{}',
+                stopping_reason TEXT NOT NULL,
+                total_rounds INTEGER NOT NULL DEFAULT 0,
+                total_candidates INTEGER NOT NULL DEFAULT 0,
+                unique_candidates INTEGER NOT NULL DEFAULT 0,
+                rounds_summary_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (review_id) REFERENCES prisma_reviews(review_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_snowball_review ON snowball_runs(review_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS snowball_candidates (
+                candidate_id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                review_id TEXT DEFAULT NULL,
+                parent_paper_id TEXT NOT NULL,
+                paper_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                doi TEXT DEFAULT '',
+                direction TEXT NOT NULL CHECK (direction IN ('BACKWARD', 'FORWARD')),
+                round_number INTEGER NOT NULL,
+                provider TEXT NOT NULL,
+                lookup_params_json TEXT NOT NULL DEFAULT '{}',
+                is_duplicate BOOLEAN NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (run_id) REFERENCES snowball_runs(run_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_snowball_candidates_run ON snowball_candidates(run_id);
         """)
 
     return conn
@@ -1978,5 +2094,407 @@ def list_manuscript_exports_db(
             d["metadata"] = {}
         out.append(d)
     return out
+
+
+# ==============================================================================
+# Phase 6: Project Memberships & Collaboration Persistence
+# ==============================================================================
+
+def add_project_member_db(
+    membership_id: str,
+    project_id: str,
+    user_id: str,
+    role: str,
+    invited_at: Optional[str] = None,
+    accepted_at: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    inv_at = invited_at or now_iso
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO project_members (
+                membership_id, project_id, user_id, role, invited_at, accepted_at, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(project_id, user_id) DO UPDATE SET
+                role = excluded.role,
+                accepted_at = COALESCE(excluded.accepted_at, project_members.accepted_at);
+        """, (membership_id, project_id, user_id, role, inv_at, accepted_at, now_iso))
+
+    return get_project_member_db(project_id, user_id, db_path=db_path) or {
+        "membership_id": membership_id,
+        "project_id": project_id,
+        "user_id": user_id,
+        "role": role,
+        "invited_at": inv_at,
+        "accepted_at": accepted_at,
+        "created_at": now_iso,
+    }
+
+
+def get_project_member_db(
+    project_id: str,
+    user_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> Optional[dict]:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM project_members WHERE project_id = ? AND user_id = ?;",
+        (project_id, user_id),
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
+
+
+def list_project_members_db(
+    project_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM project_members WHERE project_id = ? ORDER BY created_at ASC;",
+        (project_id,),
+    )
+    return [dict(r) for r in cursor.fetchall()]
+
+
+def delete_project_member_db(
+    project_id: str,
+    user_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> bool:
+    init_db(db_path)
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM project_members WHERE project_id = ? AND user_id = ?;",
+            (project_id, user_id),
+        )
+        return cursor.rowcount > 0
+
+
+# ==============================================================================
+# Phase 6: Sync Outbox Persistence
+# ==============================================================================
+
+def add_sync_outbox_event_db(
+    event_id: str,
+    entity_type: str,
+    entity_id: str,
+    operation: str,
+    payload: dict,
+    project_id: Optional[str] = None,
+    status: str = "PENDING",
+    error_message: str = "",
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    payload_json = json.dumps(payload)
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO sync_outbox (
+                event_id, project_id, entity_type, entity_id, operation,
+                payload_json, status, retry_count, error_message, created_at, synced_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NULL);
+        """, (event_id, project_id, entity_type, entity_id, operation, payload_json, status, error_message, now_iso))
+
+    return {
+        "event_id": event_id,
+        "project_id": project_id,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "operation": operation,
+        "payload": payload,
+        "status": status,
+        "retry_count": 0,
+        "error_message": error_message,
+        "created_at": now_iso,
+        "synced_at": None,
+    }
+
+
+def list_pending_sync_outbox_events_db(
+    limit: int = 50,
+    project_id: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    query = "SELECT * FROM sync_outbox WHERE status = 'PENDING'"
+    params = []
+    if project_id:
+        query += " AND project_id = ?"
+        params.append(project_id)
+    query += " ORDER BY created_at ASC LIMIT ?;"
+    params.append(limit)
+
+    cursor.execute(query, tuple(params))
+    out = []
+    for r in cursor.fetchall():
+        d = dict(r)
+        try:
+            d["payload"] = json.loads(d.get("payload_json") or "{}")
+        except Exception:
+            d["payload"] = {}
+        out.append(d)
+    return out
+
+
+def list_sync_outbox_events_db(
+    project_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    query = "SELECT * FROM sync_outbox WHERE 1=1"
+    params = []
+    if project_id:
+        query += " AND project_id = ?"
+        params.append(project_id)
+    if status:
+        query += " AND status = ?"
+        params.append(status)
+    query += " ORDER BY created_at DESC LIMIT ?;"
+    params.append(limit)
+
+    cursor.execute(query, tuple(params))
+    out = []
+    for r in cursor.fetchall():
+        d = dict(r)
+        try:
+            d["payload"] = json.loads(d.get("payload_json") or "{}")
+        except Exception:
+            d["payload"] = {}
+        out.append(d)
+    return out
+
+
+def update_sync_outbox_event_db(
+    event_id: str,
+    status: str,
+    error_message: str = "",
+    increment_retry: bool = False,
+    synced: bool = False,
+    db_path: str = DEFAULT_DB_PATH,
+) -> bool:
+    import datetime
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat() if synced else None
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        retry_fragment = "retry_count = retry_count + 1," if increment_retry else ""
+        cursor.execute(f"""
+            UPDATE sync_outbox
+            SET status = ?,
+                error_message = ?,
+                {retry_fragment}
+                synced_at = COALESCE(?, synced_at)
+            WHERE event_id = ?;
+        """, (status, error_message, now_iso, event_id))
+        return cursor.rowcount > 0
+
+
+# ==============================================================================
+# Phase 6: Snowball Runs & Candidates Persistence
+# ==============================================================================
+
+def save_snowball_run_db(
+    run_id: str,
+    review_id: str,
+    brief_id: str,
+    config: dict,
+    stopping_reason: str,
+    total_rounds: int,
+    total_candidates: int,
+    unique_candidates: int,
+    rounds_summary: list,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    config_json = json.dumps(config)
+    summary_json = json.dumps(rounds_summary)
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        actual_review_id = review_id
+        if review_id:
+            cursor.execute("SELECT review_id FROM prisma_reviews WHERE review_id = ?;", (review_id,))
+            if not cursor.fetchone():
+                actual_review_id = None
+
+        cursor.execute("""
+            INSERT INTO snowball_runs (
+                run_id, review_id, brief_id, config_json, stopping_reason,
+                total_rounds, total_candidates, unique_candidates, rounds_summary_json, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (run_id, actual_review_id, brief_id, config_json, stopping_reason,
+              total_rounds, total_candidates, unique_candidates, summary_json, now_iso))
+
+    return {
+        "run_id": run_id,
+        "review_id": review_id,
+        "brief_id": brief_id,
+        "config": config,
+        "stopping_reason": stopping_reason,
+        "total_rounds": total_rounds,
+        "total_candidates": total_candidates,
+        "unique_candidates": unique_candidates,
+        "rounds_summary": rounds_summary,
+        "created_at": now_iso,
+    }
+
+
+def get_snowball_run_db(
+    run_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> Optional[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM snowball_runs WHERE run_id = ?;", (run_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["config"] = json.loads(d.get("config_json") or "{}")
+        d["rounds_summary"] = json.loads(d.get("rounds_summary_json") or "[]")
+    except Exception:
+        d["config"] = {}
+        d["rounds_summary"] = []
+    return d
+
+
+def list_snowball_runs_db(
+    review_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM snowball_runs WHERE review_id = ? ORDER BY created_at DESC;",
+        (review_id,),
+    )
+    out = []
+    for r in cursor.fetchall():
+        d = dict(r)
+        try:
+            d["config"] = json.loads(d.get("config_json") or "{}")
+            d["rounds_summary"] = json.loads(d.get("rounds_summary_json") or "[]")
+        except Exception:
+            d["config"] = {}
+            d["rounds_summary"] = []
+        out.append(d)
+    return out
+
+
+def add_snowball_candidate_db(
+    candidate_id: str,
+    run_id: str,
+    review_id: str,
+    parent_paper_id: str,
+    paper_id: str,
+    title: str,
+    direction: str,
+    round_number: int,
+    provider: str,
+    doi: str = "",
+    lookup_params: Optional[dict] = None,
+    is_duplicate: bool = False,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    params_json = json.dumps(lookup_params or {})
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO snowball_candidates (
+                candidate_id, run_id, review_id, parent_paper_id, paper_id,
+                title, doi, direction, round_number, provider, lookup_params_json,
+                is_duplicate, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (candidate_id, run_id, review_id, parent_paper_id, paper_id,
+              title, doi, direction, round_number, provider, params_json,
+              1 if is_duplicate else 0, now_iso))
+
+    return {
+        "candidate_id": candidate_id,
+        "run_id": run_id,
+        "review_id": review_id,
+        "parent_paper_id": parent_paper_id,
+        "paper_id": paper_id,
+        "title": title,
+        "doi": doi,
+        "direction": direction,
+        "round_number": round_number,
+        "provider": provider,
+        "lookup_params": lookup_params or {},
+        "is_duplicate": is_duplicate,
+        "created_at": now_iso,
+    }
+
+
+def list_snowball_candidates_db(
+    run_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM snowball_candidates WHERE run_id = ? ORDER BY round_number ASC, created_at ASC;",
+        (run_id,),
+    )
+    out = []
+    for r in cursor.fetchall():
+        d = dict(r)
+        d["is_duplicate"] = bool(d.get("is_duplicate"))
+        try:
+            d["lookup_params"] = json.loads(d.get("lookup_params_json") or "{}")
+        except Exception:
+            d["lookup_params"] = {}
+        out.append(d)
+    return out
+
 
 

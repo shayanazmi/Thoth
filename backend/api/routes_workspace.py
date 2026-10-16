@@ -43,7 +43,19 @@ from backend.workspace.traceability import (
     get_flow_node_records,
     get_claim_traceability,
 )
-from backend.memory.db import get_manuscript_export_db, list_manuscript_exports_db
+from backend.memory.db import DEFAULT_DB_PATH, get_manuscript_export_db, list_manuscript_exports_db
+from backend.collaboration.membership import (
+    ProjectRole,
+    ProjectPermission,
+    add_project_member,
+    list_project_members,
+    remove_project_member,
+    verify_project_access as verify_collaboration_access,
+)
+from backend.collaboration.sync import (
+    replay_sync_outbox,
+    get_project_sync_status,
+)
 
 logger = get_logger("WorkspaceAPI")
 router = APIRouter(prefix="/api", tags=["Workspace & Manuscripts"])
@@ -58,6 +70,16 @@ class ProjectCreateRequest(BaseModel):
     description: str = Field("", description="Detailed scope or description")
     session_id: str = Field("", description="Session context / owner")
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ProjectMemberAddRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, description="Collaborator user ID")
+    role: str = Field("VIEWER", description="OWNER, EDITOR, or VIEWER")
+    inviter_id: Optional[str] = None
+
+
+class SyncReplayRequest(BaseModel):
+    limit: int = Field(50, ge=1, le=500)
 
 
 class ArtifactAssociationRequest(BaseModel):
@@ -99,8 +121,9 @@ class QualificationProposalsRequest(BaseModel):
 
 
 class ManuscriptExportRequest(BaseModel):
-    format: str = Field(..., description="markdown, latex, bibtex, or html")
+    format: str = Field(..., description="markdown, latex, bibtex, html, or pdf")
     version: Optional[int] = None
+    engine: str = Field("auto", description="PDF engine: auto, latex/pdflatex, or reportlab")
 
 
 # ==========================================
@@ -182,6 +205,84 @@ async def api_delete_project(project_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found.")
     return {"status": "success", "deleted": True}
+
+
+# ==========================================
+# 1.1 Project Collaboration & Synchronization (Phase 6 Deliverable C)
+# ==========================================
+
+@router.post("/projects/{project_id}/members", status_code=status.HTTP_201_CREATED)
+async def api_add_project_member(project_id: str, req: ProjectMemberAddRequest):
+    try:
+        member = add_project_member(
+            project_id=project_id,
+            user_id=req.user_id,
+            role=req.role,
+            inviter_id=req.inviter_id,
+        )
+        return {"status": "success", "member": member.to_dict()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error adding project member: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/projects/{project_id}/members")
+async def api_list_project_members(project_id: str):
+    try:
+        members = list_project_members(project_id)
+        return {"status": "success", "members": [m.to_dict() for m in members]}
+    except Exception as e:
+        logger.error(f"Error listing project members: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/projects/{project_id}/members/{user_id}")
+async def api_remove_project_member(
+    project_id: str,
+    user_id: str,
+    remover_id: Optional[str] = Query(None),
+):
+    try:
+        ok = remove_project_member(project_id=project_id, user_id=user_id, remover_id=remover_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail=f"Member '{user_id}' not found in project '{project_id}'.")
+        return {"status": "success", "removed": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error removing project member: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/projects/{project_id}/sync/status")
+async def api_get_project_sync_status(project_id: str):
+    try:
+        status_info = get_project_sync_status(project_id=project_id)
+        return {"status": "success", "sync": status_info}
+    except Exception as e:
+        logger.error(f"Error getting sync status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/projects/{project_id}/sync/replay")
+async def api_replay_project_sync(project_id: str, req: SyncReplayRequest):
+    try:
+        replay_res = replay_sync_outbox(
+            supabase_client=None,  # Offline-first default or injected provider
+            project_id=project_id,
+            limit=req.limit,
+        )
+        return {"status": "success", "replay": replay_res}
+    except Exception as e:
+        logger.error(f"Error replaying outbox sync: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # ==========================================
@@ -324,6 +425,7 @@ async def api_export_manuscript(manuscript_id: str, req: ManuscriptExportRequest
             format_type=req.format,
             version=req.version,
             save_to_db=True,
+            pdf_engine=req.engine,
         )
         return {"status": "success", "export": res.to_dict()}
     except ValueError as e:
@@ -352,11 +454,54 @@ async def api_list_exports(
 
 
 @router.get("/exports/{export_id}")
-async def api_get_export(export_id: str):
-    res = get_manuscript_export_db(export_id)
+async def api_get_export(export_id: str, db_path: Optional[str] = Query(None)):
+    path = db_path or DEFAULT_DB_PATH
+    res = get_manuscript_export_db(export_id, db_path=path)
     if not res:
         raise HTTPException(status_code=404, detail=f"Export artifact '{export_id}' not found.")
     return {"status": "success", "export": res}
+
+
+@router.get("/exports/{export_id}/download")
+async def api_download_export(export_id: str, db_path: Optional[str] = Query(None)):
+    import base64
+    from fastapi.responses import Response
+    path = db_path or DEFAULT_DB_PATH
+    res = get_manuscript_export_db(export_id, db_path=path)
+    if not res:
+        raise HTTPException(status_code=404, detail=f"Export artifact '{export_id}' not found.")
+
+    fmt = res["format"].lower()
+    meta = res.get("metadata") or {}
+    filename = meta.get("filename") or f"{export_id}.{fmt}"
+
+    if fmt == "pdf":
+        raw_b64 = res["content"]
+        try:
+            pdf_bytes = base64.b64decode(raw_b64)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to decode binary PDF: {e}")
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(pdf_bytes)),
+            },
+        )
+    elif fmt == "html":
+        return Response(
+            content=res["content"],
+            media_type="text/html",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    else:
+        return Response(
+            content=res["content"],
+            media_type="text/plain",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
 
 
 # ==========================================

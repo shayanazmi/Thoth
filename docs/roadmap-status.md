@@ -17,7 +17,7 @@
 | **Phase 3.2** | Thinker Dialectic Convergence & Objection Translation | Completed | **ACCEPT** | 7 dialectic & counter-evidence tests passing (`test_thinker_dialectic_and_counter_evidence.py`). Framework-specific query generation across 10 thinkers, objection-to-query translation, SQLite brief persistence, agency-preserving hypothesis revision proposals, and search node counter-evidence tagging verified. |
 | **Phase 4** | Reproducible Literature Reviews | Completed | **ACCEPT** | 12 PRISMA review & evidence synthesis tests passing (`test_prisma_review_and_evidence_synthesis.py`). PRISMA 2020 flow accounting, mathematical invariant verification, criteria-grounded screening ledger, retrieval failure vs eligibility distinction, multi-report study grouping, study appraisal matrix, dialectic contradiction mapping with Phase 3.2 counter-evidence, SQLite persistence, and REST API verified. |
 | **Phase 5** | Persistent Research Workspace & Manuscript Engine | Completed | **ACCEPT** | 11 workspace & manuscript engine tests passing (`test_project_workspace_and_manuscript_engine.py`). Project-scoped persistence connecting ideas, briefs, PRISMA review ledgers, evidence matrices, and reports; non-destructive multi-revision drafts with collision guards; multi-format export engine (academic Markdown, LaTeX, verified BibTeX, and publication-ready HTML); and record-level drill-down & bidirectional claim-to-study traceability verified. |
-| **Phase 6** | Advanced PDF Compilation, Snowballing Search & Production Collaboration | Next Milestone | **PENDING** | Automated binary PDF generation (via WeasyPrint/XeLaTeX), recursive citation snowballing with decay heuristics, and collaborative multi-tenant sync. |
+| **Phase 6** | Advanced PDF Compilation, Snowballing Search & Production Collaboration | Completed | **ACCEPT** | 15 Phase 6 tests passing (`test_phase6_pdf_snowball_and_collaboration.py`). Server-side binary PDF generation (dual `pdflatex` & pure-Python ReportLab engines) with %PDF- & page validation; recursive citation snowballing with backward/forward discovery, cycle prevention, marginal yield decay stopping, and PRISMA flow accounting; and multi-tenant RBAC, outbox queueing, collision detection, and Supabase PostgreSQL RLS migrations verified. |
 
 
 ---
@@ -251,14 +251,62 @@
 
 ---
 
-## 3. Next Milestone: Phase 6 — Advanced PDF Compilation, Snowballing Search & Production Collaboration
+### Phase 6: Advanced PDF Compilation, Snowballing Search & Production Collaboration (Accepted Milestone)
+- **Status:** **ACCEPT**
+- **Original Unmet Criterion:**
+  1. Server-side binary PDF generation from saved manuscript versions using LaTeX or HTML-to-PDF compilers, with output validation and failure diagnostics.
+  2. Recursive backward and forward citation snowballing with stopping criteria, deduplication, and preserved source provenance integrated into PRISMA review accounting.
+  3. Multi-tenant project collaboration and cloud PostgreSQL synchronization (Supabase) with role-based access boundaries, outbox queueing, collision detection, and offline-first resilience.
+- **Implementation Changes:**
+  - [backend/workspace/pdf_compiler.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/workspace/pdf_compiler.py):
+    - Dual-engine compiler supporting `pdflatex` (via isolated temporary working directories and argument arrays) and pure-Python ReportLab rendering.
+    - Automated binary PDF validation: non-empty, `%PDF-` header bytes verification, and `pypdf` page count parsing (`pages >= 1`).
+    - Structured ReportLab publication layout: academic typography, metadata header, abstract block, body sections, structured evidence matrix table, and verified references.
+  - [backend/workspace/exporter.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/workspace/exporter.py):
+    - Added `ExportFormat.PDF = "pdf"`.
+    - Integrated `compile_manuscript_to_pdf` into `export_manuscript`, encoding binary PDF as base64 in SQLite `manuscript_exports` while saving file in `vault/exports/{export_id}.pdf`.
+  - [backend/intellectual_rigour/snowball.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/intellectual_rigour/snowball.py):
+    - Recursive citation traversal engine supporting backward (cited references) and forward (citing papers) discovery.
+    - Normalized paper identification (`doi:...`, `s2:...`, `arxiv:...`, `title:...`) preventing circular citation loops and duplicate lookups.
+    - Explicit recursive round summaries tracking queries, candidates retrieved, new unique candidates, duplicates, and marginal yield.
+    - Defensible stopping criteria: maximum depth, maximum candidates, consecutive zero-yield bounds, and marginal yield decay (`marginal_yield < threshold`).
+    - PRISMA accounting integration: registers discovered candidates as `TITLE_ABSTRACT` / `UNRESOLVED` in `screening_decisions`, updates `PRISMAFlowCounts.identified_snowball`, and preserves flow invariants.
+  - [backend/collaboration/membership.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/collaboration/membership.py):
+    - Multi-tenant role-based access control: `OWNER`, `EDITOR`, `VIEWER` with explicit permission mappings (`ProjectPermission`).
+    - Boundary enforcement: `verify_project_access` validates permissions and protects against unauthorized member modification or project deletion.
+  - [backend/collaboration/sync.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/collaboration/sync.py):
+    - Outbox pattern queueing entity mutations (`INSERT`, `UPDATE`, `DELETE`) in `sync_outbox`.
+    - Offline-first durability: operates completely offline without blocking research when cloud Postgres / Supabase is unconfigured.
+    - Revision collision detection: checks remote version against local `base_version` to flag `CONFLICT` rather than silent overwrite.
+  - [db/migrations/004_phase6_collaboration_and_workspace.sql](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/db/migrations/004_phase6_collaboration_and_workspace.sql):
+    - Schema DDL for `research_projects`, `project_members`, `manuscripts`, `manuscript_revisions`, `manuscript_claims`, `manuscript_exports`, and `sync_outbox`.
+    - Supabase Row Level Security (RLS) policies enforcing project boundaries, owner management, editor write permissions, and viewer read restrictions.
+  - [backend/memory/db.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/memory/db.py):
+    - Schema update and migration helper allowing `'pdf'` in `manuscript_exports`.
+    - Added tables `project_members`, `sync_outbox`, `snowball_runs`, and `snowball_candidates`.
+    - CRUD helpers for project members, outbox events, snowball runs, and candidate provenance.
+  - [backend/api/routes_workspace.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/api/routes_workspace.py) & [backend/api/routes_prisma.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/api/routes_prisma.py):
+    - REST endpoints for PDF export download (`GET /api/exports/{id}/download`), project collaborators (`/api/projects/{id}/members`), sync outbox status & replay (`/api/projects/{id}/sync/status`, `/api/projects/{id}/sync/replay`), and recursive snowballing (`POST /api/prisma/reviews/{id}/snowball`, `GET /api/prisma/reviews/{id}/snowball`, `GET /api/prisma/reviews/snowball-runs/{id}/candidates`).
+  - [backend/tests/test_phase6_pdf_snowball_and_collaboration.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/tests/test_phase6_pdf_snowball_and_collaboration.py):
+    - 15 comprehensive unit and integration tests covering binary PDF generation, pdflatex & ReportLab engines, error handling, backward/forward citation discovery, cycle prevention, marginal yield stopping, PRISMA flow count updates, RBAC permissions, outbox queueing, conflict detection, and end-to-end research-to-PDF lifecycle.
+  - [Makefile](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/Makefile):
+    - Added `test_phase6_pdf_snowball_and_collaboration.py` to `test:` target; added Phase 6 modules to `lint:` target.
+- **Observed Test Evidence:**
+  - `pytest backend/tests/test_phase6_pdf_snowball_and_collaboration.py`: **15 passed in 2.21s (Exit Code: 0)**.
+  - Canonical suite `make test`: **292 passed, 33 subtests passed in 47.43s across 18 test suites (Exit Code: 0)**.
+  - Verification check `make lint`: All core modules imported successfully (Exit Code: 0).
+- **Explicit Documented Limitations:**
+  - When `pdflatex` or `xelatex` is not present in the host operating system, the system seamlessly falls back to pure-Python ReportLab rendering, preserving output validity and typography without requiring native TeX installations.
+  - Live Supabase cloud synchronization requires external Supabase credentials (`SUPABASE_URL` and `SUPABASE_SERVICE_KEY`); in the absence of credentials, the system runs in resilient offline-first mode with all mutations safely queued in `sync_outbox`.
 
-### Objective
-Advance THOTH into an autonomous, collaborative research companion by integrating server-side binary PDF compilation, recursive citation snowballing with decay heuristics, and multi-tenant synchronization.
+---
 
-### Required Capabilities
-1. **Server-Side Binary PDF Generation**: Compilation of publication-ready PDFs from verified LaTeX/HTML templates using headless renderers (WeasyPrint / XeLaTeX) with customizable academic style sheets.
-2. **Recursive Citation Snowballing**: Forward and backward citation retrieval with configurable stopping criteria (citation counts, search depth, marginal semantic decay) to discover seminal literature.
-3. **Collaborative Multi-Tenant Sync**: Enterprise workspace synchronization between local SQLite stores and cloud Postgres (Supabase) preserving fine-grained audit ledgers and human approval barriers.
+## 3. Future Roadmap Horizons
+
+With Phase 0 through Phase 6 fully accepted and verified:
+1. **Interactive Multi-User Live Collaboration**: Real-time collaborative drafting and live presence using Supabase Realtime channels.
+2. **Deep Semantic Literature Clustering**: Citation network graph visualization and thematic cluster embeddings.
+3. **Automated Journal Submission Formatting**: Pre-configured style sheets for major academic publishers (ACM, IEEE, Nature, NeurIPS).
+
 
 

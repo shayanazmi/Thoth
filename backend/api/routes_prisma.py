@@ -10,6 +10,11 @@ from backend.intellectual_rigour.prisma import (
     ReviewerType,
     run_prisma_review_workflow,
 )
+from backend.intellectual_rigour.snowball import (
+    SnowballConfig,
+    run_recursive_snowball,
+)
+from backend.scholarly import SourceCandidate
 from backend.memory.db import (
     DEFAULT_DB_PATH,
     get_prisma_review_db,
@@ -19,6 +24,9 @@ from backend.memory.db import (
     list_screening_decisions_db,
     update_screening_decision_db,
     get_brief_db,
+    list_snowball_runs_db,
+    get_snowball_run_db,
+    list_snowball_candidates_db,
 )
 
 logger = get_logger("PrismaRouter")
@@ -186,3 +194,125 @@ async def get_mermaid_flowchart(
             detail=f"PRISMA review '{review_id_or_brief_id}' not found.",
         )
     return rev.get("mermaid_diagram", "")
+
+
+# ==============================================================================
+# Phase 6: Recursive Citation Snowballing Endpoints
+# ==============================================================================
+
+class SnowballExecutionRequest(BaseModel):
+    seeds: Optional[List[Dict[str, Any]]] = Field(default=None, description="Optional seed papers. Defaults to review's screened or matrix studies.")
+    max_depth: int = Field(default=3, ge=1, le=10)
+    max_candidates: int = Field(default=50, ge=1, le=500)
+    marginal_yield_threshold: float = Field(default=0.10, ge=0.0, le=1.0)
+    enable_backward: bool = True
+    enable_forward: bool = True
+    limit_per_paper: int = Field(default=5, ge=1, le=20)
+
+
+@router.post("/reviews/{review_id}/snowball", status_code=status.HTTP_201_CREATED)
+async def execute_snowball_for_review(
+    review_id: str,
+    req: SnowballExecutionRequest,
+    db_path: Optional[str] = None,
+):
+    """
+    Execute recursive backward and forward citation snowballing for an existing PRISMA review.
+    Discovered candidates enter screening decisions and update PRISMA flow accounting.
+    """
+    path = db_path or DEFAULT_DB_PATH
+    rev = get_prisma_review_db(review_id, db_path=path)
+    if not rev:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PRISMA review '{review_id}' not found.",
+        )
+
+    brief_id = rev.get("brief_id") or ""
+    seed_candidates: List[SourceCandidate] = []
+    if req.seeds:
+        for s in req.seeds:
+            seed_candidates.append(
+                SourceCandidate(
+                    title=s.get("title") or "Untitled",
+                    authors=s.get("authors") or [],
+                    doi=s.get("doi"),
+                    paper_id=s.get("paper_id") or s.get("study_id"),
+                    url=s.get("url") or "",
+                    abstract=s.get("abstract") or "",
+                )
+            )
+    else:
+        # Extract seeds from evidence matrix studies
+        ev_matrix = rev.get("evidence_matrix") or {}
+        for study in ev_matrix.get("studies", []):
+            seed_candidates.append(
+                SourceCandidate(
+                    title=study.get("title") or "Untitled",
+                    authors=study.get("authors") or [],
+                    doi=study.get("doi_or_url") if study.get("doi_or_url", "").startswith("10.") else None,
+                    paper_id=study.get("study_id"),
+                    url=study.get("doi_or_url") or "",
+                )
+            )
+        # Fallback to screening decisions if matrix is empty
+        if not seed_candidates:
+            decisions = list_screening_decisions_db(review_id, db_path=path)
+            for d in decisions[:5]:
+                seed_candidates.append(
+                    SourceCandidate(
+                        title=d.get("title") or "Untitled",
+                        paper_id=d.get("source_id"),
+                        url=d.get("source_url") or "",
+                    )
+                )
+
+    if not seed_candidates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No seed papers found in review or request to start citation snowballing.",
+        )
+
+    config = SnowballConfig(
+        max_depth=req.max_depth,
+        max_candidates=req.max_candidates,
+        marginal_yield_threshold=req.marginal_yield_threshold,
+        enable_backward=req.enable_backward,
+        enable_forward=req.enable_forward,
+        limit_per_paper=req.limit_per_paper,
+    )
+
+    result = await run_recursive_snowball(
+        seeds=seed_candidates,
+        review_id=review_id,
+        brief_id=brief_id,
+        config=config,
+        db_path=path,
+    )
+    return {"status": "success", "snowball_result": result.to_dict()}
+
+
+@router.get("/reviews/{review_id}/snowball")
+async def list_snowball_runs_for_review(
+    review_id: str,
+    db_path: Optional[str] = None,
+):
+    """List historical snowball traversal runs and stopping summaries for a PRISMA review."""
+    path = db_path or DEFAULT_DB_PATH
+    runs = list_snowball_runs_db(review_id, db_path=path)
+    return {"status": "success", "runs": runs}
+
+
+@router.get("/reviews/snowball-runs/{run_id}/candidates")
+async def list_snowball_candidates_for_run(
+    run_id: str,
+    db_path: Optional[str] = None,
+):
+    """Retrieve all discovered candidates and parent-child provenance for a specific snowball run."""
+    path = db_path or DEFAULT_DB_PATH
+    run = get_snowball_run_db(run_id, db_path=path)
+    if not run:
+        raise HTTPException(status_code=404, detail=f"Snowball run '{run_id}' not found.")
+    candidates = list_snowball_candidates_db(run_id, db_path=path)
+    return {"status": "success", "run": run, "candidates": candidates}
+
