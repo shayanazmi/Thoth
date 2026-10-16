@@ -14,8 +14,8 @@
 | **Phase 1** | Source-to-Publication Integrity | Completed | **ACCEPT WITH LIMITATIONS** | 16-case adversarial suite passing (`test_evidence_audit_and_correctness_gate.py`). Caution banners on unverified reports; strict locator & passage checks. |
 | **Phase 2** | Secure Research Handoff | Completed | **ACCEPT** | 26 durable task lifecycle & approval invariant tests passing. Server-side approval barrier, SQLite atomic deduplication, cooperative cancellation verified. |
 | **Phase 3.1** | Persistent Idea & Hypothesis Lifecycle | Completed | **ACCEPT** | 8 lifecycle & promotion barrier tests passing (`test_idea_hypothesis_lifecycle.py`). Promotion barrier enforced, immutable revision lineage preserved, brief integration connected. |
-| **Phase 3.2** | Thinker Dialectic Convergence & Objection Tracking | Next Milestone | **PENDING** | Substantive thinker objection translation into counter-evidence discovery. |
-| **Phase 4** | Reproducible Literature Reviews | Roadmap | **PENDING** | Dependent on Phases 1–3 completion. Audit trail, screening decisions, PRISMA flow data. |
+| **Phase 3.2** | Thinker Dialectic Convergence & Objection Translation | Completed | **ACCEPT** | 7 dialectic & counter-evidence tests passing (`test_thinker_dialectic_and_counter_evidence.py`). Framework-specific query generation across 10 thinkers, objection-to-query translation, SQLite brief persistence, agency-preserving hypothesis revision proposals, and search node counter-evidence tagging verified. |
+| **Phase 4** | Reproducible Literature Reviews | Next Milestone | **PENDING** | PRISMA flow data, systematic screening decisions (inclusion/exclusion criteria), source appraisal audit trails, and synthesis traceability. |
 | **Phase 5** | Persistent Research Workspace & Manuscript Engine | Roadmap | **PENDING** | Dependent on Phases 1–4. Project-scoped retention, versioned drafts, multi-format exports. |
 
 ---
@@ -105,17 +105,58 @@
 
 ---
 
-## 3. Next Milestone: Phase 3.2 — Thinker Dialectic Convergence & Objection Translation
+### Phase 3.2: Thinker Dialectic Convergence & Objection Translation
+- **Status:** **ACCEPT**
+- **Original Unmet Criterion:**
+  1. Translating substantive thinker sparring objections and falsification criteria into explicit counter-evidence search parameters.
+  2. Integrating counter-evidence search parameters directly into the literature review search planner and pipeline.
+  3. Generating inspectable hypothesis revision recommendations grounded in discovered counter-evidence while strictly preserving user agency without silent mutations.
+- **Implementation Changes:**
+  - [backend/intellectual_rigour/counter_evidence.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/intellectual_rigour/counter_evidence.py):
+    - Implemented framework-specific counter-evidence query generators and falsification criteria for all 10 philosophical archetypes (Popper, Hume, Box, Kuhn, Simon, Bacon, Aristotle, Descartes, Darwin, Turing).
+    - Implemented objection translation engine extracting targeted phrases and keywords into specific scholarly queries.
+    - Implemented `generate_hypothesis_revision_proposal` constructing candidate revision options (scoped applicability, mechanistic qualification, falsifiable boundaries) and empirical boundary conditions without modifying the stored hypothesis.
+  - [backend/conversation/brief.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/conversation/brief.py):
+    - Added `counter_evidence_queries` and `falsification_criteria` to `ResearchBrief` model and `from_mandate`.
+    - Updated `prepare_research_brief` to automatically synthesize a `CounterEvidencePlan` from thinker context / unresolved objections when briefs are formulated.
+    - Added `counter_evidence_queries` and `falsification_criteria` to `substantive_keys` in `update_research_brief`.
+  - [backend/memory/db.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/memory/db.py):
+    - Added columns `counter_evidence_queries_json` and `falsification_criteria_json` to `research_briefs` table schema and runtime migrations in `init_db()`.
+    - Updated `save_brief_db`, `get_brief_db`, and `list_briefs_db` to persist and load counter-evidence fields across restarts.
+  - [backend/orchestrator.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/orchestrator.py):
+    - Updated `create_initial_state` to forward `counter_evidence_queries` and `falsification_criteria` from brief data into `ResearchState`.
+  - [backend/pipeline.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/pipeline.py):
+    - Added `counter_evidence_queries` and `falsification_criteria` to `ResearchState`.
+    - Updated `search_node` to execute targeted queries for counter-evidence and tag resulting `cumulative_sources` with `relation="counter_evidence"`.
+  - [backend/conversation/idea.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/conversation/idea.py):
+    - Added `version` property and serialization alias to `ResearchIdea` matching `revision_version`.
+  - [backend/api/routes_ideas.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/api/routes_ideas.py):
+    - Exposed REST endpoints:
+      - `POST /api/ideas/{id}/counter-evidence-plan`
+      - `POST /api/ideas/{id}/propose-revision`
+  - [backend/tests/test_thinker_dialectic_and_counter_evidence.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/tests/test_thinker_dialectic_and_counter_evidence.py):
+    - 7 comprehensive tests verifying all 10 framework query templates, objection-to-query translation, brief auto-planning, SQLite persistence across reloads, agency-preserving hypothesis revision proposals, search node counter-evidence query execution and source candidate relation tagging, and FastAPI REST endpoints.
+  - [Makefile](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/Makefile):
+    - Added `backend/tests/test_thinker_dialectic_and_counter_evidence.py` to canonical `test:` target.
+- **Observed Test Evidence:**
+  - `pytest backend/tests/test_thinker_dialectic_and_counter_evidence.py`: 7 passed in 0.95s (Exit Code: 0).
+  - Canonical suite `make test`: **254 passed, 33 subtests passed in 46.90s (Exit Code: 0)**.
+  - Verification check `make lint`: All core modules imported successfully (Exit Code: 0).
+
+---
+
+## 3. Next Milestone: Phase 4 — Reproducible Literature Reviews (PRISMA Flow & Evidence Screening)
 
 ### Objective
-Advance Phase 3 by translating substantive thinker critiques and open objections into explicit counter-evidence search parameters and hypothesis refinement suggestions.
+Advance from initial search and single-document retrieval to systematic, verifiable evidence synthesis adhering to reproducible literature review principles (PRISMA flow tracking, inclusion/exclusion filtering, and screening auditability).
 
 ### Required Capabilities
-1. When thinker sparring produces unresolved objections (e.g. Popperian falsification criteria or Kuhn paradigm boundary objections), convert these objections into targeted counter-evidence search queries.
-2. Feed these counter-evidence queries directly into the literature review search planner upon brief formulation.
-3. Offer hypothesis revision recommendations grounded in discovered counter-evidence, preserving the user's agency to accept, revise, or reject the proposed modification.
+1. **PRISMA Flow Tracking**: Record explicit counts and identifiers across review stages: *Identified* (databases, registries) -> *Deduplicated* -> *Screened* (title/abstract) -> *Assessed for Eligibility* (full text) -> *Included* in synthesis.
+2. **Explicit Screening Decisions**: Record why candidate papers were included or excluded based on brief `selection_criteria` and constraints.
+3. **Appraisal & Contradiction Mapping**: In synthesis reports, provide an auditable evidence matrix contrasting supporting studies against counter-evidence studies tagged during retrieval.
+4. **Exportable Audit Trail**: Persist the review protocol, search strings, database timestamps, and screening ledger for reproducible export.
 
-### Acceptance Criteria for Phase 3.2
-- A thinker critique containing an explicit falsification objection generates at least one counter-evidence query in the search strategy.
-- Discovered counter-evidence triggers an inspectable hypothesis revision proposal without silently rewriting the user's persisted hypothesis.
-- Full regression suite (`make test`, `make lint`) remains green.
+### Acceptance Criteria for Phase 4
+- The pipeline produces a structured PRISMA ledger with counts and explicit inclusion/exclusion rationales matching brief selection criteria.
+- Full regression suite remains green without performance or schema regressions.
+

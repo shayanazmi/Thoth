@@ -94,6 +94,8 @@ def create_initial_state(
         "hypotheses": brief_data.get("hypotheses") or [],
         "selection_criteria": brief_data.get("selection_criteria") or [],
         "unresolved_questions": brief_data.get("unresolved_questions") or [],
+        "counter_evidence_queries": brief_data.get("counter_evidence_queries") or [],
+        "falsification_criteria": brief_data.get("falsification_criteria") or [],
     }
 
 @observe(type="tool", description="Concurrently scrapes and extracts readable text from candidate URLs")

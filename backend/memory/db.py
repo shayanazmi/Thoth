@@ -104,12 +104,24 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                 approved_at TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                idea_id TEXT DEFAULT NULL
+                idea_id TEXT DEFAULT NULL,
+                counter_evidence_queries_json TEXT NOT NULL DEFAULT '[]',
+                falsification_criteria_json TEXT NOT NULL DEFAULT '[]'
             );
         """)
 
         try:
             conn.execute("ALTER TABLE research_briefs ADD COLUMN idea_id TEXT DEFAULT NULL;")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE research_briefs ADD COLUMN counter_evidence_queries_json TEXT NOT NULL DEFAULT '[]';")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE research_briefs ADD COLUMN falsification_criteria_json TEXT NOT NULL DEFAULT '[]';")
         except sqlite3.OperationalError:
             pass
 
@@ -380,9 +392,10 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
                 brief_id, session_id, topic, version, research_question,
                 objectives_json, hypotheses_json, assumptions_json, search_scope,
                 selection_criteria_json, thinker_context_json, unresolved_questions_json,
-                approval_status, approved_version, approved_at, created_at, updated_at, idea_id
+                approval_status, approved_version, approved_at, created_at, updated_at, idea_id,
+                counter_evidence_queries_json, falsification_criteria_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(brief_id) DO UPDATE SET
                 session_id=excluded.session_id,
                 topic=excluded.topic,
@@ -399,7 +412,9 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
                 approved_version=excluded.approved_version,
                 approved_at=excluded.approved_at,
                 updated_at=excluded.updated_at,
-                idea_id=COALESCE(excluded.idea_id, research_briefs.idea_id);
+                idea_id=COALESCE(excluded.idea_id, research_briefs.idea_id),
+                counter_evidence_queries_json=excluded.counter_evidence_queries_json,
+                falsification_criteria_json=excluded.falsification_criteria_json;
         """, (
             brief_data["brief_id"],
             brief_data.get("session_id", ""),
@@ -419,6 +434,8 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
             brief_data.get("created_at"),
             brief_data.get("updated_at"),
             brief_data.get("idea_id"),
+            json.dumps(brief_data.get("counter_evidence_queries", [])),
+            json.dumps(brief_data.get("falsification_criteria", [])),
         ))
     return get_brief_db(brief_data["brief_id"], db_path=db_path)
 
@@ -440,6 +457,8 @@ def get_brief_db(brief_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[dict
     d["thinker_context"] = json.loads(d.get("thinker_context_json") or "{}") or None
     d["unresolved_questions"] = json.loads(d.get("unresolved_questions_json") or "[]")
     d["idea_id"] = d.get("idea_id")
+    d["counter_evidence_queries"] = json.loads(d.get("counter_evidence_queries_json") or "[]")
+    d["falsification_criteria"] = json.loads(d.get("falsification_criteria_json") or "[]")
     return d
 
 
@@ -463,6 +482,8 @@ def list_briefs_db(session_id: Optional[str] = None, limit: int = 50, db_path: s
         d["thinker_context"] = json.loads(d.get("thinker_context_json") or "{}") or None
         d["unresolved_questions"] = json.loads(d.get("unresolved_questions_json") or "[]")
         d["idea_id"] = d.get("idea_id")
+        d["counter_evidence_queries"] = json.loads(d.get("counter_evidence_queries_json") or "[]")
+        d["falsification_criteria"] = json.loads(d.get("falsification_criteria_json") or "[]")
         results.append(d)
     return results
 

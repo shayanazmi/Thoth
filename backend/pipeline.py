@@ -139,6 +139,9 @@ class ResearchState(TypedDict):
     integrity_status: str
     integrity_result: Dict[str, Any]
     is_verified: bool
+    brief: Optional[Dict[str, Any]]
+    counter_evidence_queries: Optional[List[Any]]
+    falsification_criteria: Optional[List[Any]]
 
 def _extract_domain(url: str) -> str:
     try:
@@ -256,8 +259,34 @@ def search_node(state: ResearchState) -> dict:
     target_count = max(int(state.get("scrape_top_n", 15) or 15), 3)
     candidates: List[SourceCandidate] = []
 
+    counter_queries = state.get("counter_evidence_queries") or (state.get("brief") or {}).get("counter_evidence_queries") or []
+    counter_query_strs: List[str] = []
+    for cq in counter_queries:
+        if isinstance(cq, dict):
+            q_text = cq.get("query")
+        else:
+            q_text = str(cq)
+        if q_text and q_text not in counter_query_strs:
+            counter_query_strs.append(q_text)
+
     try:
         def _run_async_search():
+            async def _execute_all():
+                main_cands = await search_scholarly_sources(topic, max_results=target_count, min_scholarly_results=min(target_count, 5))
+                if counter_query_strs:
+                    top_ce_query = counter_query_strs[0]
+                    try:
+                        ce_cands = await search_scholarly_sources(top_ce_query, max_results=3, min_scholarly_results=1)
+                        existing_urls = {c.url for c in main_cands if c.url}
+                        for ce_c in ce_cands:
+                            ce_c.relation = "counter_evidence"
+                            if ce_c.url not in existing_urls:
+                                main_cands.append(ce_c)
+                                existing_urls.add(ce_c.url)
+                    except Exception as ce_err:
+                        logger.warning(f"[SEARCH NODE] Counter-evidence search for '{top_ce_query}' failed: {ce_err}")
+                return main_cands
+
             try:
                 loop = asyncio.get_running_loop()
             except RuntimeError:
@@ -265,9 +294,9 @@ def search_node(state: ResearchState) -> dict:
             if loop and loop.is_running():
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                    return executor.submit(asyncio.run, search_scholarly_sources(topic, max_results=target_count, min_scholarly_results=min(target_count, 5))).result()
+                    return executor.submit(asyncio.run, _execute_all()).result()
             else:
-                return asyncio.run(search_scholarly_sources(topic, max_results=target_count, min_scholarly_results=min(target_count, 5)))
+                return asyncio.run(_execute_all())
 
         candidates = _run_async_search()
     except Exception as e:

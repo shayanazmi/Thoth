@@ -48,6 +48,8 @@ class ResearchBrief(BaseModel):
     approved_version: Optional[int] = Field(default=None, description="Exact version explicitly approved by the user")
     approved_at: Optional[str] = Field(default=None, description="ISO timestamp of user approval")
     idea_id: Optional[str] = Field(default=None, description="Linked promoted idea artifact ID")
+    counter_evidence_queries: List[Any] = Field(default_factory=list, description="Targeted queries to search for contradictory or disconfirming literature")
+    falsification_criteria: List[str] = Field(default_factory=list, description="Explicit conditions under which hypothesis would be disproven")
     created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
@@ -82,6 +84,8 @@ class ResearchBrief(BaseModel):
         unresolved_questions: Optional[List[str]] = None,
         session_id: str = "",
         idea_id: Optional[str] = None,
+        counter_evidence_queries: Optional[List[str]] = None,
+        falsification_criteria: Optional[List[str]] = None,
     ) -> "ResearchBrief":
         return cls(
             session_id=session_id,
@@ -95,6 +99,8 @@ class ResearchBrief(BaseModel):
             thinker_context=thinker_context,
             unresolved_questions=list(unresolved_questions or []),
             idea_id=idea_id,
+            counter_evidence_queries=list(counter_evidence_queries or []),
+            falsification_criteria=list(falsification_criteria or []),
             approval_status=BriefApprovalStatus.PENDING_APPROVAL,
             version=1,
         )
@@ -260,6 +266,8 @@ def prepare_research_brief(
     unresolved_questions: Optional[List[str]] = None,
     session_id: str = "",
     idea_id: Optional[str] = None,
+    counter_evidence_queries: Optional[List[str]] = None,
+    falsification_criteria: Optional[List[str]] = None,
     db_path: Optional[str] = None,
 ) -> ResearchBrief:
     """
@@ -267,6 +275,18 @@ def prepare_research_brief(
     promoted research idea, or explicit user query without launching formal research.
     """
     db_path = _resolve_db_path(db_path)
+    if isinstance(topic, dict):
+        d = topic
+        topic = d.get("topic") or d.get("title") or ""
+        research_question = research_question or d.get("primary_question") or d.get("research_question")
+        objectives = objectives or d.get("objectives")
+        hypothesis = hypothesis or (d.get("hypotheses")[0] if d.get("hypotheses") else None) or d.get("hypothesis")
+        thinker_ctx = d.get("thinker_context") or {}
+        thinker_id = thinker_id or d.get("thinker_id") or thinker_ctx.get("thinker_id")
+        unresolved_questions = unresolved_questions or d.get("unresolved_questions") or thinker_ctx.get("unresolved_objections")
+        counter_evidence_queries = counter_evidence_queries or d.get("counter_evidence_queries")
+        falsification_criteria = falsification_criteria or d.get("falsification_criteria")
+        session_id = session_id or d.get("session_id", "")
     clean_topic = (topic or "").strip()
     turns = chat_turns or []
 
@@ -358,7 +378,27 @@ def prepare_research_brief(
         if (not resolved_topic or resolved_topic == "Untitled Research Idea") and linked_idea.title:
             resolved_topic = linked_idea.title
 
-    # 7. Formulate research question and objectives
+    # 7. Formulate counter-evidence queries and falsification criteria
+    if counter_evidence_queries is not None:
+        active_counter_queries = list(counter_evidence_queries)
+    else:
+        from backend.intellectual_rigour.counter_evidence import generate_counter_evidence_plan
+        primary_hypo = active_hypotheses[0] if active_hypotheses else resolved_topic
+        tid_for_plan = (thinker_context.get("thinker_id") if thinker_context else (thinker_id or "popper"))
+        ce_plan = generate_counter_evidence_plan(
+            hypothesis=primary_hypo,
+            thinker_id=tid_for_plan,
+            objections=active_unresolved,
+            topic=resolved_topic,
+        )
+        active_counter_queries = [q.to_dict() for q in ce_plan.queries]
+
+    if falsification_criteria is not None:
+        active_falsification = list(falsification_criteria)
+    else:
+        active_falsification = ce_plan.falsification_criteria if 'ce_plan' in locals() else []
+
+    # 8. Formulate research question and objectives
     if research_question and research_question.strip():
         research_q = research_question.strip()
     elif active_hypotheses:
@@ -388,6 +428,8 @@ def prepare_research_brief(
         thinker_context=thinker_context,
         unresolved_questions=active_unresolved[:3],
         idea_id=idea_id,
+        counter_evidence_queries=active_counter_queries,
+        falsification_criteria=active_falsification,
         approval_status=BriefApprovalStatus.PENDING_APPROVAL,
     )
 
@@ -425,7 +467,8 @@ def update_research_brief(
     substantive_keys = {
         "topic", "research_question", "objectives", "hypotheses",
         "context_and_assumptions", "search_scope", "selection_criteria",
-        "thinker_context", "unresolved_questions", "idea_id"
+        "thinker_context", "unresolved_questions", "idea_id",
+        "counter_evidence_queries", "falsification_criteria"
     }
 
     substantive_change = False

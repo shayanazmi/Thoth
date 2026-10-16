@@ -15,6 +15,10 @@ from backend.conversation.idea import (
     ResearchIdea,
     IdeaStatus,
 )
+from backend.intellectual_rigour.counter_evidence import (
+    generate_counter_evidence_plan,
+    generate_hypothesis_revision_proposal,
+)
 
 logger = get_logger("IdeasRouter")
 router = APIRouter(prefix="/api/ideas", tags=["Ideas & Hypotheses Lifecycle"])
@@ -45,6 +49,18 @@ class ReviseIdeaRequest(BaseModel):
 
 class AbandonIdeaRequest(BaseModel):
     reason: Optional[str] = Field(default="", description="Reason for shelving or abandoning this idea")
+
+
+class CounterEvidencePlanRequest(BaseModel):
+    thinker_id: Optional[str] = Field(default=None, description="Thinker ID override")
+    objections: Optional[List[str]] = Field(default=None, description="Specific objections to translate into counter-evidence queries")
+    topic: Optional[str] = Field(default=None, description="Broader research topic context")
+
+
+class ProposeRevisionRequest(BaseModel):
+    counter_evidence_findings: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted counter-evidence claims or findings")
+    thinker_id: Optional[str] = Field(default=None, description="Thinker ID override")
+    objection: Optional[str] = Field(default="", description="Specific objection prompting the revision")
 
 
 @router.post("/tentative", status_code=status.HTTP_201_CREATED)
@@ -148,3 +164,57 @@ async def api_list_ideas(
 ):
     ideas = list_ideas(session_id=session_id, status=status, limit=limit)
     return JSONResponse(content={"ideas": [i.to_dict() for i in ideas]})
+
+
+@router.post("/{idea_id}/counter-evidence-plan")
+async def api_counter_evidence_plan(idea_id: str, payload: Optional[CounterEvidencePlanRequest] = None):
+    idea = get_idea(idea_id)
+    if not idea:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Research idea '{idea_id}' not found.",
+        )
+    p = payload or CounterEvidencePlanRequest()
+    plan = generate_counter_evidence_plan(
+        hypothesis=idea.hypothesis,
+        thinker_id=p.thinker_id or idea.thinker_id,
+        objections=p.objections if p.objections is not None else idea.unresolved_objections,
+        topic=p.topic or idea.title,
+    )
+    return JSONResponse(
+        content={
+            "success": True,
+            "idea_id": idea_id,
+            "plan": plan.to_dict(),
+        }
+    )
+
+
+@router.post("/{idea_id}/propose-revision")
+async def api_propose_revision(idea_id: str, payload: ProposeRevisionRequest):
+    idea = get_idea(idea_id)
+    if not idea:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Research idea '{idea_id}' not found.",
+        )
+    primary_objection = payload.objection
+    if not primary_objection and idea.unresolved_objections:
+        primary_objection = idea.unresolved_objections[0]
+
+    proposal = generate_hypothesis_revision_proposal(
+        idea_id=idea_id,
+        current_hypothesis=idea.hypothesis,
+        counter_evidence_findings=payload.counter_evidence_findings,
+        thinker_id=payload.thinker_id or idea.thinker_id,
+        objection=primary_objection or "",
+    )
+    return JSONResponse(
+        content={
+            "success": True,
+            "idea_id": idea_id,
+            "proposal": proposal.to_dict(),
+            "message": "Hypothesis revision proposal generated. Note: The persisted idea remains unchanged until explicit user approval via POST /api/ideas/{idea_id}/revise.",
+        }
+    )
+

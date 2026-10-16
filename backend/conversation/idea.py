@@ -36,12 +36,21 @@ class ResearchIdea(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
+    @property
+    def version(self) -> int:
+        return self.revision_version
+
     def to_dict(self) -> Dict[str, Any]:
-        return self.model_dump()
+        d = self.model_dump()
+        d["version"] = self.revision_version
+        return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ResearchIdea":
-        return cls(**data)
+        clean_data = dict(data)
+        if "version" in clean_data and "revision_version" not in clean_data:
+            clean_data["revision_version"] = clean_data.pop("version")
+        return cls(**clean_data)
 
 
 def _resolve_db_path(db_path: Optional[str] = None) -> str:
