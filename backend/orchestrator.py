@@ -12,6 +12,7 @@ from backend.memory.index import index_note
 from backend.pipeline import (
     search_node,
     snowball_node,
+    prisma_node,
     writer_node,
     verifier_node,
     critic_node,
@@ -29,6 +30,7 @@ class ResearchFSMState:
     SEARCH = "SEARCH"
     SNOWBALL = "SNOWBALL"
     SCRAPE = "SCRAPE"
+    PRISMA = "PRISMA"
     DRAFT = "DRAFT"
     TRUTH_GUARD = "TRUTH_GUARD"
     CRITIC = "CRITIC"
@@ -367,6 +369,12 @@ def stream_research_pipeline(
 
     state.update(scrape_update)
     yield "scrape", scrape_update, dict(state)
+
+    # --- PRISMA 2020 Systematic Review & Evidence Synthesis Ledger ---
+    logger.info("[ORCHESTRATOR - ACT] Executing PRISMA 2020 Review Accounting and Screening...")
+    prisma_update = dict(prisma_node(state))
+    state.update(prisma_update)
+    yield "prisma", prisma_update, dict(state)
 
     while True:
         if cancel_event and cancel_event.is_set():

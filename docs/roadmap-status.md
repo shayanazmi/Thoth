@@ -15,8 +15,8 @@
 | **Phase 2** | Secure Research Handoff | Completed | **ACCEPT** | 26 durable task lifecycle & approval invariant tests passing. Server-side approval barrier, SQLite atomic deduplication, cooperative cancellation verified. |
 | **Phase 3.1** | Persistent Idea & Hypothesis Lifecycle | Completed | **ACCEPT** | 8 lifecycle & promotion barrier tests passing (`test_idea_hypothesis_lifecycle.py`). Promotion barrier enforced, immutable revision lineage preserved, brief integration connected. |
 | **Phase 3.2** | Thinker Dialectic Convergence & Objection Translation | Completed | **ACCEPT** | 7 dialectic & counter-evidence tests passing (`test_thinker_dialectic_and_counter_evidence.py`). Framework-specific query generation across 10 thinkers, objection-to-query translation, SQLite brief persistence, agency-preserving hypothesis revision proposals, and search node counter-evidence tagging verified. |
-| **Phase 4** | Reproducible Literature Reviews | Next Milestone | **PENDING** | PRISMA flow data, systematic screening decisions (inclusion/exclusion criteria), source appraisal audit trails, and synthesis traceability. |
-| **Phase 5** | Persistent Research Workspace & Manuscript Engine | Roadmap | **PENDING** | Dependent on Phases 1–4. Project-scoped retention, versioned drafts, multi-format exports. |
+| **Phase 4** | Reproducible Literature Reviews | Completed | **ACCEPT** | 12 PRISMA review & evidence synthesis tests passing (`test_prisma_review_and_evidence_synthesis.py`). PRISMA 2020 flow accounting, mathematical invariant verification, criteria-grounded screening ledger, retrieval failure vs eligibility distinction, multi-report study grouping, study appraisal matrix, dialectic contradiction mapping with Phase 3.2 counter-evidence, SQLite persistence, and REST API verified. |
+| **Phase 5** | Persistent Research Workspace & Manuscript Engine | Next Milestone | **PENDING** | Project-scoped retention, versioned drafts, multi-format exports, human-in-the-loop editing. |
 
 ---
 
@@ -145,18 +145,73 @@
 
 ---
 
-## 3. Next Milestone: Phase 4 — Reproducible Literature Reviews (PRISMA Flow & Evidence Screening)
+---
+
+### Phase 4: Reproducible Literature Reviews (PRISMA Flow & Evidence Screening)
+- **Status:** **ACCEPT**
+- **Original Unmet Criterion:**
+  1. Record explicit, mathematically coherent PRISMA 2020 literature-review flow counts across databases, deduplication, screening, retrieval, eligibility, and included studies without fabricated totals or count leaks.
+  2. Implement an inspectable, criteria-grounded screening decision ledger preserving brief criteria, rationales, specific exclusion reasons, and a strict distinction between retrieval failures (`NOT_RETRIEVED`) and eligibility exclusions (`EXCLUDED`).
+  3. Support human reviewer audit operations (confirmations, overrides, audit notes, and reviewer attribution).
+  4. Build a traceable study appraisal matrix (design archetype, baseline controls, reproducibility artifacts, statistical validation, limitations, and hypothesis stance) and dialectic contradiction mapping directly incorporating Phase 3.2 counter-evidence.
+  5. Integrate flow accounting and evidence matrices into the pipeline, drafted reports, and REST API.
+- **Implementation Changes:**
+  - [backend/intellectual_rigour/prisma.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/intellectual_rigour/prisma.py):
+    - Defined domain models: `ReviewProtocol`, `ScreeningStage` (`TITLE_ABSTRACT`, `FULL_TEXT_ELIGIBILITY`), `ScreeningDisposition` (`INCLUDED`, `EXCLUDED`, `UNRESOLVED`, `NOT_RETRIEVED`), `ReviewerType` (`AI_RECOMMENDED`, `REVIEWER_CONFIRMED`), `HypothesisRelation` (`SUPPORTS`, `CHALLENGES`, `QUALIFIES`, `NEUTRAL`), `ScreeningDecision`, `StudyAppraisal`, `ContradictionEntry`, `EvidenceMatrix`, `PRISMAFlowCounts`, and `PRISMAReviewLedger`.
+    - Implemented `PRISMAFlowCounts.verify_accounting_integrity()` enforcing mathematical invariants across review stages.
+    - Implemented `group_sources_into_studies()` linking multiple reports/preprints to underlying studies by DOI, arXiv ID, or normalized title.
+    - Implemented `screen_source_title_abstract()` grounded in brief selection criteria and topical indicators.
+    - Implemented `screen_source_full_text()` enforcing the crucial distinction between retrieval failures (`NOT_RETRIEVED` for paywalls, 403, network errors, empty extractions) and methodological exclusions (`EXCLUDED` for missing baseline controls).
+    - Implemented `appraise_included_study()` extracting study design archetypes, baseline controls, code/data reproducibility artifacts, significance validation, author-reported limitations, and hypothesis stance.
+    - Implemented `map_contradictions()` pairing supporting and challenging studies (including Phase 3.2 counter-evidence) and identifying substantive divergences (design divergence, distribution shifts) and empirical resolution requirements.
+    - Implemented `generate_prisma_mermaid_diagram()` producing valid Mermaid flowchart markdown.
+    - Implemented `run_prisma_review_workflow()` driving end-to-end execution.
+  - [backend/memory/db.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/memory/db.py):
+    - Added tables `prisma_reviews` and `screening_decisions` with indexes and foreign keys in `init_db()`.
+    - Implemented CRUD helpers: `save_prisma_review_db`, `get_prisma_review_db`, `list_prisma_reviews_db`, `save_screening_decision_db`, `get_screening_decision_db`, `list_screening_decisions_db`, `update_screening_decision_db`.
+    - Made `save_brief_db` and `save_prisma_review_db` safe against missing optional fields and foreign key order dependencies.
+  - [backend/pipeline.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/pipeline.py):
+    - Added `prisma_review`, `screening_decisions`, `evidence_matrix`, and `prisma_mermaid` to `ResearchState`.
+    - Implemented `prisma_node(state: ResearchState) -> dict`.
+    - Enhanced `writer_node` to inject PRISMA flow accounting, the evidence appraisal table, and dialectic contradictions into the synthesis context, and automatically append the PRISMA Mermaid diagram and evidence table to the final report.
+  - [backend/orchestrator.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/orchestrator.py):
+    - Added `PRISMA` to `ResearchFSMState`.
+    - Added `prisma_node` execution and yielded streaming event `"prisma"` between the scraping and drafting phases.
+  - [backend/api/routes_prisma.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/api/routes_prisma.py):
+    - Exposed REST endpoints:
+      - `GET /api/prisma/reviews`
+      - `GET /api/prisma/reviews/{id}`
+      - `POST /api/prisma/reviews`
+      - `GET /api/prisma/reviews/{id}/decisions`
+      - `POST /api/prisma/reviews/{id}/decisions/{id}/confirm`
+      - `GET /api/prisma/reviews/{id}/evidence-matrix`
+      - `GET /api/prisma/reviews/{id}/mermaid`
+  - [backend/main.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/main.py):
+    - Registered `prisma_router` under prefix `/api/prisma`.
+  - [backend/tests/test_prisma_review_and_evidence_synthesis.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/tests/test_prisma_review_and_evidence_synthesis.py):
+    - 12 comprehensive unit, integration, and API tests validating mathematical invariants, inflation detection, Mermaid rendering, multi-report study grouping, criteria-grounded screening, retrieval failure vs eligibility distinction, study appraisal, dialectic contradiction mapping, SQLite persistence, autonomous end-to-end workflow execution, and REST API endpoints.
+  - [Makefile](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/Makefile):
+    - Included `backend/tests/test_prisma_review_and_evidence_synthesis.py` in the canonical `test:` target.
+- **Observed Test Evidence:**
+  - `pytest backend/tests/test_prisma_review_and_evidence_synthesis.py`: 12 passed in 0.89s (Exit Code: 0).
+  - Canonical suite `make test`: **266 passed, 33 subtests passed in 47.98s (Exit Code: 0)**.
+  - Verification check `make lint`: All core modules imported successfully (Exit Code: 0).
+
+---
+
+## 3. Next Milestone: Phase 5 — Persistent Research Workspace & Manuscript Engine
 
 ### Objective
-Advance from initial search and single-document retrieval to systematic, verifiable evidence synthesis adhering to reproducible literature review principles (PRISMA flow tracking, inclusion/exclusion filtering, and screening auditability).
+Provide project-scoped workspace persistence, draft version history, human-in-the-loop collaborative editing, and publication-ready multi-format exports (Markdown, LaTeX, HTML, and structured JSON) anchored in verifiable evidence matrices.
 
 ### Required Capabilities
-1. **PRISMA Flow Tracking**: Record explicit counts and identifiers across review stages: *Identified* (databases, registries) -> *Deduplicated* -> *Screened* (title/abstract) -> *Assessed for Eligibility* (full text) -> *Included* in synthesis.
-2. **Explicit Screening Decisions**: Record why candidate papers were included or excluded based on brief `selection_criteria` and constraints.
-3. **Appraisal & Contradiction Mapping**: In synthesis reports, provide an auditable evidence matrix contrasting supporting studies against counter-evidence studies tagged during retrieval.
-4. **Exportable Audit Trail**: Persist the review protocol, search strings, database timestamps, and screening ledger for reproducible export.
+1. **Project-Scoped Workspace**: Persistent workspaces binding research ideas, briefs, PRISMA review ledgers, evidence matrices, and drafted reports.
+2. **Versioned Draft Progression**: Multi-revision manuscript evolution tracking claim adjustments, citation updates, and reviewer notes across drafts.
+3. **Multi-Format Export Engine**: Deterministic export to LaTeX (with BibTeX bibliographies grounded in verified DOIs/locators), academic Markdown, and publication-ready HTML.
+4. **Interactive Evidence Matrix Inspection**: User interface allowing human researchers to explore PRISMA flowcharts, click from flow counts directly to underlying records, and inspect dialectic contradiction cards.
 
-### Acceptance Criteria for Phase 4
-- The pipeline produces a structured PRISMA ledger with counts and explicit inclusion/exclusion rationales matching brief selection criteria.
-- Full regression suite remains green without performance or schema regressions.
+### Acceptance Criteria for Phase 5
+- Research projects persist across process restarts with all associated briefs, reviews, decisions, and drafts accessible through unified project APIs.
+- Export engine produces valid LaTeX and BibTeX containing authentic source locators and badges without hallucinated references.
+- All existing tests in `make test` remain green.
 

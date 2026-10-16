@@ -142,6 +142,10 @@ class ResearchState(TypedDict):
     brief: Optional[Dict[str, Any]]
     counter_evidence_queries: Optional[List[Any]]
     falsification_criteria: Optional[List[Any]]
+    prisma_review: Optional[Dict[str, Any]]
+    screening_decisions: Optional[List[Dict[str, Any]]]
+    evidence_matrix: Optional[Dict[str, Any]]
+    prisma_mermaid: Optional[str]
 
 def _extract_domain(url: str) -> str:
     try:
@@ -656,6 +660,40 @@ def scrape_node(state: ResearchState) -> dict:
         "cumulative_sources": cumulative_sources
     }
 
+@observe(type="tool")
+def prisma_node(state: ResearchState) -> dict:
+    print("\n" + "= " * 50)
+    print("Step 2.5 - PRISMA 2020 Systematic Review & Evidence Synthesis Ledger...")
+    print("=" * 50)
+    from backend.intellectual_rigour.prisma import run_prisma_review_workflow
+    from backend.memory.db import DEFAULT_DB_PATH
+
+    topic = state.get("topic", "")
+    sources = state.get("cumulative_sources", [])
+    brief = state.get("brief") or {}
+    session_id = brief.get("session_id") or ""
+
+    ledger = run_prisma_review_workflow(
+        topic=topic,
+        sources=sources,
+        brief=brief,
+        session_id=session_id,
+        db_path=DEFAULT_DB_PATH
+    )
+
+    print(f"[PRISMA] Processed {ledger.flow_counts.total_identified} identified records across databases.")
+    print(f"[PRISMA] Screened: {ledger.flow_counts.records_screened} | Excluded (TA): {ledger.flow_counts.records_excluded_title_abstract}")
+    print(f"[PRISMA] Sought retrieval: {ledger.flow_counts.reports_sought_for_retrieval} | Not retrieved: {ledger.flow_counts.reports_not_retrieved}")
+    print(f"[PRISMA] Assessed full-text: {ledger.flow_counts.reports_assessed_for_eligibility} | Excluded (FT): {ledger.flow_counts.reports_excluded_full_text}")
+    print(f"[PRISMA] Included: {ledger.flow_counts.included_reports} reports ({ledger.flow_counts.included_studies} studies)")
+
+    return {
+        "prisma_review": ledger.to_dict(),
+        "screening_decisions": [d.to_dict() for d in ledger.decisions],
+        "evidence_matrix": ledger.evidence_matrix.to_dict(),
+        "prisma_mermaid": ledger.mermaid_diagram,
+    }
+
 @observe(type="llm")
 def writer_node(state: ResearchState) -> dict:
     attempt = state.get("attempt", 0) + 1
@@ -748,6 +786,36 @@ def writer_node(state: ResearchState) -> dict:
     if session_ctx["recent_turns"]:
         research_combined += f"\n\nRECENT CONVERSATION TURNS:\n{session_ctx['recent_turns']}"
 
+    # Inject PRISMA 2020 review ledger context
+    prisma_rev = state.get("prisma_review")
+    if prisma_rev:
+        fc = prisma_rev.get("flow_counts", {})
+        research_combined += (
+            f"\n\nPRISMA 2020 SYSTEMATIC REVIEW FLOW ACCOUNTING:\n"
+            f"- Total Records Identified: {fc.get('total_identified', 0)} (Databases: {fc.get('identified_databases', 0)}, Registers/Web: {fc.get('identified_registries_web', 0)}, Snowball: {fc.get('identified_snowball', 0)})\n"
+            f"- Duplicates Removed: {fc.get('duplicates_removed', 0)}\n"
+            f"- Records Screened (Title/Abstract): {fc.get('records_screened', 0)} (Excluded: {fc.get('records_excluded_title_abstract', 0)})\n"
+            f"- Reports Sought for Retrieval: {fc.get('reports_sought_for_retrieval', 0)} (Not Retrieved / Inaccessible: {fc.get('reports_not_retrieved', 0)})\n"
+            f"- Reports Assessed for Full-Text Eligibility: {fc.get('reports_assessed_for_eligibility', 0)} (Excluded: {fc.get('reports_excluded_full_text', 0)})\n"
+            f"- Final Included Corpus: {fc.get('included_reports', 0)} reports representing {fc.get('included_studies', 0)} distinct studies\n"
+        )
+
+    # Inject Evidence Matrix & Study Appraisal Table
+    ev_matrix = state.get("evidence_matrix")
+    if ev_matrix and ev_matrix.get("studies"):
+        from backend.intellectual_rigour.prisma import EvidenceMatrix
+        try:
+            em_obj = EvidenceMatrix(**ev_matrix)
+            research_combined += f"\n\nEVIDENCE MATRIX & STUDY APPRAISAL TABLE:\n{em_obj.to_markdown_table()}"
+            if em_obj.contradictions:
+                contradictions_text = "\n".join(
+                    f"- Hypothesis: {c.focal_hypothesis}\n  Supporting Studies: {c.supporting_study_ids}\n  Counter Studies: {c.counter_study_ids}\n  Divergence Analysis: {c.substantive_divergence}\n  Required Resolution: {c.resolution_requirements}"
+                    for c in em_obj.contradictions
+                )
+                research_combined += f"\n\nIDENTIFIED CONTRADICTIONS & DIALECTIC TENSIONS (Phase 3.2 Counter-Evidence):\n{contradictions_text}"
+        except Exception as e:
+            logger.debug(f"[WRITER] Evidence matrix formatting skipped: {e}")
+
     brief = state.get("brief") or {}
     thinker_ctx = state.get("thinker_context") or brief.get("thinker_context")
     if thinker_ctx and isinstance(thinker_ctx, dict) and thinker_ctx.get("thinker_name"):
@@ -786,6 +854,18 @@ def writer_node(state: ResearchState) -> dict:
         "current_date": datetime.datetime.now().strftime("%B %d, %Y")
     })
     report = strip_chain_of_thought(raw_report)
+
+    # Append PRISMA 2020 Flow Diagram and Evidence Matrix to synthesis report if not already included
+    mermaid_diag = state.get("prisma_mermaid")
+    if mermaid_diag and "```mermaid" not in report:
+        report += f"\n\n## Systematic Literature Review & Evidence Accounting (PRISMA 2020)\n\n{mermaid_diag}\n"
+        if ev_matrix and ev_matrix.get("studies"):
+            try:
+                from backend.intellectual_rigour.prisma import EvidenceMatrix
+                em_obj = EvidenceMatrix(**ev_matrix)
+                report += f"\n### Evidence Matrix & Study Appraisal\n\n{em_obj.to_markdown_table()}\n"
+            except Exception:
+                pass
 
     print("\nDrafted Synthesis Report Preview:\n", report[:400] + "...")
     return {"report": report, "attempt": attempt, "verifier_feedback": "", "feedback": ""}

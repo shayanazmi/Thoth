@@ -195,6 +195,64 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON research_tasks(status);
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS prisma_reviews (
+                review_id TEXT PRIMARY KEY,
+                brief_id TEXT NOT NULL,
+                session_id TEXT DEFAULT '',
+                topic TEXT NOT NULL,
+                protocol_json TEXT NOT NULL DEFAULT '{}',
+                flow_counts_json TEXT NOT NULL DEFAULT '{}',
+                evidence_matrix_json TEXT NOT NULL DEFAULT '{}',
+                mermaid_diagram TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (brief_id) REFERENCES research_briefs(brief_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_prisma_brief ON prisma_reviews(brief_id);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_prisma_session ON prisma_reviews(session_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS screening_decisions (
+                decision_id TEXT PRIMARY KEY,
+                review_id TEXT NOT NULL,
+                brief_id TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                source_url TEXT DEFAULT '',
+                title TEXT NOT NULL,
+                stage TEXT NOT NULL CHECK (stage IN ('TITLE_ABSTRACT', 'FULL_TEXT_ELIGIBILITY')),
+                disposition TEXT NOT NULL CHECK (disposition IN ('INCLUDED', 'EXCLUDED', 'UNRESOLVED', 'NOT_RETRIEVED')),
+                criteria_applied_json TEXT NOT NULL DEFAULT '[]',
+                exclusion_reason TEXT DEFAULT '',
+                rationale TEXT DEFAULT '',
+                supporting_passages_json TEXT NOT NULL DEFAULT '[]',
+                reviewer_type TEXT NOT NULL DEFAULT 'AI_RECOMMENDED' CHECK (reviewer_type IN ('AI_RECOMMENDED', 'REVIEWER_CONFIRMED')),
+                study_id TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (review_id) REFERENCES prisma_reviews(review_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_screening_review ON screening_decisions(review_id);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_screening_brief ON screening_decisions(brief_id);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_screening_stage_disp ON screening_decisions(stage, disposition);
+        """)
+
     return conn
 
 def save_session(
@@ -384,7 +442,11 @@ def set_cached_response(cache_key: str, response_json: str, ttl_seconds: int = 8
 
 def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
     import json
+    import datetime
     init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    created_at = brief_data.get("created_at") or now_iso
+    updated_at = brief_data.get("updated_at") or now_iso
     conn = get_connection(db_path)
     with conn:
         conn.execute("""
@@ -420,7 +482,7 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
             brief_data.get("session_id", ""),
             brief_data["topic"],
             brief_data.get("version", 1),
-            brief_data["research_question"],
+            brief_data.get("research_question", ""),
             json.dumps(brief_data.get("objectives", [])),
             json.dumps(brief_data.get("hypotheses", [])),
             json.dumps(brief_data.get("context_and_assumptions", [])),
@@ -431,8 +493,8 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
             brief_data.get("approval_status", "PENDING_APPROVAL"),
             brief_data.get("approved_version"),
             brief_data.get("approved_at"),
-            brief_data.get("created_at"),
-            brief_data.get("updated_at"),
+            created_at,
+            updated_at,
             brief_data.get("idea_id"),
             json.dumps(brief_data.get("counter_evidence_queries", [])),
             json.dumps(brief_data.get("falsification_criteria", [])),
@@ -988,3 +1050,268 @@ def clear_tasks_db(db_path: str = DEFAULT_DB_PATH):
     conn = get_connection(db_path)
     with conn:
         conn.execute("DELETE FROM research_tasks;")
+
+
+def save_prisma_review_db(
+    review_data: Dict[str, Any],
+    db_path: str = DEFAULT_DB_PATH,
+) -> Dict[str, Any]:
+    import json
+    import datetime
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    rev_id = review_data.get("review_id") or f"rev-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+    brief_id = review_data.get("brief_id") or ""
+    session_id = review_data.get("session_id") or ""
+    topic = review_data.get("topic") or ""
+
+    protocol_json = json.dumps(review_data.get("protocol") or {})
+    flow_counts_json = json.dumps(review_data.get("flow_counts") or {})
+    evidence_matrix_json = json.dumps(review_data.get("evidence_matrix") or {})
+    mermaid_diagram = review_data.get("mermaid_diagram") or ""
+    created_at = review_data.get("created_at") or now_iso
+    updated_at = now_iso
+
+    conn = get_connection(db_path)
+    with conn:
+        if brief_id:
+            conn.execute("""
+                INSERT OR IGNORE INTO research_briefs (
+                    brief_id, session_id, topic, research_question, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?);
+            """, (brief_id, session_id, topic or "Systematic Review", f"Review for {topic or brief_id}", created_at, updated_at))
+
+        conn.execute("""
+            INSERT INTO prisma_reviews (
+                review_id, brief_id, session_id, topic, protocol_json,
+                flow_counts_json, evidence_matrix_json, mermaid_diagram,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(review_id) DO UPDATE SET
+                protocol_json=excluded.protocol_json,
+                flow_counts_json=excluded.flow_counts_json,
+                evidence_matrix_json=excluded.evidence_matrix_json,
+                mermaid_diagram=excluded.mermaid_diagram,
+                updated_at=excluded.updated_at;
+        """, (
+            rev_id, brief_id, session_id, topic, protocol_json,
+            flow_counts_json, evidence_matrix_json, mermaid_diagram,
+            created_at, updated_at
+        ))
+    return get_prisma_review_db(rev_id, db_path=db_path) or review_data
+
+
+def get_prisma_review_db(
+    review_id_or_brief_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> Optional[Dict[str, Any]]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM prisma_reviews
+        WHERE review_id = ? OR brief_id = ?
+        ORDER BY updated_at DESC LIMIT 1;
+    """, (review_id_or_brief_id, review_id_or_brief_id))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["protocol"] = json.loads(d.get("protocol_json") or "{}")
+    except Exception:
+        d["protocol"] = {}
+    try:
+        d["flow_counts"] = json.loads(d.get("flow_counts_json") or "{}")
+    except Exception:
+        d["flow_counts"] = {}
+    try:
+        d["evidence_matrix"] = json.loads(d.get("evidence_matrix_json") or "{}")
+    except Exception:
+        d["evidence_matrix"] = {}
+    return d
+
+
+def list_prisma_reviews_db(
+    session_id: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> List[Dict[str, Any]]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    if session_id:
+        cursor.execute("SELECT * FROM prisma_reviews WHERE session_id = ? ORDER BY created_at DESC;", (session_id,))
+    else:
+        cursor.execute("SELECT * FROM prisma_reviews ORDER BY created_at DESC;")
+    rows = cursor.fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["protocol"] = json.loads(d.get("protocol_json") or "{}")
+        except Exception:
+            d["protocol"] = {}
+        try:
+            d["flow_counts"] = json.loads(d.get("flow_counts_json") or "{}")
+        except Exception:
+            d["flow_counts"] = {}
+        try:
+            d["evidence_matrix"] = json.loads(d.get("evidence_matrix_json") or "{}")
+        except Exception:
+            d["evidence_matrix"] = {}
+        out.append(d)
+    return out
+
+
+def save_screening_decision_db(
+    decision_data: Dict[str, Any],
+    db_path: str = DEFAULT_DB_PATH,
+) -> Dict[str, Any]:
+    import json
+    import datetime
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    dec_id = decision_data.get("decision_id") or f"dec-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+    review_id = decision_data.get("review_id") or ""
+    brief_id = decision_data.get("brief_id") or ""
+    source_id = decision_data.get("source_id") or ""
+    source_url = decision_data.get("source_url") or ""
+    title = decision_data.get("title") or "Untitled"
+    stage = decision_data.get("stage") or "TITLE_ABSTRACT"
+    disposition = decision_data.get("disposition") or "INCLUDED"
+    criteria_json = json.dumps(decision_data.get("criteria_applied") or [])
+    exclusion_reason = decision_data.get("exclusion_reason") or ""
+    rationale = decision_data.get("rationale") or ""
+    passages_json = json.dumps(decision_data.get("supporting_passages") or [])
+    reviewer_type = decision_data.get("reviewer_type") or "AI_RECOMMENDED"
+    study_id = decision_data.get("study_id") or ""
+    created_at = decision_data.get("created_at") or now_iso
+    updated_at = now_iso
+
+    conn = get_connection(db_path)
+    with conn:
+        conn.execute("""
+            INSERT INTO screening_decisions (
+                decision_id, review_id, brief_id, source_id, source_url, title,
+                stage, disposition, criteria_applied_json, exclusion_reason,
+                rationale, supporting_passages_json, reviewer_type, study_id,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(decision_id) DO UPDATE SET
+                disposition=excluded.disposition,
+                criteria_applied_json=excluded.criteria_applied_json,
+                exclusion_reason=excluded.exclusion_reason,
+                rationale=excluded.rationale,
+                supporting_passages_json=excluded.supporting_passages_json,
+                reviewer_type=excluded.reviewer_type,
+                study_id=excluded.study_id,
+                updated_at=excluded.updated_at;
+        """, (
+            dec_id, review_id, brief_id, source_id, source_url, title,
+            stage, disposition, criteria_json, exclusion_reason,
+            rationale, passages_json, reviewer_type, study_id,
+            created_at, updated_at
+        ))
+    return get_screening_decision_db(dec_id, db_path=db_path) or decision_data
+
+
+def get_screening_decision_db(
+    decision_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> Optional[Dict[str, Any]]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM screening_decisions WHERE decision_id = ?;", (decision_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["criteria_applied"] = json.loads(d.get("criteria_applied_json") or "[]")
+    except Exception:
+        d["criteria_applied"] = []
+    try:
+        d["supporting_passages"] = json.loads(d.get("supporting_passages_json") or "[]")
+    except Exception:
+        d["supporting_passages"] = []
+    return d
+
+
+def list_screening_decisions_db(
+    review_id: Optional[str] = None,
+    brief_id: Optional[str] = None,
+    stage: Optional[str] = None,
+    disposition: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> List[Dict[str, Any]]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+
+    query = "SELECT * FROM screening_decisions WHERE 1=1"
+    params: List[Any] = []
+    if review_id:
+        query += " AND review_id = ?"
+        params.append(review_id)
+    if brief_id:
+        query += " AND brief_id = ?"
+        params.append(brief_id)
+    if stage:
+        query += " AND stage = ?"
+        params.append(stage)
+    if disposition:
+        query += " AND disposition = ?"
+        params.append(disposition)
+    query += " ORDER BY created_at ASC;"
+
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["criteria_applied"] = json.loads(d.get("criteria_applied_json") or "[]")
+        except Exception:
+            d["criteria_applied"] = []
+        try:
+            d["supporting_passages"] = json.loads(d.get("supporting_passages_json") or "[]")
+        except Exception:
+            d["supporting_passages"] = []
+        out.append(d)
+    return out
+
+
+def update_screening_decision_db(
+    decision_id: str,
+    disposition: str,
+    reviewer_notes: str = "",
+    reviewer_type: str = "REVIEWER_CONFIRMED",
+    db_path: str = DEFAULT_DB_PATH,
+) -> bool:
+    import datetime
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT rationale FROM screening_decisions WHERE decision_id = ?;", (decision_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        old_rationale = row["rationale"] or ""
+        new_rationale = f"{old_rationale} [Reviewer Note: {reviewer_notes}]" if reviewer_notes else old_rationale
+
+        cursor.execute("""
+            UPDATE screening_decisions
+            SET disposition = ?, reviewer_type = ?, rationale = ?, updated_at = ?
+            WHERE decision_id = ?;
+        """, (disposition, reviewer_type, new_rationale, now_iso, decision_id))
+        return cursor.rowcount > 0
+

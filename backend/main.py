@@ -31,6 +31,7 @@ from backend.api.routes_followup import router as followup_router
 from backend.api.routes_brainstorm import router as brainstorm_router
 from backend.api.routes_vault import router as vault_router
 from backend.api.routes_ideas import router as ideas_router
+from backend.api.routes_prisma import router as prisma_router
 
 logger = get_logger("ThothApp")
 
@@ -82,6 +83,7 @@ app.include_router(followup_router)
 app.include_router(brainstorm_router)
 app.include_router(vault_router)
 app.include_router(ideas_router)
+app.include_router(prisma_router)
 
 # Mount local frontend if available
 _FRONTEND_DIR = os.path.join(_PROJECT_ROOT, "frontend")
