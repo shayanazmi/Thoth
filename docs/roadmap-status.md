@@ -18,6 +18,7 @@
 | **Phase 4** | Reproducible Literature Reviews | Completed | **ACCEPT** | 12 PRISMA review & evidence synthesis tests passing (`test_prisma_review_and_evidence_synthesis.py`). PRISMA 2020 flow accounting, mathematical invariant verification, criteria-grounded screening ledger, retrieval failure vs eligibility distinction, multi-report study grouping, study appraisal matrix, dialectic contradiction mapping with Phase 3.2 counter-evidence, SQLite persistence, and REST API verified. |
 | **Phase 5** | Persistent Research Workspace & Manuscript Engine | Completed | **ACCEPT** | 11 workspace & manuscript engine tests passing (`test_project_workspace_and_manuscript_engine.py`). Project-scoped persistence connecting ideas, briefs, PRISMA review ledgers, evidence matrices, and reports; non-destructive multi-revision drafts with collision guards; multi-format export engine (academic Markdown, LaTeX, verified BibTeX, and publication-ready HTML); and record-level drill-down & bidirectional claim-to-study traceability verified. |
 | **Phase 6** | Advanced PDF Compilation, Snowballing Search & Production Collaboration | Completed | **ACCEPT** | 15 Phase 6 tests passing (`test_phase6_pdf_snowball_and_collaboration.py`). Server-side binary PDF generation (dual `pdflatex` & pure-Python ReportLab engines) with %PDF- & page validation; recursive citation snowballing with backward/forward discovery, cycle prevention, marginal yield decay stopping, and PRISMA flow accounting; and multi-tenant RBAC, outbox queueing, collision detection, and Supabase PostgreSQL RLS migrations verified. |
+| **Phase 7** | Deep Semantic Literature Clustering, Citation Graph Visualization & Automated Journal Submission Formatting Engine | Completed | **ACCEPT** | 16 comprehensive Phase 7 tests passing (`test_phase7_clustering_and_journal_engine.py`). TF-IDF & KMeans thematic clustering with cohesion metrics; Brandes' betweenness & bridge scores; structural hole discovery; 2D force-directed layout coordinates; Mermaid diagram flowchart generation; multi-publisher LaTeX formatting (ACM `acmart`, IEEE `IEEEtran`, Nature `sn-jnl`, NeurIPS `neurips_2024`); double-blind anonymization; compliance checklists; in-memory ZIP package bundler (`.tex`, `.bib`, `checklist.md`, `.pdf`, `manifest.json`); SQLite persistence; and REST endpoints verified. Canonical test suite: **308 passed, 33 subtests passed across 19 suites (0 failures)**. |
 
 
 ---
@@ -301,12 +302,71 @@
 
 ---
 
+### Phase 7: Deep Semantic Literature Clustering, Citation Graph Visualization & Automated Journal Submission Formatting Engine (Accepted Milestone)
+- **Status:** **ACCEPT**
+- **Original Unmet Criterion:**
+  1. Unsupervised thematic clustering and semantic representation of PRISMA review studies and discovered snowball candidates, with automated topic extraction, keyword identification, and cluster cohesion scoring.
+  2. Directed citation network graph construction with topological centrality analysis (in/out degree, Brandes' betweenness centrality, cross-cluster bridge paper detection), structural hole identification (conceptually related clusters lacking citation bridges), 2D force-directed layout coordinate generation, and Mermaid diagram export.
+  3. Automated journal submission formatting engine providing publisher-tailored LaTeX generation across 4 major venues:
+     - **ACM** (`acmart`, `sigconf`, double-blind anonymization, CCS XML blocks).
+     - **IEEE** (`IEEEtran`, journal/conference modes, author affiliations, keywords).
+     - **Nature** (`sn-jnl`, numbered references, bold lead paragraphs, and Methods placed at the end of the manuscript).
+     - **NeurIPS** (`neurips_2024`, 9-page limit validation, and standard NeurIPS Paper Checklist).
+  4. Comprehensive submission compliance checklist generation, in-memory `.zip` submission package bundling (`manuscript.tex`, `references.bib`, `SUBMISSION_CHECKLIST.md`, `manuscript.pdf`, `MANIFEST.json`), SQLite persistence, and REST APIs for reviews, manuscripts, and project-wide literature maps.
+- **Implementation Changes:**
+  - [backend/intellectual_rigour/clustering.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/intellectual_rigour/clustering.py):
+    - Domain models: `ThematicCluster`, `CitationNode`, `CitationEdge`, `StructuralHole`, `LiteratureCitationGraph`, `ClusteringResult`.
+    - Corpus aggregation (`build_literature_corpus`): extracts screened studies from `screening_decisions`, candidates from `snowball_candidates`, and metadata from `prisma_reviews`.
+    - Text vectorization: TF-IDF with English stop words and n-gram ranges (1, 2).
+    - Unsupervised clustering: deterministic KMeans with cohesion scoring and dominant keyword extraction.
+    - Graph topology analysis: NetworkX directed graph modeling, Brandes' betweenness centrality, cross-cluster bridge scoring (`is_bridge` thresholded at betweenness > 0.15 or cross-cluster edge count >= 2).
+    - Structural hole discovery: detects cluster pairs with high cosine similarity (>= 0.15) but zero direct citation bridges, providing structured research opportunity narratives.
+    - 2D force-directed coordinates: Fruchterman-Reingold spring layout scaled to `[-100, 100]`.
+    - Diagram generator: converts citation network into Mermaid flowcharts with cluster subgraphs and bridge styling.
+  - [backend/workspace/journal_formatter.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/workspace/journal_formatter.py):
+    - Preset catalog: `JournalPreset` enum (`ACM`, `IEEE`, `NATURE`, `NEURIPS`) with document classes, citation styles, page limits, double-blind policies, and guidelines.
+    - Publisher-specific LaTeX generators:
+      - `generate_acm_latex`: `\documentclass[sigconf]{acmart}`, anonymized author blocks, CCSXML, ACM reference format.
+      - `generate_ieee_latex`: `\documentclass[journal]{IEEEtran}`, IEEE author blocks, IEEE keywords.
+      - `generate_nature_latex`: `\documentclass[sn-standardnature]{sn-jnl}`, bold summary lead, Methods section dynamically reordered after main text and references.
+      - `generate_neurips_latex`: `\documentclass{article}` with `neurips_2024` package, 9-page content allocation check, and embedded NeurIPS Paper Checklist questions.
+    - Compliance checklist generator: creates markdown verification tables for title, abstract word limits, double-blind compliance, bibliography, and figures.
+    - ZIP submission package builder (`build_journal_submission_package`): bundles `.tex`, `.bib`, `SUBMISSION_CHECKLIST.md`, `.pdf`, and `MANIFEST.json` into an in-memory zip archive, persisting base64 zip in database and saving to `vault/submissions/`.
+  - [backend/memory/db.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/memory/db.py):
+    - Created tables `literature_clusters`, `citation_graphs`, and `journal_submissions` with foreign keys and index coverage.
+    - Added CRUD methods: `save_literature_clustering_db`, `get_literature_clustering_db`, `list_literature_clusterings_db`, `save_citation_graph_db`, `get_citation_graph_db`, `get_project_literature_map_db`, `save_journal_submission_db`, `get_journal_submission_db`, and `list_journal_submissions_db`.
+  - [backend/api/routes_prisma.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/api/routes_prisma.py) & [backend/api/routes_workspace.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/api/routes_workspace.py):
+    - REST endpoints:
+      - `POST /api/prisma/reviews/{review_id}/cluster`
+      - `GET /api/prisma/reviews/{review_id}/cluster`
+      - `GET /api/prisma/reviews/{review_id}/citation-graph`
+      - `GET /api/prisma/reviews/{review_id}/citation-graph/mermaid`
+      - `GET /api/manuscripts/journal-presets`
+      - `POST /api/manuscripts/{manuscript_id}/journal-submission`
+      - `GET /api/manuscripts/{manuscript_id}/journal-submissions`
+      - `GET /api/submissions/{submission_id}`
+      - `GET /api/submissions/{submission_id}/download`
+      - `GET /api/projects/{project_id}/literature-map`
+  - [backend/tests/test_phase7_clustering_and_journal_engine.py](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/backend/tests/test_phase7_clustering_and_journal_engine.py):
+    - 16 unit and integration tests verifying paper ID normalization, KMeans partitions, edge cases, centrality & bridge scores, structural hole detection, 2D coordinates & Mermaid flowchart generation, end-to-end review clustering persistence, preset catalogs, ACM/IEEE/Nature/NeurIPS formatters, submission checklists, ZIP package bundling, and REST API routes.
+  - [Makefile](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/Makefile):
+    - Added `test_phase7_clustering_and_journal_engine.py` to `test:` target; added Phase 7 modules to `lint:` target.
+- **Observed Test Evidence:**
+  - `pytest backend/tests/test_phase7_clustering_and_journal_engine.py`: **16 passed in 3.33s (Exit Code: 0)**.
+  - Canonical suite `make test`: **308 passed, 33 subtests passed in 52.78s across 19 test suites (Exit Code: 0)**.
+  - Verification check `make lint`: All core modules imported successfully (Exit Code: 0).
+- **Explicit Documented Limitations:**
+  - Automated journal formatting provides template-compliant `.tex`, `.bib`, and pre-flight checklists; final layout tuning (e.g. figure placement, wrapfig adjustments) should be reviewed by authors in their target compilation environment.
+  - TF-IDF clustering operates deterministically on local extracted textual metadata; future embedding upgrades can utilize fine-tuned neural models when configured.
+
+---
+
 ## 3. Future Roadmap Horizons
 
-With Phase 0 through Phase 6 fully accepted and verified:
-1. **Interactive Multi-User Live Collaboration**: Real-time collaborative drafting and live presence using Supabase Realtime channels.
-2. **Deep Semantic Literature Clustering**: Citation network graph visualization and thematic cluster embeddings.
-3. **Automated Journal Submission Formatting**: Pre-configured style sheets for major academic publishers (ACM, IEEE, Nature, NeurIPS).
+With Phase 0 through Phase 7 fully accepted and verified:
+1. **Interactive Multi-User Live Collaboration & Real-Time CRDTs (Phase 8)**: Real-time collaborative manuscript editing, concurrent cursor presence, and live synchronization over Supabase Realtime / WebSockets.
+2. **Automated Quantitative Meta-Analysis & Forest Plot Synthesis**: Statistical pooling (fixed/random effects models, odds ratios, Cohen's d), heterogeneity assessment ($I^2$), and automated SVG/PDF Forest plot generation.
+3. **Multi-Modal Evidence Extraction & Figure Dissection**: Parsing and extracting tabular data, chart coordinate series, and supplementary material figures from scientific PDF attachments.
 
 
 

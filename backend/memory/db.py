@@ -477,6 +477,63 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             CREATE INDEX IF NOT EXISTS idx_snowball_candidates_run ON snowball_candidates(run_id);
         """)
 
+        # Phase 7: Deep Semantic Literature Clustering & Citation Network Graph
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS literature_clusters (
+                cluster_run_id TEXT PRIMARY KEY,
+                review_id TEXT NOT NULL,
+                project_id TEXT DEFAULT NULL,
+                algorithm TEXT NOT NULL DEFAULT 'TFIDF_KMEANS',
+                num_clusters INTEGER NOT NULL DEFAULT 0,
+                clusters_json TEXT NOT NULL DEFAULT '[]',
+                summary TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (review_id) REFERENCES prisma_reviews(review_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_clusters_review ON literature_clusters(review_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS citation_graphs (
+                graph_id TEXT PRIMARY KEY,
+                review_id TEXT NOT NULL,
+                project_id TEXT DEFAULT NULL,
+                nodes_json TEXT NOT NULL DEFAULT '[]',
+                edges_json TEXT NOT NULL DEFAULT '[]',
+                bridge_papers_json TEXT NOT NULL DEFAULT '[]',
+                structural_holes_json TEXT NOT NULL DEFAULT '[]',
+                metrics_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (review_id) REFERENCES prisma_reviews(review_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_graphs_review ON citation_graphs(review_id);
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS journal_submissions (
+                submission_id TEXT PRIMARY KEY,
+                manuscript_id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                preset TEXT NOT NULL,
+                is_anonymized BOOLEAN NOT NULL DEFAULT 0,
+                package_filename TEXT NOT NULL,
+                manifest_json TEXT NOT NULL DEFAULT '{}',
+                checklist_md TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (manuscript_id) REFERENCES manuscripts(manuscript_id) ON DELETE CASCADE
+            );
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_submissions_manuscript ON journal_submissions(manuscript_id);
+        """)
+
     return conn
 
 def save_session(
@@ -2495,6 +2552,374 @@ def list_snowball_candidates_db(
             d["lookup_params"] = {}
         out.append(d)
     return out
+
+
+# ==============================================================================
+# Phase 7: Literature Clustering & Citation Graph Persistence
+# ==============================================================================
+
+def save_literature_clustering_db(
+    clustering_data: dict,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    cluster_run_id = clustering_data.get("cluster_run_id") or f"clust-{now_iso}"
+    review_id = clustering_data["review_id"]
+    project_id = clustering_data.get("project_id")
+    algorithm = clustering_data.get("algorithm", "TFIDF_KMEANS")
+    num_clusters = int(clustering_data.get("num_clusters", 0))
+    clusters_json = clustering_data.get("clusters_json")
+    if not isinstance(clusters_json, str):
+        clusters_json = json.dumps(clustering_data.get("clusters", []))
+    summary = clustering_data.get("summary", "")
+    created_at = clustering_data.get("created_at") or now_iso
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO literature_clusters (
+                cluster_run_id, review_id, project_id, algorithm,
+                num_clusters, clusters_json, summary, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(cluster_run_id) DO UPDATE SET
+                algorithm = excluded.algorithm,
+                num_clusters = excluded.num_clusters,
+                clusters_json = excluded.clusters_json,
+                summary = excluded.summary;
+        """, (cluster_run_id, review_id, project_id, algorithm,
+              num_clusters, clusters_json, summary, created_at))
+
+    return {
+        "cluster_run_id": cluster_run_id,
+        "review_id": review_id,
+        "project_id": project_id,
+        "algorithm": algorithm,
+        "num_clusters": num_clusters,
+        "clusters_json": clusters_json,
+        "summary": summary,
+        "created_at": created_at,
+    }
+
+
+def get_literature_clustering_db(
+    review_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> Optional[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM literature_clusters
+        WHERE review_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1;
+    """, (review_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["clusters"] = json.loads(d.get("clusters_json") or "[]")
+    except Exception:
+        d["clusters"] = []
+    return d
+
+
+def list_literature_clusterings_db(
+    review_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM literature_clusters
+        WHERE review_id = ?
+        ORDER BY created_at DESC;
+    """, (review_id,))
+    out = []
+    for row in cursor.fetchall():
+        d = dict(row)
+        try:
+            d["clusters"] = json.loads(d.get("clusters_json") or "[]")
+        except Exception:
+            d["clusters"] = []
+        out.append(d)
+    return out
+
+
+def save_citation_graph_db(
+    graph_data: dict,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    graph_id = graph_data.get("graph_id") or f"graph-{now_iso}"
+    review_id = graph_data["review_id"]
+    project_id = graph_data.get("project_id")
+
+    nodes_json = graph_data.get("nodes_json")
+    if not isinstance(nodes_json, str):
+        nodes_json = json.dumps(graph_data.get("nodes", []))
+
+    edges_json = graph_data.get("edges_json")
+    if not isinstance(edges_json, str):
+        edges_json = json.dumps(graph_data.get("edges", []))
+
+    bridge_papers_json = graph_data.get("bridge_papers_json")
+    if not isinstance(bridge_papers_json, str):
+        bridge_papers_json = json.dumps(graph_data.get("bridge_papers", []))
+
+    structural_holes_json = graph_data.get("structural_holes_json")
+    if not isinstance(structural_holes_json, str):
+        structural_holes_json = json.dumps(graph_data.get("structural_holes", []))
+
+    metrics_json = graph_data.get("metrics_json")
+    if not isinstance(metrics_json, str):
+        metrics_json = json.dumps(graph_data.get("metrics", {}))
+
+    created_at = graph_data.get("created_at") or now_iso
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO citation_graphs (
+                graph_id, review_id, project_id, nodes_json, edges_json,
+                bridge_papers_json, structural_holes_json, metrics_json, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(graph_id) DO UPDATE SET
+                nodes_json = excluded.nodes_json,
+                edges_json = excluded.edges_json,
+                bridge_papers_json = excluded.bridge_papers_json,
+                structural_holes_json = excluded.structural_holes_json,
+                metrics_json = excluded.metrics_json;
+        """, (graph_id, review_id, project_id, nodes_json, edges_json,
+              bridge_papers_json, structural_holes_json, metrics_json, created_at))
+
+    return {
+        "graph_id": graph_id,
+        "review_id": review_id,
+        "project_id": project_id,
+        "nodes_json": nodes_json,
+        "edges_json": edges_json,
+        "bridge_papers_json": bridge_papers_json,
+        "structural_holes_json": structural_holes_json,
+        "metrics_json": metrics_json,
+        "created_at": created_at,
+    }
+
+
+def get_citation_graph_db(
+    review_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> Optional[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM citation_graphs
+        WHERE review_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1;
+    """, (review_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["nodes"] = json.loads(d.get("nodes_json") or "[]")
+        d["edges"] = json.loads(d.get("edges_json") or "[]")
+        d["bridge_papers"] = json.loads(d.get("bridge_papers_json") or "[]")
+        d["structural_holes"] = json.loads(d.get("structural_holes_json") or "[]")
+        d["metrics"] = json.loads(d.get("metrics_json") or "{}")
+    except Exception:
+        d["nodes"] = []
+        d["edges"] = []
+        d["bridge_papers"] = []
+        d["structural_holes"] = []
+        d["metrics"] = {}
+    return d
+
+
+def get_project_literature_map_db(
+    project_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    # Find all reviews for project
+    cursor.execute("""
+        SELECT review_id, topic FROM prisma_reviews
+        WHERE project_id = ?
+        ORDER BY created_at DESC;
+    """, (project_id,))
+    reviews = [dict(r) for r in cursor.fetchall()]
+
+    all_clusters = []
+    all_graphs = []
+    for rev in reviews:
+        c = get_literature_clustering_db(rev["review_id"], db_path=db_path)
+        if c:
+            all_clusters.append(c)
+        g = get_citation_graph_db(rev["review_id"], db_path=db_path)
+        if g:
+            all_graphs.append(g)
+
+    # Also find clusters directly associated with project_id
+    cursor.execute("""
+        SELECT cluster_run_id FROM literature_clusters
+        WHERE project_id = ?
+        ORDER BY created_at DESC;
+    """, (project_id,))
+    for row in cursor.fetchall():
+        run_id = row["cluster_run_id"]
+        if not any(c.get("cluster_run_id") == run_id for c in all_clusters):
+            cur2 = conn.execute("SELECT * FROM literature_clusters WHERE cluster_run_id = ?", (run_id,))
+            c_row = cur2.fetchone()
+            if c_row:
+                d = dict(c_row)
+                d["clusters"] = json.loads(d.get("clusters_json") or "[]")
+                all_clusters.append(d)
+
+    # Also find citation graphs directly associated with project_id
+    cursor.execute("""
+        SELECT graph_id FROM citation_graphs
+        WHERE project_id = ?
+        ORDER BY created_at DESC;
+    """, (project_id,))
+    for row in cursor.fetchall():
+        gid = row["graph_id"]
+        if not any(g.get("graph_id") == gid for g in all_graphs):
+            cur2 = conn.execute("SELECT * FROM citation_graphs WHERE graph_id = ?", (gid,))
+            g_row = cur2.fetchone()
+            if g_row:
+                gd = dict(g_row)
+                gd["nodes"] = json.loads(gd.get("nodes_json") or "[]")
+                gd["edges"] = json.loads(gd.get("edges_json") or "[]")
+                gd["bridge_papers"] = json.loads(gd.get("bridge_papers_json") or "[]")
+                gd["structural_holes"] = json.loads(gd.get("structural_holes_json") or "[]")
+                gd["metrics"] = json.loads(gd.get("metrics_json") or "{}")
+                all_graphs.append(gd)
+
+    return {
+        "project_id": project_id,
+        "reviews": reviews,
+        "clusterings": all_clusters,
+        "graphs": all_graphs,
+    }
+
+
+# ==============================================================================
+# Phase 7: Journal Submission Persistence
+# ==============================================================================
+
+def save_journal_submission_db(
+    submission_data: dict,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict:
+    import datetime
+    import json
+    init_db(db_path)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    submission_id = submission_data["submission_id"]
+    manuscript_id = submission_data["manuscript_id"]
+    version = int(submission_data["version"])
+    preset = submission_data["preset"]
+    is_anonymized = 1 if submission_data.get("is_anonymized") else 0
+    package_filename = submission_data.get("package_filename", f"{submission_id}.zip")
+    manifest_json = submission_data.get("manifest_json")
+    if not isinstance(manifest_json, str):
+        manifest_json = json.dumps(submission_data.get("manifest", {}))
+    checklist_md = submission_data.get("checklist_md", "")
+    created_at = submission_data.get("created_at") or now_iso
+
+    conn = get_connection(db_path)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO journal_submissions (
+                submission_id, manuscript_id, version, preset, is_anonymized,
+                package_filename, manifest_json, checklist_md, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(submission_id) DO UPDATE SET
+                preset = excluded.preset,
+                manifest_json = excluded.manifest_json,
+                checklist_md = excluded.checklist_md;
+        """, (submission_id, manuscript_id, version, preset, is_anonymized,
+              package_filename, manifest_json, checklist_md, created_at))
+
+    return {
+        "submission_id": submission_id,
+        "manuscript_id": manuscript_id,
+        "version": version,
+        "preset": preset,
+        "is_anonymized": is_anonymized,
+        "package_filename": package_filename,
+        "manifest_json": manifest_json,
+        "checklist_md": checklist_md,
+        "created_at": created_at,
+    }
+
+
+def get_journal_submission_db(
+    submission_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> Optional[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM journal_submissions WHERE submission_id = ?;", (submission_id,))
+    row = cursor.fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d["manifest"] = json.loads(d.get("manifest_json") or "{}")
+    except Exception:
+        d["manifest"] = {}
+    return d
+
+
+def list_journal_submissions_db(
+    manuscript_id: str,
+    db_path: str = DEFAULT_DB_PATH,
+) -> list[dict]:
+    import json
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM journal_submissions
+        WHERE manuscript_id = ?
+        ORDER BY created_at DESC;
+    """, (manuscript_id,))
+    out = []
+    for r in cursor.fetchall():
+        d = dict(r)
+        try:
+            d["manifest"] = json.loads(d.get("manifest_json") or "{}")
+        except Exception:
+            d["manifest"] = {}
+        out.append(d)
+    return out
+
+
 
 
 

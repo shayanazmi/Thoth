@@ -6,8 +6,9 @@ and Interactive Evidence Matrix Traceability.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
 from backend.core.logging import get_logger
@@ -344,6 +345,14 @@ async def api_list_manuscripts(project_id: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/manuscripts/journal-presets")
+async def api_list_journal_presets():
+    """List all supported academic publisher presets, documentclasses, and venue guidelines."""
+    from backend.workspace.journal_formatter import PRESET_CATALOG
+    presets = [meta.to_dict() for meta in PRESET_CATALOG.values()]
+    return {"status": "success", "presets": presets}
+
+
 @router.get("/manuscripts/{manuscript_id}")
 async def api_get_manuscript(manuscript_id: str):
     ms = get_manuscript(manuscript_id)
@@ -503,6 +512,109 @@ async def api_download_export(export_id: str, db_path: Optional[str] = Query(Non
         )
 
 
+# ==========================================
+# 3.1 Automated Journal Submission Engine (Phase 7 Deliverable B)
+# ==========================================
+
+class JournalSubmissionRequest(BaseModel):
+    preset: str = Field(..., description="Target journal preset: acm, ieee, nature, neurips")
+    version: Optional[int] = Field(default=None, description="Manuscript revision version. Defaults to latest.")
+    anonymize: bool = Field(default=False, description="Enable double-blind author and affiliation suppression.")
+
+
+@router.post("/manuscripts/{manuscript_id}/journal-submission")
+async def api_create_journal_submission(
+    manuscript_id: str,
+    req: JournalSubmissionRequest,
+    db_path: Optional[str] = Query(None),
+):
+    """
+    Generate an authoritative journal submission package (.zip) for ACM, IEEE, Nature, or NeurIPS.
+    Includes customized LaTeX source, verified BibTeX, publisher compliance checklist, and compiled PDF.
+    """
+    path = db_path or DEFAULT_DB_PATH
+    from backend.workspace.journal_formatter import build_journal_submission_package
+    try:
+        pkg = build_journal_submission_package(
+            manuscript_id=manuscript_id,
+            preset_name=req.preset,
+            version=req.version,
+            anonymize=req.anonymize,
+            db_path=path,
+        )
+        return {"status": "success", "submission": pkg}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating journal submission package: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/manuscripts/{manuscript_id}/journal-submissions")
+async def api_list_manuscript_journal_submissions(
+    manuscript_id: str,
+    db_path: Optional[str] = Query(None),
+):
+    """List historical journal submission packages generated for a manuscript."""
+    path = db_path or DEFAULT_DB_PATH
+    from backend.workspace.journal_formatter import list_journal_submissions_db
+    submissions = list_journal_submissions_db(manuscript_id=manuscript_id, db_path=path)
+    return {"status": "success", "submissions": submissions}
+
+
+@router.get("/submissions/{submission_id}")
+async def api_get_journal_submission(
+    submission_id: str,
+    db_path: Optional[str] = Query(None),
+):
+    """Retrieve details and checklist for a specific journal submission package."""
+    path = db_path or DEFAULT_DB_PATH
+    from backend.workspace.journal_formatter import get_journal_submission_db
+    sub = get_journal_submission_db(submission_id, db_path=path)
+    if not sub:
+        raise HTTPException(status_code=404, detail=f"Submission package '{submission_id}' not found.")
+    return {"status": "success", "submission": sub}
+
+
+@router.get("/submissions/{submission_id}/download")
+async def api_download_journal_submission_zip(
+    submission_id: str,
+    db_path: Optional[str] = Query(None),
+):
+    """Download the full journal submission ZIP archive containing .tex, .bib, checklist, and .pdf."""
+    path = db_path or DEFAULT_DB_PATH
+    from backend.workspace.journal_formatter import get_journal_submission_db
+    sub = get_journal_submission_db(submission_id, db_path=path)
+    if not sub:
+        raise HTTPException(status_code=404, detail=f"Submission package '{submission_id}' not found.")
+
+    pkg_filename = sub.get("package_filename", f"{submission_id}.zip")
+    import base64
+    disk_path = os.path.join(os.path.dirname(os.path.abspath(path)), "..", "vault", "submissions", pkg_filename)
+
+    if os.path.exists(disk_path):
+        with open(disk_path, "rb") as f:
+            zip_bytes = f.read()
+    else:
+        # Re-generate package on the fly
+        from backend.workspace.journal_formatter import build_journal_submission_package
+        pkg = build_journal_submission_package(
+            manuscript_id=sub["manuscript_id"],
+            preset_name=sub["preset"],
+            version=sub["version"],
+            anonymize=bool(sub.get("is_anonymized")),
+            db_path=path,
+        )
+        zip_bytes = base64.b64decode(pkg["zip_base64"])
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{pkg_filename}"'},
+    )
+
+
+
 
 # ==========================================
 # 4. Interactive Traceability (Deliverable D)
@@ -545,3 +657,24 @@ async def api_get_claim_traceability(
     except Exception as e:
         logger.error(f"Error retrieving claim traceability: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# 5. Project Literature Map (Phase 7 Deliverable)
+# ==========================================
+
+@router.get("/projects/{project_id}/literature-map")
+async def api_get_project_literature_map(
+    project_id: str,
+    db_path: Optional[str] = Query(None),
+):
+    """Retrieve aggregated literature clusters and citation networks across all reviews in a project."""
+    path = db_path or DEFAULT_DB_PATH
+    from backend.memory.db import get_project_literature_map_db, get_project_db
+    proj = get_project_db(project_id, db_path=path)
+    if not proj:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found.")
+
+    lit_map = get_project_literature_map_db(project_id, db_path=path)
+    return {"status": "success", "literature_map": lit_map}
+

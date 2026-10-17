@@ -316,3 +316,147 @@ async def list_snowball_candidates_for_run(
     candidates = list_snowball_candidates_db(run_id, db_path=path)
     return {"status": "success", "run": run, "candidates": candidates}
 
+
+# ==============================================================================
+# Phase 7: Literature Clustering & Citation Network Graph Endpoints
+# ==============================================================================
+
+class LiteratureClusteringRequest(BaseModel):
+    n_clusters: Optional[int] = Field(default=None, ge=1, le=20, description="Optional target number of thematic clusters")
+
+
+@router.post("/reviews/{review_id}/cluster", status_code=status.HTTP_201_CREATED)
+async def execute_clustering_for_review(
+    review_id: str,
+    req: LiteratureClusteringRequest = LiteratureClusteringRequest(),
+    db_path: Optional[str] = None,
+):
+    """
+    Execute semantic thematic clustering and citation network graph analysis for a PRISMA review.
+    Computes betweenness centrality, bridge papers, structural holes, and 2D force-directed layout.
+    """
+    path = db_path or DEFAULT_DB_PATH
+    rev = get_prisma_review_db(review_id, db_path=path)
+    if not rev:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PRISMA review '{review_id}' not found.",
+        )
+
+    from backend.intellectual_rigour.clustering import run_literature_clustering_and_graph
+    result = run_literature_clustering_and_graph(
+        review_id=review_id,
+        project_id=rev.get("project_id"),
+        n_clusters=req.n_clusters,
+        db_path=path,
+    )
+    return {"status": "success", "clustering": result.to_dict()}
+
+
+@router.get("/reviews/{review_id}/cluster")
+async def get_clustering_for_review(
+    review_id: str,
+    auto_generate: bool = True,
+    db_path: Optional[str] = None,
+):
+    """Retrieve the latest thematic clustering result for a review. Automatically generates if missing."""
+    path = db_path or DEFAULT_DB_PATH
+    rev = get_prisma_review_db(review_id, db_path=path)
+    if not rev:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PRISMA review '{review_id}' not found.",
+        )
+
+    from backend.memory.db import get_literature_clustering_db
+    clustering = get_literature_clustering_db(review_id, db_path=path)
+    if not clustering and auto_generate:
+        from backend.intellectual_rigour.clustering import run_literature_clustering_and_graph
+        res = run_literature_clustering_and_graph(
+            review_id=review_id,
+            project_id=rev.get("project_id"),
+            db_path=path,
+        )
+        clustering = res.to_dict()
+
+    if not clustering:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No literature clustering found for review '{review_id}'.",
+        )
+
+    return {"status": "success", "clustering": clustering}
+
+
+@router.get("/reviews/{review_id}/citation-graph")
+async def get_citation_graph_for_review(
+    review_id: str,
+    auto_generate: bool = True,
+    db_path: Optional[str] = None,
+):
+    """Retrieve the 2D layout citation graph and centrality metrics for a review."""
+    path = db_path or DEFAULT_DB_PATH
+    rev = get_prisma_review_db(review_id, db_path=path)
+    if not rev:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PRISMA review '{review_id}' not found.",
+        )
+
+    from backend.memory.db import get_citation_graph_db
+    graph = get_citation_graph_db(review_id, db_path=path)
+    if not graph and auto_generate:
+        from backend.intellectual_rigour.clustering import run_literature_clustering_and_graph
+        res = run_literature_clustering_and_graph(
+            review_id=review_id,
+            project_id=rev.get("project_id"),
+            db_path=path,
+        )
+        graph = res.graph.to_dict()
+
+    if not graph:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No citation graph found for review '{review_id}'.",
+        )
+
+    return {"status": "success", "citation_graph": graph}
+
+
+@router.get("/reviews/{review_id}/citation-graph/mermaid")
+async def get_citation_graph_mermaid_for_review(
+    review_id: str,
+    max_nodes: int = 25,
+    db_path: Optional[str] = None,
+):
+    """Generate Mermaid flowchart markdown for the review's citation network graph."""
+    path = db_path or DEFAULT_DB_PATH
+    rev = get_prisma_review_db(review_id, db_path=path)
+    if not rev:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PRISMA review '{review_id}' not found.",
+        )
+
+    from backend.intellectual_rigour.clustering import (
+        LiteratureCitationGraph,
+        generate_citation_network_mermaid,
+        run_literature_clustering_and_graph,
+    )
+    from backend.memory.db import get_citation_graph_db
+
+    graph_dict = get_citation_graph_db(review_id, db_path=path)
+    if not graph_dict:
+        res = run_literature_clustering_and_graph(
+            review_id=review_id,
+            project_id=rev.get("project_id"),
+            db_path=path,
+        )
+        mermaid = generate_citation_network_mermaid(res.graph, max_nodes=max_nodes)
+    else:
+        graph = LiteratureCitationGraph(**graph_dict)
+        mermaid = generate_citation_network_mermaid(graph, max_nodes=max_nodes)
+
+    return {"status": "success", "review_id": review_id, "mermaid": mermaid}
+
+
