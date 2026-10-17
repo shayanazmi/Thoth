@@ -59,6 +59,10 @@ def create_initial_state(
     initial_turns: Optional[List[Dict[str, Any]]] = None,
     initial_summary: str = "",
     brief: Any = None,
+    project_id: Optional[str] = None,
+    db_path: Optional[str] = None,
+    vault_dir: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     if hasattr(brief, "to_dict"):
         brief_data = brief.to_dict()
@@ -98,6 +102,10 @@ def create_initial_state(
         "unresolved_questions": brief_data.get("unresolved_questions") or [],
         "counter_evidence_queries": brief_data.get("counter_evidence_queries") or [],
         "falsification_criteria": brief_data.get("falsification_criteria") or [],
+        "project_id": project_id or brief_data.get("project_id"),
+        "db_path": db_path,
+        "vault_dir": vault_dir,
+        "session_id": session_id or brief_data.get("session_id") or "",
     }
 
 @observe(type="tool", description="Concurrently scrapes and extracts readable text from candidate URLs")
@@ -142,8 +150,8 @@ async def concurrent_scrape_urls(urls: List[str], dispatcher: Dispatcher = pipel
                 source_info["passages"] = res.passages
                 source_info["extracted_text"] = res.text
                 if res.status == "success":
-                    trunc_note = " [Partial Extraction - Truncated]" if res.is_truncated else ""
-                    text_content = f"\n\n--- Source: {url} ({res.content_type.upper()}{trunc_note}) ---\n{res.text}"
+                    trunc_note = f" ({res.content_type.upper()}{' [Partial Extraction - Truncated]' if res.is_truncated else ''})" if res.content_type else ""
+                    text_content = f"\n\n--- Source: {url} ---{trunc_note}\n{res.text}"
                 elif res.status == "empty":
                     text_content = f"\n\n--- Source: {url} ---\n(Empty content extracted)"
                 elif res.status == "unsupported":
@@ -199,8 +207,8 @@ async def concurrent_scrape_urls(urls: List[str], dispatcher: Dispatcher = pipel
                     content_type=content_type,
                     source_uri=url
                 )
-                trunc_note = " [Partial Extraction - Truncated]" if is_truncated else ""
-                text_content = f"\n\n--- Source: {url} ({content_type.upper()}{trunc_note}) ---\n{extracted}"
+                trunc_note = f" ({content_type.upper()}{' [Partial Extraction - Truncated]' if is_truncated else ''})" if content_type else ""
+                text_content = f"\n\n--- Source: {url} ---{trunc_note}\n{extracted}"
             return source_info, text_content
         except Exception as e:
             source_info["extracted_text"] = ""
@@ -272,6 +280,10 @@ def stream_research_pipeline(
     cancel_event=None,
     dispatcher: Dispatcher = pipeline_dispatcher,
     brief: Optional[Dict[str, Any]] = None,
+    project_id: Optional[str] = None,
+    db_path: Optional[str] = None,
+    vault_dir: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Generator[tuple[str, Dict[str, Any], Dict[str, Any]], None, None]:
     state = create_initial_state(
         topic=topic,
@@ -284,6 +296,10 @@ def stream_research_pipeline(
         initial_turns=initial_turns,
         initial_summary=initial_summary,
         brief=brief,
+        project_id=project_id,
+        db_path=db_path,
+        vault_dir=vault_dir,
+        session_id=session_id,
     )
 
     act_phase_start = time.time()
@@ -421,7 +437,11 @@ def stream_research_pipeline(
         logger.info(f"[ACT PHASE TIMING] Act phase (concurrent fan-out scrape + parallel verifier/critic) completed in {act_duration}s.")
         print(f"\n[TIMING] [ACT PHASE] Completed in {act_duration}s (Concurrent fan-out active).")
 
-        integrity_status = state.get("integrity_status") or ("FAILED" if state.get("verifier_feedback") else "PASSED")
+        raw_integrity = state.get("integrity_status")
+        if raw_integrity and raw_integrity not in ("PENDING", "UNKNOWN"):
+            integrity_status = raw_integrity
+        else:
+            integrity_status = "FAILED" if state.get("verifier_feedback") else "PASSED"
         verifier_feedback = state.get("verifier_feedback", "")
 
         # 1. Fail-closed Research Integrity Gate
@@ -492,7 +512,11 @@ def stream_research_pipeline(
         return
 
     logger.info("[ORCHESTRATOR - POST-VERIFICATION] Extracting atomic claims and persisting notes to Vault & Index...")
-    vault_update = persist_turn_to_vault(state)
+    vault_update = persist_turn_to_vault(
+        state,
+        vault_dir=state.get("vault_dir") or DEFAULT_VAULT_DIR,
+        db_path=state.get("db_path") or DEFAULT_DB_PATH
+    )
     state.update(vault_update)
     yield "vault", vault_update, dict(state)
 
@@ -513,6 +537,122 @@ def stream_research_pipeline(
     followup_update = follow_up_node(state)
     state.update(followup_update)
     yield "follow_up", followup_update, dict(state)
+
+    if cancel_event and cancel_event.is_set():
+        logger.info("[ORCHESTRATOR] Cancel event detected before manuscript synthesis.")
+        return
+
+    logger.info("[ORCHESTRATOR - ACT] Connecting project workspace & instantiating structured manuscript...")
+    db_path = state.get("db_path") or DEFAULT_DB_PATH
+    brief_data = state.get("brief") or {}
+    brief_id = brief_data.get("brief_id")
+    prisma_data = state.get("prisma_review") or {}
+    review_id = prisma_data.get("review_id") or state.get("review_id")
+    session_id = brief_data.get("session_id") or state.get("session_id") or ""
+    project_id = state.get("project_id") or brief_data.get("project_id")
+
+    from backend.workspace.project import create_project, get_project, associate_artifact, list_projects
+    from backend.workspace.manuscript import create_manuscript_from_brief_and_review, create_manuscript
+
+    project = None
+    if project_id:
+        try:
+            project = get_project(project_id, db_path=db_path)
+        except Exception:
+            project = None
+    if not project and session_id:
+        try:
+            existing_projects = list_projects(session_id=session_id, db_path=db_path)
+            if existing_projects:
+                project = existing_projects[0]
+                project_id = project.project_id
+        except Exception:
+            pass
+    if not project:
+        proj_title = f"Project: {topic[:60]}" if topic else "THOTH Research Project"
+        try:
+            project = create_project(
+                title=proj_title,
+                description=f"Auto-instantiated project workspace for research topic '{topic}'",
+                session_id=session_id,
+                db_path=db_path
+            )
+            project_id = project.project_id
+        except Exception as e:
+            logger.warning(f"[ORCHESTRATOR] Could not create project: {e}")
+            project_id = f"proj_fallback_{int(time.time())}"
+
+    state["project_id"] = project_id
+
+    if brief_id and project_id:
+        try:
+            associate_artifact(project_id, "brief", brief_id, db_path=db_path)
+        except Exception as e:
+            logger.debug(f"[ORCHESTRATOR] Could not associate brief {brief_id}: {e}")
+
+    if review_id and project_id:
+        try:
+            associate_artifact(project_id, "prisma_review", review_id, db_path=db_path)
+        except Exception as e:
+            logger.debug(f"[ORCHESTRATOR] Could not associate review {review_id}: {e}")
+
+    primary_note = state.get("primary_topic_note")
+    if primary_note and project_id:
+        try:
+            associate_artifact(project_id, "report", primary_note, db_path=db_path)
+        except Exception as e:
+            logger.debug(f"[ORCHESTRATOR] Could not associate report note {primary_note}: {e}")
+
+    ms_obj = None
+    rev_obj = None
+    if brief_id and review_id and project_id:
+        try:
+            ms_obj, rev_obj = create_manuscript_from_brief_and_review(
+                project_id=project_id,
+                brief_id=brief_id,
+                review_id=review_id,
+                title=f"Systematic Review & Synthesis: {topic}",
+                db_path=db_path
+            )
+            logger.info(f"[ORCHESTRATOR] Created structured manuscript '{ms_obj.manuscript_id}' (v{rev_obj.version}) with {len(rev_obj.claims)} claims.")
+        except Exception as e:
+            logger.warning(f"[ORCHESTRATOR] create_manuscript_from_brief_and_review failed: {e}")
+
+    if not ms_obj and project_id:
+        try:
+            report_text = state.get("report") or state.get("draft", "")
+            ms_obj, rev_obj = create_manuscript(
+                project_id=project_id,
+                title=f"Research Synthesis: {topic}",
+                brief_id=brief_id,
+                review_id=review_id,
+                initial_sections={
+                    "abstract": {
+                        "heading": "Abstract",
+                        "content": f"Synthesized research report on '{topic}'.",
+                        "order": 1,
+                        "section_type": "standard",
+                    },
+                    "synthesis": {
+                        "heading": "Synthesis Findings",
+                        "content": report_text,
+                        "order": 2,
+                        "section_type": "standard",
+                    }
+                },
+                db_path=db_path
+            )
+        except Exception as e:
+            logger.debug(f"[ORCHESTRATOR] Fallback manuscript creation failed: {e}")
+
+    manuscript_update = {
+        "manuscript": ms_obj.to_dict() if ms_obj else {},
+        "revision": rev_obj.to_dict() if rev_obj else {},
+        "manuscript_id": ms_obj.manuscript_id if ms_obj else "",
+        "project_id": project_id,
+    }
+    state.update(manuscript_update)
+    yield "manuscript", manuscript_update, dict(state)
 
 def _slugify(text: str, max_len: int = 40) -> str:
     cleaned = re.sub(r"[^a-zA-Z0-9_-]", "_", text.strip().lower())

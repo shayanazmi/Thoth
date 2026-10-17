@@ -35,7 +35,15 @@ class CreateTentativeIdeaRequest(BaseModel):
 
 
 class PromoteIdeaRequest(BaseModel):
-    approved: bool = Field(..., description="Explicit user confirmation to promote idea into persistent storage")
+    approved: Optional[bool] = Field(default=None, description="Explicit user confirmation to promote idea into persistent storage")
+    user_approved: Optional[bool] = Field(default=None, description="Alias for approved")
+
+    def is_approved(self) -> bool:
+        if self.user_approved is not None:
+            return self.user_approved
+        if self.approved is not None:
+            return self.approved
+        return False
 
 
 class ReviseIdeaRequest(BaseModel):
@@ -84,7 +92,7 @@ async def api_create_tentative_idea(payload: CreateTentativeIdeaRequest):
 async def api_promote_idea(idea_id: str, payload: PromoteIdeaRequest):
     success, idea, msg = promote_idea_to_artifact(
         idea_id=idea_id,
-        user_approved=payload.approved,
+        user_approved=payload.is_approved(),
     )
     if not success:
         raise HTTPException(

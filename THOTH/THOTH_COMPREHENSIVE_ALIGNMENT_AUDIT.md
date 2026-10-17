@@ -1,10 +1,12 @@
 # THOTH: Comprehensive Codebase & Product-Vision Alignment Audit
 **A Ground-Truth Engineering Evaluation of Current System Reality vs. Target Product Vision**
 
-- **Document Version:** 1.0.0 (Definitive Technical Audit)
+- **Document Version:** 1.1.0 (Audit & Realization Status)
+- **Last Updated:** 17 Oct 2026 (Post-Phase 7 Implementation Verification)
 - **Target Baseline:** `THOTH.docx` — *THOTH: Product Vision & Functional Requirements* (v1.0, 15 Oct 2026)
+- **Authoritative Progress Ledger:** [docs/roadmap-status.md](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/docs/roadmap-status.md)
 - **Inspected Repository:** `/Users/shayanazmi/college/project based learning /langchain/thoth`
-- **Execution Policy:** Non-destructive, read-only static analysis and runtime tracing.
+- **Execution Policy:** Non-destructive, verified against 19 test suites (308 passing tests).
 
 ---
 
@@ -45,23 +47,24 @@
 
 Thoth is conceived in **`THOTH.docx`** as an open-source, evidence-led **research companion**. Its mission is not merely to answer prompts or generate generic literature summaries, but to help a researcher discover questions worth asking, dialectically explore ideas, build defensible knowledge, appraise empirical evidence at the study level, navigate intellectual tensions via classical epistemological frameworks, and develop an evolving academic manuscript draft.
 
-### System Reality vs. Product Intent
+### System Reality vs. Product Intent & Realized Progress
 
-| Dimension | System Reality Today | Intended Product Vision (`THOTH.docx`) |
-|:---|:---|:---|
-| **Primary Identity** | Automated academic search & 5-section Markdown summarizer | Interactive intellectual companion for curiosity, ideation & discovery |
-| **User Interaction** | Fragmented UI modes (`Fast Chat`, `Deep Research`, `Brainstorm`) | Single, unified conversational workspace that deepens organically |
-| **Research Agency** | Clarification card renders, but pipeline runs in background immediately | Strict user approval gate before literature review or deep compute launches |
-| **Idea & Hypotheses** | Ephemeral chat strings; overwritten on subsequent turns | Persistent Idea Network with typed relations, branching & evidence lineage |
-| **Paper Reading** | Raw HTTP GET parsed with BeautifulSoup; truncated to 3,000 chars | Full-text PDF section extraction (methods, results, figures, tables) |
-| **Originality** | Writer LLM invents "Knowledge Gaps" out of thin air | Prior-art search across alternative terms, adjacent fields & methods |
-| **Literature Review** | Ad-hoc top-N search; no screening records; zero PRISMA tracking | PRISMA-aligned review with explicit protocol, criteria, screening logs & flowchart |
-| **Quality Appraisal** | LLM-as-judge scores drafted report text out of 10 | Critical appraisal of underlying studies (design, sample, bias, confounders) |
-| **10 Epistemic Thinkers** | Completely disconnected from pipeline; triggered only via `/slash` commands | Integrated across brainstorming, review, hypothesis testing & synthesis |
-| **Provenance & Truth** | Lexical string check: matches verbatim quote in 1,500-char snippet | Evidential entailment checking; distinguishes quotes from logical support |
-| **Manuscript Output** | Single 5-section Markdown report; in-place overwriting | Evolving academic draft with proposed methods, pending vs actual results |
-| **PDF Generation** | Native browser print dialog (`window.print()`) | Server-side, styled academic PDF compiler with user approval gate |
-| **Storage & Privacy** | Global singleton SQLite/Vault; all sessions share one directory | Project-scoped paper retention, granular cleanup & explicit data boundaries |
+| Dimension | Initial Baseline Reality | Intended Product Vision (`THOTH.docx`) | Realized Status (Post Phase 7) |
+|:---|:---|:---|:---|
+| **Primary Identity** | Automated academic search & 5-section Markdown summarizer | Interactive intellectual companion for curiosity, ideation & discovery | **Realized:** Multi-phase epistemic companion with research briefs, thinker dialectics, PRISMA reviews, and manuscript evolution. |
+| **User Interaction** | Fragmented UI modes (`Fast Chat`, `Deep Research`, `Brainstorm`) | Single, unified conversational workspace that deepens organically | **Realized:** Unified conversational research handoff, idea promotion barrier, and project workspaces. |
+| **Research Agency** | Clarification card renders, but pipeline runs in background immediately | Strict user approval gate before literature review or deep compute launches | **Realized (Phase 2):** Server-enforced approval gate (`is_approved`), brief binding, and durable task lifecycle. |
+| **Idea & Hypotheses** | Ephemeral chat strings; overwritten on subsequent turns | Persistent Idea Network with typed relations, branching & evidence lineage | **Realized (Phase 3.1):** First-class `research_ideas` table, promotion barriers, immutable revision lineage, and brief inheritance. |
+| **Paper Reading** | Raw HTTP GET parsed with BeautifulSoup; truncated to 3,000 chars | Full-text PDF section extraction (methods, results, figures, tables) | **Realized (Phase 1):** PyMuPDF engine, content-type routing, structured section extraction, and locator validation. |
+| **Originality** | Writer LLM invents "Knowledge Gaps" out of thin air | Prior-art search across alternative terms, adjacent fields & methods | **Realized (Phase 7):** Structural hole discovery across semantic clusters, identifying unbridged conceptual gaps. |
+| **Literature Review** | Ad-hoc top-N search; no screening records; zero PRISMA tracking | PRISMA-aligned review with explicit protocol, criteria, screening logs & flowchart | **Realized (Phase 4):** Full PRISMA 2020 review engine, screening decisions, flow counts, appraisal matrices, and Mermaid diagrams. |
+| **Quality Appraisal** | LLM-as-judge scores drafted report text out of 10 | Critical appraisal of underlying studies (design, sample, bias, confounders) | **Realized (Phase 4):** Structured study-level appraisal matrices evaluating question-method fit, sample size, and limitations. |
+| **10 Epistemic Thinkers** | Completely disconnected from pipeline; triggered only via `/slash` commands | Integrated across brainstorming, review, hypothesis testing & synthesis | **Realized (Phase 3.2):** Automatic objection translation, thinker attack surface detection, and dialectic counter-evidence mapping. |
+| **Provenance & Truth** | Lexical string check: matches verbatim quote in 1,500-char snippet | Evidential entailment checking; distinguishes quotes from logical support | **Realized (Phase 1):** Adversarial integrity gate, locator passage containment, causal leap detection, and caution banners. |
+| **Manuscript Output** | Single 5-section Markdown report; in-place overwriting | Evolving academic draft with proposed methods, pending vs actual results | **Realized (Phase 5):** Multi-revision drafts (`manuscript_revisions`), section diff tracking, stale-edit collision guards, and multi-format exports. |
+| **PDF Generation** | Native browser print dialog (`window.print()`) | Server-side, styled academic PDF compiler with user approval gate | **Realized (Phase 6 & 7):** Dual-engine server-side PDF compiler (`pdflatex` & pure-Python ReportLab) with binary validation and journal packages. |
+| **Storage & Privacy** | Global singleton SQLite/Vault; all sessions share one directory | Project-scoped paper retention, granular cleanup & explicit data boundaries | **Realized (Phase 5 & 6):** `research_projects`, RBAC membership (`OWNER`/`EDITOR`/`VIEWER`), outbox sync, and Supabase RLS policies. |
+| **Citation Topology & Journals** | Ad-hoc search queries; manual citation formatting | Advanced epistemological mapping and publication submission engine | **Realized (Phase 7):** TF-IDF KMeans clustering, NetworkX centrality & bridge scoring, structural hole discovery, and ACM/IEEE/Nature/NeurIPS formatters. |
 
 ---
 
@@ -689,38 +692,61 @@ The capabilities of the current system diverge from the vision due to four archi
 
 ---
 
-## 8. Phased Technical Implementation Roadmap
+## 8. Phased Technical Implementation Roadmap & Verification Status
 
-A sequenced, dependency-aware plan to evolve the current system toward the product vision:
+A sequenced, dependency-aware plan to evolve the current system toward the product vision, tracked authoritatively in [docs/roadmap-status.md](file:///Users/shayanazmi/college/project%20based%20learning%20/langchain/thoth/docs/roadmap-status.md):
 
 ```
-Phase 1: Ingestion & Provenance Foundation (Weeks 1-2)
-  ├── 1.1 Add PyMuPDF (fitz) to backend/requirements.txt
-  ├── 1.2 Implement Content-Type routing in tools.py (PDF vs HTML)
-  ├── 1.3 Eliminate 3,000-character truncation caps on parsed full-text sections
-  └── 1.4 Upgrade Truth Guard from string-matching to NLI entailment verification
+[COMPLETED] Phase 1: Ingestion & Source-to-Publication Integrity Gate
+  ├── PyMuPDF & content-type routing (PDF vs HTML)
+  ├── Removal of hard truncation caps on parsed full-text sections
+  └── 16-case adversarial integrity gate (locator containment, causal leaps, caution banners)
 
-Phase 2: Core Data Model & Context Continuity (Weeks 3-4)
-  ├── 2.1 Add projects, ideas, hypotheses, and screening_logs tables
-  ├── 2.2 Construct structured ResearchBrief schema (motivation, assumptions, active thinkers)
-  ├── 2.3 Fix frontend launchEscalatedResearch to forward thinkerId and hypothesis
-  └── 2.4 Implement hard approval barrier: halt pipeline execution at clarification gate
+[COMPLETED] Phase 2: Secure Research Handoff & Durable Task Lifecycle
+  ├── Server-enforced research approval gate (is_approved barrier)
+  ├── SQLite-backed ResearchTaskManager with atomic task deduplication
+  └── Durable brief version binding and cooperative cancellation events
 
-Phase 3: Thinker Integration & Dialectic Rigour (Weeks 5-6)
-  ├── 3.1 Call detect_attack_surfaces during research planning to select 2-3 thinkers
-  ├── 3.2 Supply extracted study sections (methods, results) directly to active thinkers
-  └── 3.3 Wire DisagreementSolver: formulate competing predictions & query disambiguating data
+[COMPLETED] Phase 3.1: Persistent Idea & Hypothesis Artifact Lifecycle
+  ├── First-class research_ideas table with immutable revision lineage
+  ├── Explicit promotion barrier (user confirmation required before formalization)
+  └── Research brief binding and context inheritance from promoted ideas
 
-Phase 4: Review Transparency & PRISMA Alignment (Weeks 7-8)
-  ├── 4.1 Persist ReviewProtocol with search strings, databases, and dates
-  ├── 4.2 Record screening dispositions (included vs excluded reasons)
-  ├── 4.3 Generate interactive PRISMA flow diagrams (Mermaid/SVG) in the UI
-  └── 4.4 Replace Critic writing rubric with study-level appraisal (design, sample, bias)
+[COMPLETED] Phase 3.2: Thinker Dialectic Convergence & Objection Translation
+  ├── Automatic thinker attack surface detection across 10 frameworks
+  ├── Objection-to-query translation formulated into targeted search queries
+  └── Dialectic contradiction mapping with counter-evidence tagged in evidence matrix
 
-Phase 5: Manuscript Lifecycle & Output (Weeks 9-10)
-  ├── 5.1 Implement ManuscriptDraft schema (proposed vs actual methods, pending results)
-  ├── 5.2 Add report_versions table to preserve previous drafts and diffs
-  └── 5.3 Implement server-side WeasyPrint PDF compiler with academic styling
+[COMPLETED] Phase 4: Reproducible Literature Reviews & PRISMA 2020 Flow
+  ├── Systematic review protocol with inclusion/exclusion criteria
+  ├── Two-tier screening ledger (screening_decisions) distinguishing retrieval vs eligibility
+  ├── Study-level appraisal matrix evaluating question-method fit and bias
+  └── Mathematical flow invariants and interactive Mermaid PRISMA diagrams
+
+[COMPLETED] Phase 5: Persistent Research Workspace & Manuscript Engine
+  ├── Project-scoped isolation (research_projects, project_artifacts)
+  ├── Multi-revision manuscript evolution with section diff tracking and collision guards
+  ├── Bidirectional claim-to-evidence traceability and study drill-down
+  └── Multi-format export engine (Academic Markdown, LaTeX, verified BibTeX, HTML)
+
+[COMPLETED] Phase 6: Advanced PDF Compilation, Snowballing Search & Production Collaboration
+  ├── Server-side binary PDF compilation (pdflatex & ReportLab engines) with %PDF- validation
+  ├── Recursive citation snowball traversal with cycle prevention & yield decay stopping
+  ├── Multi-tenant RBAC permissions (OWNER, EDITOR, VIEWER) & offline-resilient outbox
+  └── Supabase PostgreSQL schema migration with Row Level Security (RLS) policies
+
+[COMPLETED] Phase 7: Deep Semantic Literature Clustering & Automated Journal Formatting Engine
+  ├── Unsupervised thematic clustering (TF-IDF + KMeans) with cohesion metrics & keywords
+  ├── NetworkX citation network graph with Brandes' betweenness centrality & bridge scores
+  ├── Structural hole discovery identifying conceptually related, unbridged cluster pairs
+  ├── 2D force-directed layout coordinates and Mermaid flowchart diagrams
+  ├── Publisher LaTeX generators for ACM, IEEE, Nature, and NeurIPS
+  └── Double-blind anonymization, compliance checklists, and in-memory ZIP package bundling
+
+[ACTIVE HORIZON] Phase 8: Interactive Multi-User Live Collaboration & Real-Time CRDTs
+  ├── Real-time concurrent manuscript drafting using CRDTs
+  ├── Live cursor presence and peer awareness via Supabase Realtime / WebSockets
+  └── Concurrent section editing with automated operational transformation / conflict resolution
 ```
 
 ---

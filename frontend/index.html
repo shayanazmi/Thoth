@@ -375,8 +375,14 @@
           <button class="artifact-tab-btn active" data-tab="report">
             <i data-lucide="file-text" style="width:12px;height:12px;vertical-align:middle;"></i> Report
           </button>
+          <button class="artifact-tab-btn" data-tab="prisma">
+            <i data-lucide="filter" style="width:12px;height:12px;vertical-align:middle;"></i> PRISMA
+          </button>
+          <button class="artifact-tab-btn" data-tab="manuscript">
+            <i data-lucide="book-open" style="width:12px;height:12px;vertical-align:middle;"></i> Manuscript
+          </button>
           <button class="artifact-tab-btn" data-tab="truth">
-            <i data-lucide="scale" style="width:12px;height:12px;vertical-align:middle;"></i> Scales of Ma'at
+            <i data-lucide="scale" style="width:12px;height:12px;vertical-align:middle;"></i> Scales
           </button>
           <button class="artifact-tab-btn" data-tab="mindmap">
             <i data-lucide="network" style="width:12px;height:12px;vertical-align:middle;"></i> Mind Map
@@ -388,6 +394,14 @@
 
         <div class="artifact-pane-body" id="artifactReportPane">
           <p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">The living synthesis report will render here in real-time as the scribe drafts.</p>
+        </div>
+
+        <div class="artifact-pane-body hidden" id="artifactPrismaPane">
+          <p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">Systematic PRISMA 2020 review flow & screening ledger will appear here.</p>
+        </div>
+
+        <div class="artifact-pane-body hidden" id="artifactManuscriptPane">
+          <p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">Living structured academic manuscript with claim-level evidence matrices.</p>
         </div>
 
         <div class="artifact-pane-body hidden" id="artifactTruthPane">

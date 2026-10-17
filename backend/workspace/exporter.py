@@ -45,6 +45,23 @@ class ExportResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: str = ""
 
+    @property
+    def format_type(self) -> str:
+        return self.format
+
+    @property
+    def filename(self) -> str:
+        return self.metadata.get("filename", "")
+
+    @property
+    def binary_bytes(self) -> Optional[bytes]:
+        if self.format == "pdf" and self.content:
+            try:
+                return base64.b64decode(self.content)
+            except Exception:
+                return None
+        return None
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "export_id": self.export_id,

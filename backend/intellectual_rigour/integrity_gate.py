@@ -53,7 +53,10 @@ def _stem(w: str) -> str:
         if w.endswith(sfx) and len(w) - len(sfx) >= 3:
             if sfx == "ies":
                 return w[:-3] + "y"
-            return w[:-len(sfx)]
+            w = w[:-len(sfx)]
+            break
+    if len(w) >= 4 and w.endswith("e") and not w.endswith("ee"):
+        w = w[:-1]
     return w
 
 
@@ -549,12 +552,14 @@ def evaluate_claim_support(
     corpus_parts = []
     if title:
         corpus_parts.append(title)
+    if abstract:
+        corpus_parts.append(abstract)
     if passage_texts:
         corpus_parts.extend(passage_texts)
-    else:
-        for text_part in [extracted_text, abstract, snippet]:
-            if text_part:
-                corpus_parts.append(text_part)
+    elif extracted_text:
+        corpus_parts.append(extracted_text)
+    elif snippet and snippet != abstract:
+        corpus_parts.append(snippet)
     combined_source = " \n ".join(corpus_parts)
     norm_source = normalize_text(combined_source)
     clean_claim = re.sub(r"\[\[.*?\]\]", "", claim_text).strip()

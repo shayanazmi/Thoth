@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 import uuid
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -381,8 +382,8 @@ def create_manuscript_from_brief_and_review(
 
     ms_title = title or f"Systematic Review & Synthesis: {brief.get('topic', 'Academic Research')}"
     ev_matrix = review.get("evidence_matrix", {})
-    studies = ev_matrix.get("included_studies", [])
-    contradictions = ev_matrix.get("dialectical_contradictions", [])
+    studies = ev_matrix.get("studies") or ev_matrix.get("included_studies", [])
+    contradictions = ev_matrix.get("contradictions") or ev_matrix.get("dialectical_contradictions", [])
 
     # Build initial sections
     sections = {
@@ -417,7 +418,7 @@ def create_manuscript_from_brief_and_review(
             "heading": "Dialectical Discussion & Counter-Evidence",
             "content": "Synthesis of findings alongside counter-evidence identified during screening.\n\nContradiction Analyses:\n"
             + "\n".join(
-                f"- Hypothesis: {c.get('hypothesis')}\n  Supporting: {c.get('supporting_study_id')} | Opposing: {c.get('opposing_finding')} | Dialectic: {c.get('synthesis_notes')}"
+                f"- Hypothesis: {c.get('focal_hypothesis') or c.get('hypothesis')}\n  Supporting: {c.get('supporting_study_ids') or c.get('supporting_study_id')} | Opposing: {c.get('counter_study_ids')} | Divergence: {c.get('substantive_divergence') or c.get('opposing_finding')} | Resolution: {c.get('resolution_requirements') or c.get('synthesis_notes')}"
                 for c in contradictions
             ) if contradictions else "No direct dialectical contradictions detected across included studies.",
             "order": 5,
@@ -453,32 +454,58 @@ def create_manuscript_from_brief_and_review(
         # Find matching studies from evidence matrix
         for s in studies:
             sid = s.get("study_id", "")
-            supp_sources.append({
-                "study_id": sid,
-                "source_id": s.get("primary_source_id", sid),
-                "citation_key": sid.replace("-", "_").replace(" ", "_"),
-                "finding": s.get("synthesized_findings", ""),
-            })
-            if sid not in seen_sources:
-                seen_sources.add(sid)
-                references.append({
-                    "citation_key": sid.replace("-", "_").replace(" ", "_"),
-                    "title": s.get("synthesized_findings", sid)[:80] or f"Study {sid}",
-                    "authors": ["THOTH Research Synthesis"],
-                    "year": datetime.datetime.now().year,
+            finding_text = (
+                s.get("synthesized_findings")
+                or ("; ".join(s.get("key_findings", [])) if s.get("key_findings") else "")
+                or s.get("title", "")
+            )
+            doi_val = s.get("doi") or s.get("doi_or_url", "")
+            src_url = s.get("source_url") or (doi_val if "http" in doi_val else "")
+            rel = str(s.get("hypothesis_relation", "")).upper()
+
+            if "CHALLENGE" in rel or "CONTRADICT" in rel:
+                counter_sources.append({
                     "study_id": sid,
-                    "doi": s.get("doi", ""),
-                    "source_url": s.get("source_url", ""),
-                    "verified": bool(s.get("doi")),
+                    "source_id": s.get("report_ids", [sid])[0] if s.get("report_ids") else s.get("primary_source_id", sid),
+                    "citation_key": sid.replace("-", "_").replace(" ", "_"),
+                    "counter_finding": finding_text,
+                })
+            else:
+                supp_sources.append({
+                    "study_id": sid,
+                    "source_id": s.get("report_ids", [sid])[0] if s.get("report_ids") else s.get("primary_source_id", sid),
+                    "citation_key": sid.replace("-", "_").replace(" ", "_"),
+                    "finding": finding_text,
                 })
 
-        # Match contradiction / counter-evidence
+            if sid not in seen_sources:
+                seen_sources.add(sid)
+                pub_yr = s.get("published_year") or s.get("year")
+                year_int = int(pub_yr) if pub_yr and str(pub_yr).isdigit() else datetime.datetime.now().year
+                references.append({
+                    "citation_key": sid.replace("-", "_").replace(" ", "_"),
+                    "title": s.get("title") or finding_text[:80] or f"Study {sid}",
+                    "authors": s.get("authors") or ["THOTH Research Synthesis"],
+                    "year": year_int,
+                    "study_id": sid,
+                    "doi": doi_val,
+                    "source_url": src_url,
+                    "verified": bool(doi_val),
+                })
+
+        # Match contradiction / counter-evidence from explicit contradiction entries
         for c in contradictions:
-            if c.get("hypothesis") == hyp or not contradictions:
+            focal_hyp = c.get("focal_hypothesis") or c.get("hypothesis", "")
+            if focal_hyp and (focal_hyp.strip().lower() in hyp.strip().lower() or hyp.strip().lower() in focal_hyp.strip().lower()):
+                opposing_id = (
+                    ", ".join(c.get("counter_study_ids", []))
+                    if isinstance(c.get("counter_study_ids"), list)
+                    else c.get("supporting_study_id", "")
+                )
                 counter_sources.append({
-                    "study_id": c.get("supporting_study_id", ""),
-                    "counter_finding": c.get("opposing_finding", ""),
-                    "dialectic_note": c.get("synthesis_notes", ""),
+                    "study_id": opposing_id,
+                    "counter_finding": c.get("substantive_divergence") or c.get("opposing_finding", ""),
+                    "dialectic_note": c.get("resolution_requirements") or c.get("synthesis_notes", ""),
                 })
 
         status = "QUALIFIED" if counter_sources else ("SUPPORTED" if supp_sources else "UNVERIFIED")
@@ -534,26 +561,33 @@ def propose_claim_qualifications_from_evidence(
 
         matched_evidence = []
         for ev in new_evidence_items:
-            ev_summary = ev.get("finding", "") or ev.get("opposing_finding", "") or ev.get("excerpt", "")
+            # Direct target match by claim_id
+            if ev.get("claim_id") and ev.get("claim_id") == cid:
+                matched_evidence.append(ev)
+                continue
+
+            ev_summary = ev.get("finding", "") or ev.get("opposing_finding", "") or ev.get("excerpt", "") or ev.get("qualification", "")
             # Semantic keyword overlap
-            ev_words = [w for w in ev_summary.lower().split() if len(w) > 4]
+            ev_words = [w for w in re.findall(r'\b\w{4,}\b', ev_summary.lower())]
             if any(w in ctext for w in ev_words):
                 matched_evidence.append(ev)
 
         if matched_evidence:
+            qual_text = matched_evidence[0].get("qualification") or (
+                f"Newly identified findings indicate counter-evidence or conditional boundary: "
+                f"{matched_evidence[0].get('finding', 'opposing finding')}"
+            )
             proposals.append({
                 "claim_id": cid,
                 "claim_text": claim.get("claim_text"),
                 "current_status": current_status,
                 "proposed_status": "QUALIFIED" if current_status == "SUPPORTED" else "CHALLENGED",
                 "matched_counter_evidence": matched_evidence,
-                "qualification_rationale": (
-                    f"Newly identified findings indicate counter-evidence or conditional boundary: "
-                    f"{matched_evidence[0].get('finding', 'opposing finding')}"
-                ),
+                "qualification": qual_text,
+                "qualification_rationale": qual_text,
                 "suggested_qualification_text": (
                     f"{claim.get('claim_text')} However, this effect is qualified under conditions noted in "
-                    f"{[e.get('study_id', 'new evidence') for e in matched_evidence]}."
+                    f"{[e.get('study_id', e.get('counter_source_id', 'new evidence')) for e in matched_evidence]}."
                 ),
             })
 

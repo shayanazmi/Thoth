@@ -673,12 +673,14 @@ def prisma_node(state: ResearchState) -> dict:
     brief = state.get("brief") or {}
     session_id = brief.get("session_id") or ""
 
+    db_path = state.get("db_path") or DEFAULT_DB_PATH
+
     ledger = run_prisma_review_workflow(
         topic=topic,
         sources=sources,
         brief=brief,
         session_id=session_id,
-        db_path=DEFAULT_DB_PATH
+        db_path=db_path
     )
 
     print(f"[PRISMA] Processed {ledger.flow_counts.total_identified} identified records across databases.")
@@ -692,6 +694,7 @@ def prisma_node(state: ResearchState) -> dict:
         "screening_decisions": [d.to_dict() for d in ledger.decisions],
         "evidence_matrix": ledger.evidence_matrix.to_dict(),
         "prisma_mermaid": ledger.mermaid_diagram,
+        "review_id": ledger.review_id,
     }
 
 @observe(type="llm")

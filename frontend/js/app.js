@@ -10,16 +10,18 @@ class ThothApp {
     this.isGenerating = false;
     this.eventSource = null;
 
-    this.pipelineNodes = ['search', 'snowball', 'scrape', 'writer', 'verifier', 'critic', 'mindmap', 'vault'];
+    this.pipelineNodes = ['search', 'snowball', 'scrape', 'prisma', 'writer', 'verifier', 'critic', 'vault', 'mindmap', 'manuscript'];
     this.pipelineLabels = {
       search: 'Searcher',
       snowball: 'Snowballer',
       scrape: 'Reader',
+      prisma: 'PRISMA 2020',
       writer: 'Scribe',
       verifier: 'Truth Guard',
       critic: 'Critic',
+      vault: 'Vault Indexer',
       mindmap: 'Mind Map',
-      vault: 'Vault Indexer'
+      manuscript: 'Manuscript'
     };
 
     this.modeLabels = {
@@ -105,6 +107,8 @@ class ThothApp {
     this.vaultSearchInput = document.getElementById('vaultSearchInput');
 
     this.artifactReportPane = document.getElementById('artifactReportPane');
+    this.artifactPrismaPane = document.getElementById('artifactPrismaPane');
+    this.artifactManuscriptPane = document.getElementById('artifactManuscriptPane');
     this.artifactTruthPane = document.getElementById('artifactTruthPane');
     this.artifactMindmapPane = document.getElementById('artifactMindmapPane');
     this.artifactSourcesPane = document.getElementById('artifactSourcesPane');
@@ -279,6 +283,8 @@ class ThothApp {
 
     const panes = {
       report: this.artifactReportPane,
+      prisma: this.artifactPrismaPane,
+      manuscript: this.artifactManuscriptPane,
       truth: this.artifactTruthPane,
       mindmap: this.artifactMindmapPane,
       sources: this.artifactSourcesPane
@@ -292,6 +298,12 @@ class ThothApp {
 
     if (tabName === 'mindmap' && this.currentState?.mindmap) {
       this.renderMindMap(this.currentState.mindmap);
+    }
+    if (tabName === 'prisma' && this.currentState?.prisma_review) {
+      this.renderPrismaPane(this.currentState.prisma_review);
+    }
+    if (tabName === 'manuscript' && (this.currentState?.manuscript || this.currentState?.revision)) {
+      this.renderManuscriptPane(this.currentState.manuscript, this.currentState.revision, this.currentState.project_id);
     }
   }
 
@@ -981,6 +993,8 @@ class ThothApp {
         cotBody.textContent += `[SNOWBALL] Expanded citation graph and forward reference seeds.\n`;
       } else if (node === 'scrape') {
         cotBody.textContent += `[READER] Fanning out concurrent scrape across top ${this.scrapeTopN || 15} candidate sources.\n`;
+      } else if (node === 'prisma') {
+        cotBody.textContent += `[PRISMA] Double-pass systematic screening & study eligibility ledger compiled.\n`;
       } else if (node === 'writer') {
         cotBody.textContent += `[SCRIBE] Drafted synthesis report (Attempt ${state.attempt || 1}).\n`;
       } else if (node === 'verifier') {
@@ -989,6 +1003,8 @@ class ThothApp {
         cotBody.textContent += `[CRITIC] Rubric evaluated. Score: ${state.score || 0}/10.\n`;
       } else if (node === 'vault') {
         cotBody.textContent += `[VAULT] Persisted notes to Obsidian Markdown Vault & Indexed.\n`;
+      } else if (node === 'manuscript') {
+        cotBody.textContent += `[MANUSCRIPT] Structured manuscript instantiated with claim-evidence matrix (v${state.revision?.version || 1}).\n`;
       }
     }
 
@@ -1002,9 +1018,11 @@ class ThothApp {
         'search': `🔍 Discovering top ${count} peer-reviewed papers across arXiv, Semantic Scholar & OpenAlex...`,
         'snowball': '🌐 Snowballing academic citation network & recommendations...',
         'scrape': `📖 Fanning out concurrent scrape across top ${count} primary sources...`,
+        'prisma': '📑 PRISMA 2020: Screening title/abstracts and full text eligibility...',
         'writer': '✍️ Scribing comprehensive research synthesis...',
         'verifier': '⚖️ Scales of Ma\'at: Verifying factual claims against sources...',
-        'critic': '🧐 Evaluating rigor and rubrics...'
+        'critic': '🧐 Evaluating rigor and rubrics...',
+        'manuscript': '📚 Scribing and structuring living academic manuscript...'
       };
       if (stageMessages[node]) {
         contentBody.innerHTML = `<span style="color:hsl(var(--primary));font-size:0.9rem;"><i data-lucide="loader" class="animate-spin" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;"></i> ${stageMessages[node]}</span>`;
@@ -1024,7 +1042,15 @@ class ThothApp {
       this.renderSources(state.cumulative_sources);
     }
 
-    if (node === 'follow_up' || node === 'complete') {
+    if (state.prisma_review) {
+      this.renderPrismaPane(state.prisma_review);
+    }
+
+    if (state.manuscript || state.revision) {
+      this.renderManuscriptPane(state.manuscript, state.revision, state.project_id);
+    }
+
+    if (node === 'manuscript' || node === 'follow_up' || node === 'complete') {
       this.completeStepper();
       if (state.follow_up_questions) {
         this.renderProactivePills(msgContainer, state.follow_up_questions);
@@ -1214,6 +1240,18 @@ class ThothApp {
         <i data-lucide="microscope" style="width:12px;height:12px;"></i>
         <span>Deep Research</span>
       </button>
+      <button class="msg-action-btn" onclick="window.app.switchArtifactTab('prisma')" title="View PRISMA systematic review flow & screening ledger">
+        <i data-lucide="filter" style="width:12px;height:12px;"></i>
+        <span>PRISMA</span>
+      </button>
+      <button class="msg-action-btn" onclick="window.app.switchArtifactTab('manuscript')" title="View structured academic manuscript draft">
+        <i data-lucide="book-open" style="width:12px;height:12px;"></i>
+        <span>Manuscript</span>
+      </button>
+      <button class="msg-action-btn" onclick="window.app.promptIdeaCapture('${cleanTopic}')" title="Capture conversational observation as a tentative research idea">
+        <i data-lucide="sparkles" style="width:12px;height:12px;"></i>
+        <span>Idea</span>
+      </button>
       <button class="msg-action-btn" onclick="window.app.copyMessageText(this)" title="Copy message text">
         <i data-lucide="copy" style="width:12px;height:12px;"></i>
         <span>Copy</span>
@@ -1224,10 +1262,18 @@ class ThothApp {
       </button>
       <button class="msg-action-btn" onclick="window.app.switchArtifactTab('truth')" title="View fact verification audit">
         <i data-lucide="scale" style="width:12px;height:12px;"></i>
-        <span>Scales of Ma'at</span>
+        <span>Scales</span>
       </button>
     `;
     if (window.lucide) lucide.createIcons();
+  }
+
+  promptIdeaCapture(defaultTitle = '') {
+    const title = prompt('Capture Tentative Idea — Enter a working title:', defaultTitle || this.activeTopic || 'New Research Idea');
+    if (!title) return;
+    const hyp = prompt('Enter the core testable hypothesis:', `Investigating whether ${title.toLowerCase()} presents valid empirical mechanisms.`);
+    if (!hyp) return;
+    this.captureTentativeIdea(title, hyp, `Formulated from conversational dialogue regarding ${title}`);
   }
 
   copyMessageText(btnEl) {
@@ -1562,6 +1608,322 @@ class ThothApp {
       </div>
     `;
     if (window.lucide) lucide.createIcons();
+  }
+
+  renderPrismaPane(prismaData) {
+    if (!this.artifactPrismaPane) return;
+    if (!prismaData) {
+      this.artifactPrismaPane.innerHTML = `<p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">Systematic PRISMA 2020 review flow & screening ledger will appear here.</p>`;
+      return;
+    }
+
+    const counts = prismaData.flow_counts || {};
+    const decisions = prismaData.decisions || this.currentState?.screening_decisions || [];
+    const evMatrix = prismaData.evidence_matrix || this.currentState?.evidence_matrix || {};
+    const studies = evMatrix.included_studies || [];
+    const contradictions = evMatrix.dialectical_contradictions || [];
+
+    const totalIdentified = counts.total_identified || 0;
+    const screened = counts.records_screened || 0;
+    const excludedTA = counts.records_excluded_title_abstract || 0;
+    const retrieved = counts.reports_sought_for_retrieval || 0;
+    const assessedFT = counts.reports_assessed_for_eligibility || 0;
+    const excludedFT = counts.reports_excluded_full_text || 0;
+    const includedReports = counts.included_reports || 0;
+    const includedStudies = counts.included_studies || studies.length;
+
+    let decisionsHtml = '';
+    if (decisions.length > 0) {
+      decisionsHtml = `
+        <div style="margin-top:16px;">
+          <h4 style="font-size:0.85rem;font-weight:600;margin-bottom:8px;color:hsl(var(--foreground));">Screening Ledger (${decisions.length} Decisions)</h4>
+          <div style="max-height:280px;overflow-y:auto;border:1px solid hsl(var(--border));border-radius:var(--radius-sm);">
+            <table class="truth-guard-table" style="margin:0;font-size:0.75rem;">
+              <thead>
+                <tr>
+                  <th>Paper / Report</th>
+                  <th>Stage</th>
+                  <th>Disposition</th>
+                  <th>Rationale</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${decisions.map(d => {
+                  const disp = d.disposition || 'UNRESOLVED';
+                  const dispColor = disp === 'INCLUDED' ? '#10b981' : (disp === 'EXCLUDED' ? '#ef4444' : '#f59e0b');
+                  return `
+                    <tr>
+                      <td style="font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${d.title || ''}">${d.title || 'Untitled'}</td>
+                      <td><span style="font-size:0.7rem;color:hsl(var(--muted-foreground));">${d.stage === 'TITLE_ABSTRACT' ? 'Title/Abs' : 'Full Text'}</span></td>
+                      <td><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-weight:600;font-size:0.7rem;background:${dispColor}20;color:${dispColor};border:1px solid ${dispColor}40;">${disp}</span></td>
+                      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${d.rationale || ''}">${d.exclusion_reason ? `<strong>[${d.exclusion_reason}]</strong> ` : ''}${d.rationale || 'N/A'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    let contradictionsHtml = '';
+    if (contradictions.length > 0) {
+      contradictionsHtml = `
+        <div style="margin-top:16px;padding:12px;border-radius:var(--radius-sm);background:hsl(var(--destructive)/0.08);border:1px solid hsl(var(--destructive)/0.3);">
+          <div style="font-weight:600;font-size:0.82rem;color:hsl(var(--destructive));margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+            <i data-lucide="alert-circle" style="width:14px;height:14px;"></i>
+            <span>Dialectical Contradictions & Counter-Evidence (${contradictions.length})</span>
+          </div>
+          ${contradictions.map(c => `
+            <div style="font-size:0.75rem;margin-bottom:6px;line-height:1.4;">
+              <span style="font-weight:600;color:hsl(var(--foreground));">Hypothesis:</span> ${c.hypothesis || 'Core claim'}<br>
+              <span style="color:#ef4444;font-weight:500;">Opposing Finding:</span> ${c.opposing_finding || 'Contradicting empirical outcome'}<br>
+              <span style="color:hsl(var(--muted-foreground));">Dialectic Resolution:</span> ${c.synthesis_notes || 'Requires qualification.'}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    this.artifactPrismaPane.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 class="serif" style="color:hsl(var(--primary));margin:0;font-size:1rem;">PRISMA 2020 Systematic Review</h3>
+          <span class="mono" style="font-size:0.7rem;color:hsl(var(--primary));background:hsl(var(--primary)/0.1);padding:2px 8px;border-radius:4px;">
+            ID: ${prismaData.review_id || 'active'}
+          </span>
+        </div>
+        <p style="font-size:0.78rem;color:hsl(var(--muted-foreground));margin-top:4px;">
+          Full systematic review accounting & screening flow tracking study eligibility.
+        </p>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-bottom:12px;">
+        <div style="background:hsl(var(--card));padding:10px;border-radius:var(--radius-sm);border:1px solid hsl(var(--border));text-align:center;">
+          <div style="font-size:1.2rem;font-weight:700;color:hsl(var(--primary));">${totalIdentified}</div>
+          <div style="font-size:0.7rem;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:0.05em;">Identified Records</div>
+        </div>
+        <div style="background:hsl(var(--card));padding:10px;border-radius:var(--radius-sm);border:1px solid hsl(var(--border));text-align:center;">
+          <div style="font-size:1.2rem;font-weight:700;color:#f59e0b;">${screened} (${excludedTA} Excl)</div>
+          <div style="font-size:0.7rem;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:0.05em;">Title/Abstract Screened</div>
+        </div>
+        <div style="background:hsl(var(--card));padding:10px;border-radius:var(--radius-sm);border:1px solid hsl(var(--border));text-align:center;">
+          <div style="font-size:1.2rem;font-weight:700;color:#3b82f6;">${assessedFT} (${excludedFT} Excl)</div>
+          <div style="font-size:0.7rem;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:0.05em;">Full Text Assessed</div>
+        </div>
+        <div style="background:hsl(var(--card));padding:10px;border-radius:var(--radius-sm);border:1px solid #10b98140;text-align:center;background:#10b98110;">
+          <div style="font-size:1.2rem;font-weight:700;color:#10b981;">${includedReports} Reports (${includedStudies} Studies)</div>
+          <div style="font-size:0.7rem;color:#10b981;text-transform:uppercase;letter-spacing:0.05em;">Included in Synthesis</div>
+        </div>
+      </div>
+
+      ${decisionsHtml}
+      ${contradictionsHtml}
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  renderManuscriptPane(msData, revData, projectId) {
+    if (!this.artifactManuscriptPane) return;
+    if (!msData && !revData) {
+      this.artifactManuscriptPane.innerHTML = `<p style="color:hsl(var(--muted-foreground));font-size:0.85rem;">Living structured academic manuscript with claim-level evidence matrices.</p>`;
+      return;
+    }
+
+    const manuscript = msData || {};
+    const revision = revData || this.currentState?.revision || {};
+    const mid = manuscript.manuscript_id || this.currentState?.manuscript_id || '';
+    const pid = projectId || manuscript.project_id || this.currentState?.project_id || '';
+    const version = revision.version || manuscript.current_version || 1;
+    const title = revision.title || manuscript.title || 'Academic Manuscript Draft';
+    const sections = revision.sections || {};
+    const claims = revision.claims || [];
+
+    const sectionEntries = Object.entries(sections).sort((a, b) => (a[1].order || 0) - (b[1].order || 0));
+
+    let sectionsHtml = sectionEntries.map(([secKey, sec]) => `
+      <details style="margin-bottom:8px;border:1px solid hsl(var(--border));border-radius:var(--radius-sm);background:hsl(var(--card));" open>
+        <summary style="padding:8px 12px;font-weight:600;font-size:0.82rem;cursor:pointer;color:hsl(var(--primary));display:flex;justify-content:space-between;align-items:center;">
+          <span>${sec.heading || secKey}</span>
+          <span style="font-size:0.7rem;color:hsl(var(--muted-foreground));text-transform:uppercase;">${sec.section_type || 'standard'}</span>
+        </summary>
+        <div style="padding:10px 12px;font-size:0.8rem;line-height:1.5;color:hsl(var(--foreground));border-top:1px solid hsl(var(--border));white-space:pre-wrap;">${sec.content || ''}</div>
+      </details>
+    `).join('');
+
+    let claimsHtml = '';
+    if (claims.length > 0) {
+      claimsHtml = `
+        <div style="margin-top:16px;">
+          <h4 style="font-size:0.85rem;font-weight:600;margin-bottom:8px;color:hsl(var(--foreground));">Claim-to-Evidence Matrix (${claims.length} Claims)</h4>
+          <div style="max-height:240px;overflow-y:auto;border:1px solid hsl(var(--border));border-radius:var(--radius-sm);">
+            <table class="truth-guard-table" style="margin:0;font-size:0.75rem;">
+              <thead>
+                <tr>
+                  <th>Claim</th>
+                  <th>Status</th>
+                  <th>Confidence</th>
+                  <th>Sources</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${claims.map(c => {
+                  const status = c.evidence_status || 'UNVERIFIED';
+                  const stColor = status === 'SUPPORTED' ? '#10b981' : (status === 'QUALIFIED' ? '#3b82f6' : (status === 'CHALLENGED' ? '#ef4444' : '#94a3b8'));
+                  const supp = (c.supporting_sources || []).map(s => typeof s === 'string' ? s : (s.title || s.url || 'Source')).join(', ') || 'None';
+                  return `
+                    <tr>
+                      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.claim_text || ''}">${c.claim_text || ''}</td>
+                      <td><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-weight:600;font-size:0.7rem;background:${stColor}20;color:${stColor};border:1px solid ${stColor}40;">${status}</span></td>
+                      <td class="mono">${Math.round((c.confidence || 0) * 100)}%</td>
+                      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${supp}">${supp}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    this.artifactManuscriptPane.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <h3 class="serif" style="color:hsl(var(--primary));margin:0;font-size:0.95rem;line-height:1.3;">${title}</h3>
+          <span class="mono" style="font-size:0.7rem;color:#10b981;background:#10b98115;border:1px solid #10b98140;padding:2px 6px;border-radius:4px;white-space:nowrap;">
+            v${version}
+          </span>
+        </div>
+        <p style="font-size:0.75rem;color:hsl(var(--muted-foreground));margin-top:4px;">
+          Project: <span class="mono">${pid || 'Default'}</span> · Manuscript: <span class="mono">${mid}</span>
+        </p>
+      </div>
+
+      <div class="report-export-toolbar" style="margin-bottom:12px;">
+        <span style="font-size:0.75rem;color:hsl(var(--muted-foreground));font-weight:500;">Export Draft:</span>
+        <div class="export-buttons-group">
+          <button class="export-btn" onclick="window.app.exportManuscript('${mid}', 'markdown', ${version}, '${pid}')" title="Export Academic Markdown">
+            <i data-lucide="file-text" style="width:11px;height:11px;"></i> .md
+          </button>
+          <button class="export-btn" onclick="window.app.exportManuscript('${mid}', 'latex', ${version}, '${pid}')" title="Export LaTeX Source">
+            <i data-lucide="code" style="width:11px;height:11px;"></i> LaTeX
+          </button>
+          <button class="export-btn" onclick="window.app.exportManuscript('${mid}', 'bibtex', ${version}, '${pid}')" title="Export BibTeX Bibliography">
+            <i data-lucide="file-code" style="width:11px;height:11px;"></i> BibTeX
+          </button>
+          <button class="export-btn" onclick="window.app.exportManuscript('${mid}', 'pdf', ${version}, '${pid}')" title="Export Academic PDF">
+            <i data-lucide="printer" style="width:11px;height:11px;"></i> PDF
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <h4 style="font-size:0.85rem;font-weight:600;margin-bottom:8px;color:hsl(var(--foreground));">Manuscript Sections</h4>
+        ${sectionsHtml || '<p style="color:hsl(var(--muted-foreground));font-size:0.8rem;">No sections drafted yet.</p>'}
+      </div>
+
+      ${claimsHtml}
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  async exportManuscript(manuscriptId, formatType, version, projectId) {
+    if (!manuscriptId) {
+      this.showToast('No active manuscript to export', 'alert-triangle');
+      return;
+    }
+    this.showToast(`Generating ${formatType.toUpperCase()} export...`, 'loader');
+    try {
+      const url = `/api/workspace/manuscripts/${encodeURIComponent(manuscriptId)}/export`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          format: formatType,
+          version: version || 1,
+          engine: 'typst'
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Export failed with status ${res.status}`);
+      }
+      const data = await res.json();
+      const exp = data.export || {};
+      const content = exp.content || '';
+      const filename = exp.filename || `manuscript_${manuscriptId}_v${version}.${formatType === 'markdown' ? 'md' : (formatType === 'latex' ? 'tex' : (formatType === 'bibtex' ? 'bib' : 'pdf'))}`;
+
+      if (formatType === 'pdf' && exp.binary_base64) {
+        const byteCharacters = atob(exp.binary_base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+      }
+      this.showToast(`${formatType.toUpperCase()} export ready: ${filename}`, 'check');
+    } catch (err) {
+      this.showToast(`Export error: ${err.message}`, 'alert-triangle');
+    }
+  }
+
+  async captureTentativeIdea(title, hypothesis, description = '') {
+    try {
+      const res = await fetch('/api/ideas/tentative', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title,
+          hypothesis: hypothesis,
+          description: description,
+          session_id: this.currentState?.session_id || ''
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.idea) {
+        this.showToast(`Tentative idea captured: "${data.idea.title}"`, 'sparkles');
+        return data.idea;
+      }
+    } catch (err) {
+      this.showToast(`Error capturing idea: ${err.message}`, 'alert-triangle');
+    }
+    return null;
+  }
+
+  async promoteIdeaToResearch(ideaId) {
+    try {
+      const res = await fetch(`/api/ideas/${encodeURIComponent(ideaId)}/promote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approved: true })
+      });
+      const data = await res.json();
+      if (data.success && data.idea) {
+        this.showToast(`Idea promoted to persistent research!`, 'check');
+        this.startResearch(data.idea.hypothesis || data.idea.title, true, false);
+      } else {
+        throw new Error(data.message || 'Promotion failed');
+      }
+    } catch (err) {
+      this.showToast(`Promotion error: ${err.message}`, 'alert-triangle');
+    }
   }
 
   renderMindMap(mindmap) {

@@ -4,7 +4,7 @@ from typing import Optional, Tuple, List, Dict, Any
 
 _ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _DB_CANDIDATE = os.path.join(_ROOT_DIR, "db", "store.db")
-DEFAULT_DB_PATH = _DB_CANDIDATE if os.path.exists(_DB_CANDIDATE) else os.path.join(_ROOT_DIR, "store.db")
+DEFAULT_DB_PATH = os.environ.get("THOTH_DB_PATH") or (_DB_CANDIDATE if os.path.exists(_DB_CANDIDATE) else os.path.join(_ROOT_DIR, "store.db"))
 
 def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)

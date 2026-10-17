@@ -327,6 +327,8 @@ async def api_stream_research(request: Request):
                     initial_summary=initial_summary,
                     cancel_event=cancel_event,
                     brief=brief_obj.to_dict() if brief_obj else None,
+                    project_id=body.get("project_id"),
+                    session_id=body.get("session_id") or (brief_obj.session_id if brief_obj else ""),
                 ):
                     if isinstance(item, (tuple, list)) and len(item) == 3:
                         node_name, update, current_state = item
@@ -356,6 +358,17 @@ async def api_stream_research(request: Request):
                         "thinker_context": current_state.get("thinker_context", {}),
                         "hypotheses": current_state.get("hypotheses", []),
                         "unresolved_questions": current_state.get("unresolved_questions", []),
+                        "prisma_review": current_state.get("prisma_review", {}),
+                        "screening_decisions": current_state.get("screening_decisions", []),
+                        "evidence_matrix": current_state.get("evidence_matrix", {}),
+                        "prisma_mermaid": current_state.get("prisma_mermaid", ""),
+                        "review_id": current_state.get("review_id", ""),
+                        "manuscript": current_state.get("manuscript", {}),
+                        "manuscript_id": current_state.get("manuscript_id", ""),
+                        "revision": current_state.get("revision", {}),
+                        "project_id": current_state.get("project_id", ""),
+                        "semantic_clusters": current_state.get("semantic_clusters", []),
+                        "citation_graph": current_state.get("citation_graph", {}),
                     }
                     event_data = {
                         "node": node_name,

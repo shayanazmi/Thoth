@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 import yaml
 
-DEFAULT_VAULT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "vault"))
+DEFAULT_VAULT_DIR = os.environ.get("THOTH_VAULT_DIR") or os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "vault"))
 VALID_SUBFOLDERS = ["topics", "entities", "sources", "sessions"]
 
 @dataclass
