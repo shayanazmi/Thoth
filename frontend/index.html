@@ -230,7 +230,7 @@
             </div>
             <div class="chat-bubble">
               <div class="prose">
-                <p><strong>Greetings, Scholar.</strong> I am Thoth, the Divine Scribe. Select a mode or type your query below to conduct autonomous literature discovery, rigorous truth verification, and knowledge synthesis.</p>
+                <p><strong>Greetings, Scholar.</strong> I am Thoth, the Divine Scribe. Chat with me about anything. When a research direction emerges, I'll propose a plan and wait for your approval before doing substantial work.</p>
               </div>
             </div>
           </div>
@@ -243,125 +243,19 @@
 
         <div class="chat-input-bar">
 
-          <div class="floating-tool-menu hidden" id="floatingToolMenu">
-            <div class="tool-menu-item active" data-mode="auto">
-              <div class="tool-item-icon"><i data-lucide="sparkles"></i></div>
-              <div class="tool-item-meta">
-                <div class="tool-item-title">Autonomous Router</div>
-                <div class="tool-item-desc">Intelligently classifies intent & selects execution path</div>
-              </div>
-            </div>
-            <div class="tool-menu-item" data-mode="deep_research">
-              <div class="tool-item-icon"><i data-lucide="microscope"></i></div>
-              <div class="tool-item-meta">
-                <div class="tool-item-title">Deep Research Swarm</div>
-                <div class="tool-item-desc">8-agent literature synthesis & Vault indexing</div>
-              </div>
-            </div>
-            <div class="tool-menu-item" data-mode="web_probe">
-              <div class="tool-item-icon"><i data-lucide="globe"></i></div>
-              <div class="tool-item-meta">
-                <div class="tool-item-title">Live Web Search Probe</div>
-                <div class="tool-item-desc">Real-time arXiv & web literature search</div>
-              </div>
-            </div>
-            <div class="tool-menu-item" data-mode="local_qa">
-              <div class="tool-item-icon"><i data-lucide="book-marked"></i></div>
-              <div class="tool-item-meta">
-                <div class="tool-item-title">Vault Knowledge QA</div>
-                <div class="tool-item-desc">Grounded Q&A over indexed notes & mindmap</div>
-              </div>
-            </div>
-            <div class="tool-menu-item" data-mode="expand_report">
-              <div class="tool-item-icon"><i data-lucide="file-plus"></i></div>
-              <div class="tool-item-meta">
-                <div class="tool-item-title">Expand Living Report</div>
-                <div class="tool-item-desc">Draft and append new sections to synthesis</div>
-              </div>
-            </div>
-            <div class="tool-menu-item" data-mode="fast_chat">
-              <div class="tool-item-icon"><i data-lucide="message-square"></i></div>
-              <div class="tool-item-meta">
-                <div class="tool-item-title">Fast Dialogue</div>
-                <div class="tool-item-desc">Direct instant responses without web search</div>
-              </div>
-            </div>
-            <div class="tool-menu-item" data-mode="brainstorm">
-              <div class="tool-item-icon"><i data-lucide="brain"></i></div>
-              <div class="tool-item-meta">
-                <div class="tool-item-title">Epistemic Brainstorming</div>
-                <div class="tool-item-desc">Spar with the 10 Thinkers & Auto-escalate to Research</div>
-              </div>
-            </div>
-
-            <div class="tool-menu-divider"></div>
-            <div class="tool-menu-section-header">
-              <i data-lucide="book-open" style="width:12px;height:12px;color:hsl(var(--primary));"></i>
-              <span>Papers to Scrape & Analyze</span>
-            </div>
-            <div class="paper-volume-options-grid" id="paperVolumeOptionsGrid">
-              <button class="volume-option-btn" data-volume="5">5 Papers (Fast)</button>
-              <button class="volume-option-btn" data-volume="10">10 Papers (Balanced)</button>
-              <button class="volume-option-btn active" data-volume="15">Top 15 Papers (Default)</button>
-              <button class="volume-option-btn" data-volume="20">20 Papers (Broad)</button>
-              <button class="volume-option-btn" data-volume="30">30 Papers (Exhaustive)</button>
-            </div>
+          </div>
           </div>
 
           <div class="chat-input-container">
-            <div class="brainstorm-selector-bar hidden" id="brainstormSelectorBar">
-              <div class="thinker-picker-pill">
-                <i data-lucide="sparkles" style="width:13px;height:13px;color:#c99a6b;"></i>
-                <span style="font-size:0.75rem;font-weight:600;color:hsl(var(--muted-foreground));">Thinker:</span>
-                <select id="thinkerSelect" class="thinker-dropdown">
-                  <option value="auto">⚡ Auto-Match Thinker</option>
-                  <option value="aristotle">Aristotle (Categorical Architect)</option>
-                  <option value="descartes">René Descartes (Foundational Reductionist)</option>
-                  <option value="bacon">Francis Bacon (Eliminative Empiricist)</option>
-                  <option value="hume">David Hume (Causal Skeptic)</option>
-                  <option value="darwin">Charles Darwin (Evolutionary Selectionist)</option>
-                  <option value="popper">Karl Popper (Falsificationist Warrior)</option>
-                  <option value="kuhn">Thomas Kuhn (Paradigmatic Strategist)</option>
-                  <option value="box">George Box (Pragmatic Modeling Iterativist)</option>
-                  <option value="turing">Alan Turing (Computational Operationalist)</option>
-                  <option value="simon">Herbert Simon (Bounded Rationalist)</option>
-                </select>
-              </div>
-              <div class="thinker-archetype-tag" id="thinkerArchetypeTag">
-                <span class="status-dot pulse" style="background:#c99a6b;"></span>
-                <span id="thinkerArchetypeLabel">Auto Mode: Diagnoses Root Bottleneck</span>
-              </div>
-            </div>
-
             <div class="chat-input-row">
               <textarea id="chatInput" class="chat-textarea" placeholder="Ask follow-up questions, request sub-topic probes, or type /help..."></textarea>
             </div>
             <div class="chat-input-footer">
               <div class="chat-actions-left">
-                <button class="tool-attach-btn" id="toolAttachBtn" title="Choose Mode & Tools">
-                  <i data-lucide="plus" style="width:16px;height:16px;"></i>
-                </button>
-                <div class="active-mode-badge" id="activeModeBadge" title="Click to change mode">
-                  <i data-lucide="sparkles" style="width:12px;height:12px;"></i>
-                  <span id="activeModeLabel">Auto Router</span>
-                  <i data-lucide="chevron-down" style="width:10px;height:10px;opacity:0.6;"></i>
-                </div>
-                <div class="paper-volume-badge" id="paperVolumeBadge" title="Click to change number of papers">
-                  <i data-lucide="book-open" style="width:12px;height:12px;"></i>
-                  <span id="paperVolumeLabel">15 Papers</span>
-                  <i data-lucide="chevron-down" style="width:10px;height:10px;opacity:0.6;"></i>
-                </div>
+                <!-- Phase 1 (vision §2, §10): no mode toggles. The server infers depth from the exchange. -->
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
-                <button class="brainstorm-toggle" id="brainstormToggle" title="Toggle Philosopher Brainstorming">
-                  <i data-lucide="brain" style="width:13px;height:13px;"></i>
-                  <span>Brainstorm</span>
-                </button>
-                <button class="deep-research-toggle" id="deepResearchToggle" title="Toggle Deep Research">
-                  <i data-lucide="microscope" style="width:13px;height:13px;"></i>
-                  <span>Deep Research</span>
-                </button>
-                <button class="btn-primary" id="chatSendBtn" style="padding:7px 16px;border-radius:var(--radius-full);">
+<button class="btn-primary" id="chatSendBtn" style="padding:7px 16px;border-radius:var(--radius-full);">
                   <i data-lucide="arrow-up" style="width:15px;height:15px;"></i>
                 </button>
               </div>
@@ -435,7 +329,10 @@
 
   <script>
     window.__ENV__ = {
-      API_BASE_URL: 'https://backend-production-3d15.up.railway.app',
+      // Served by a local backend (make dev) → same-origin; otherwise the hosted API.
+      API_BASE_URL: /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
+        ? ''
+        : 'https://backend-production-3d15.up.railway.app',
       SUPABASE_URL: 'https://rpvwntrufifgynyobjuh.supabase.co',
       SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwdndudHJ1ZmlmZ3lueW9ianVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDY0NjQsImV4cCI6MjEwNzQ4MjQ2NH0.KVrYPHfeGi19y36c0_BF_282ccpsWDAPcyxyvz91wy0',
       ENVIRONMENT: 'production'
@@ -446,7 +343,7 @@
   <script src="/lib/api.js"></script>
   <script src="/components/auth_modal.js"></script>
   <script src="/js/animations.js?v=3.5"></script>
-  <script src="/js/app.js?v=3.5"></script>
+  <script src="/js/app.js?v=4.4-phase3"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       if (window.lucide) lucide.createIcons();

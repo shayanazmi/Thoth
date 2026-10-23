@@ -881,6 +881,28 @@ html, body {
   border-color: hsl(var(--primary));
 }
 
+.proactive-pill {
+  padding: 6px 14px;
+  margin: 4px 6px 0 0;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--primary) / 0.6);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  color: hsl(var(--primary));
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.proactive-pill:hover:not(:disabled) {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.proactive-pill:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .proactive-pills-row {
   display: flex;
   flex-wrap: wrap;

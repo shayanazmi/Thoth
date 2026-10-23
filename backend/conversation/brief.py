@@ -50,6 +50,7 @@ class ResearchBrief(BaseModel):
     idea_id: Optional[str] = Field(default=None, description="Linked promoted idea artifact ID")
     counter_evidence_queries: List[Any] = Field(default_factory=list, description="Targeted queries to search for contradictory or disconfirming literature")
     falsification_criteria: List[str] = Field(default_factory=list, description="Explicit conditions under which hypothesis would be disproven")
+    review_mode: str = Field(default="scan", description="'scan' (lightweight, default) or 'formal' (PRISMA-aligned; needs its own approval)")
     created_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
@@ -410,7 +411,7 @@ def prepare_research_brief(
         active_objectives = list(objectives)
     else:
         active_objectives = [
-            f"Synthesize foundational theory and mechanisms of {resolved_topic}.",
+            "Synthesize the foundational theory and proposed mechanisms behind the research question.",
             f"Evaluate empirical benchmark results and methodologies in recent literature.",
             f"Identify open controversies, contradictions, and boundary conditions."
         ]
@@ -468,7 +469,7 @@ def update_research_brief(
         "topic", "research_question", "objectives", "hypotheses",
         "context_and_assumptions", "search_scope", "selection_criteria",
         "thinker_context", "unresolved_questions", "idea_id",
-        "counter_evidence_queries", "falsification_criteria"
+        "counter_evidence_queries", "falsification_criteria", "review_mode"
     }
 
     substantive_change = False

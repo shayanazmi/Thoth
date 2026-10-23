@@ -33,6 +33,7 @@ from backend.api.routes_vault import router as vault_router
 from backend.api.routes_ideas import router as ideas_router
 from backend.api.routes_prisma import router as prisma_router
 from backend.api.routes_workspace import router as workspace_router
+from backend.api.routes_chat import router as chat_router
 
 logger = get_logger("ThothApp")
 
@@ -86,6 +87,8 @@ app.include_router(vault_router)
 app.include_router(ideas_router)
 app.include_router(prisma_router)
 app.include_router(workspace_router)
+# Phase 1 — unified conversational entrypoint (vision §2, §10)
+app.include_router(chat_router)
 
 
 # Mount local frontend if available

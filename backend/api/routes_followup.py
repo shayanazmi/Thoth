@@ -38,7 +38,10 @@ def _get_stream_followup_turn():
 @router.post("/api/followup/stream")
 async def api_stream_followup(request: Request):
     body = await request.json()
-    current_state = body.get("state", {})
+    # Vision §10: users must be able to steer, pause, redirect, or abandon.
+    # A null state is legitimate (e.g. new conversation thread).
+    raw_state = body.get("state")
+    current_state = raw_state if isinstance(raw_state, dict) else {}
     user_query = body.get("user_query", "")
     mode_override = body.get("mode_override", "auto")
 

@@ -315,82 +315,87 @@ def stream_research_pipeline(
     state.update(search_update)
     yield "search", search_update, dict(state)
 
-    if cancel_event and cancel_event.is_set():
-        logger.info("[ORCHESTRATOR] Cancel event detected before snowball.")
-        state["cancelled"] = True
-        yield "cancelled", {"cancelled": True, "reason": "Task cancelled."}, dict(state)
-        return
-
-    logger.info(f"[ORCHESTRATOR - SNOWBALL] Expanding citation graph and recommendations for '{topic}'...")
-    snowball_update = snowball_node(state)
-    state.update(snowball_update)
-    yield "snowball", snowball_update, dict(state)
-
-    if cancel_event and cancel_event.is_set():
-        logger.info("[ORCHESTRATOR] Cancel event detected before scrape.")
-        state["cancelled"] = True
-        yield "cancelled", {"cancelled": True, "reason": "Task cancelled."}, dict(state)
-        return
-
-    existing_sources = state.get("cumulative_sources", [])
-    candidate_urls = [s.get("url") for s in existing_sources if s.get("url")][:state["scrape_top_n"]]
-    if not candidate_urls:
-        candidate_urls = _extract_urls_from_text(state.get("search_results", ""))[:state["scrape_top_n"]]
-
-    if candidate_urls:
-        scraped_content, new_sources = asyncio.run(concurrent_scrape_urls(candidate_urls, dispatcher))
-        new_sources_by_url = {s.get("url"): s for s in new_sources if s.get("url")}
-
-        cumulative_sources = []
-        for s in existing_sources:
-            s_copy = dict(s)
-            u = s_copy.get("url")
-            if u in new_sources_by_url:
-                scraped_meta = new_sources_by_url[u]
-                s_copy["extracted_text"] = scraped_meta.get("extracted_text", "")
-                s_copy["scrape_status"] = scraped_meta.get("scrape_status", "success")
-                s_copy["scrape_error"] = scraped_meta.get("scrape_error")
-                s_copy["content_type"] = scraped_meta.get("content_type", s_copy.get("content_type", "unknown"))
-                s_copy["extraction_quality"] = scraped_meta.get("extraction_quality", s_copy.get("extraction_quality", "unknown"))
-                s_copy["extraction_method"] = scraped_meta.get("extraction_method", s_copy.get("extraction_method", "unknown"))
-                s_copy["extraction_warnings"] = list(scraped_meta.get("extraction_warnings") or s_copy.get("extraction_warnings") or [])
-                s_copy["retrieval_timestamp"] = scraped_meta.get("retrieval_timestamp") or s_copy.get("retrieval_timestamp")
-                s_copy["char_count"] = scraped_meta.get("char_count", 0)
-                s_copy["num_pages"] = scraped_meta.get("num_pages", 0)
-                s_copy["is_truncated"] = scraped_meta.get("is_truncated", False)
-                s_copy["passages"] = list(scraped_meta.get("passages") or [])
-
-                # If scrape failed but source has an abstract or snippet, honestly mark as snippet_only rather than full failure
-                if s_copy["scrape_status"] != "success":
-                    has_snippet = bool((s_copy.get("abstract") or s_copy.get("snippet") or "").strip())
-                    if has_snippet and s_copy["extraction_quality"] == "inaccessible":
-                        s_copy["extraction_quality"] = "snippet_only"
-            cumulative_sources.append(s_copy)
-
-        existing_urls = {s.get("url") for s in cumulative_sources if s.get("url")}
-        for s_info in new_sources:
-            if s_info.get("url") and s_info["url"] not in existing_urls:
-                cumulative_sources.append(s_info)
-                existing_urls.add(s_info["url"])
-
-        scrape_update = {
-            "scraped_content": scraped_content,
-            "cumulative_sources": cumulative_sources
-        }
+    # Phase 3 (vision §5.4): lightweight scan unless the approved brief asks
+    # for a formal PRISMA-aligned review.
+    if (state.get("brief") or {}).get("review_mode", "scan") != "formal":
+        yield from _run_scan_phase(state)
     else:
-        scrape_update = {
-            "scraped_content": "(No URLs found to scrape)",
-            "cumulative_sources": list(existing_sources)
-        }
+        if cancel_event and cancel_event.is_set():
+            logger.info("[ORCHESTRATOR] Cancel event detected before snowball.")
+            state["cancelled"] = True
+            yield "cancelled", {"cancelled": True, "reason": "Task cancelled."}, dict(state)
+            return
 
-    state.update(scrape_update)
-    yield "scrape", scrape_update, dict(state)
+        logger.info(f"[ORCHESTRATOR - SNOWBALL] Expanding citation graph and recommendations for '{topic}'...")
+        snowball_update = snowball_node(state)
+        state.update(snowball_update)
+        yield "snowball", snowball_update, dict(state)
 
-    # --- PRISMA 2020 Systematic Review & Evidence Synthesis Ledger ---
-    logger.info("[ORCHESTRATOR - ACT] Executing PRISMA 2020 Review Accounting and Screening...")
-    prisma_update = dict(prisma_node(state))
-    state.update(prisma_update)
-    yield "prisma", prisma_update, dict(state)
+        if cancel_event and cancel_event.is_set():
+            logger.info("[ORCHESTRATOR] Cancel event detected before scrape.")
+            state["cancelled"] = True
+            yield "cancelled", {"cancelled": True, "reason": "Task cancelled."}, dict(state)
+            return
+
+        existing_sources = state.get("cumulative_sources", [])
+        candidate_urls = [s.get("url") for s in existing_sources if s.get("url")][:state["scrape_top_n"]]
+        if not candidate_urls:
+            candidate_urls = _extract_urls_from_text(state.get("search_results", ""))[:state["scrape_top_n"]]
+
+        if candidate_urls:
+            scraped_content, new_sources = asyncio.run(concurrent_scrape_urls(candidate_urls, dispatcher))
+            new_sources_by_url = {s.get("url"): s for s in new_sources if s.get("url")}
+
+            cumulative_sources = []
+            for s in existing_sources:
+                s_copy = dict(s)
+                u = s_copy.get("url")
+                if u in new_sources_by_url:
+                    scraped_meta = new_sources_by_url[u]
+                    s_copy["extracted_text"] = scraped_meta.get("extracted_text", "")
+                    s_copy["scrape_status"] = scraped_meta.get("scrape_status", "success")
+                    s_copy["scrape_error"] = scraped_meta.get("scrape_error")
+                    s_copy["content_type"] = scraped_meta.get("content_type", s_copy.get("content_type", "unknown"))
+                    s_copy["extraction_quality"] = scraped_meta.get("extraction_quality", s_copy.get("extraction_quality", "unknown"))
+                    s_copy["extraction_method"] = scraped_meta.get("extraction_method", s_copy.get("extraction_method", "unknown"))
+                    s_copy["extraction_warnings"] = list(scraped_meta.get("extraction_warnings") or s_copy.get("extraction_warnings") or [])
+                    s_copy["retrieval_timestamp"] = scraped_meta.get("retrieval_timestamp") or s_copy.get("retrieval_timestamp")
+                    s_copy["char_count"] = scraped_meta.get("char_count", 0)
+                    s_copy["num_pages"] = scraped_meta.get("num_pages", 0)
+                    s_copy["is_truncated"] = scraped_meta.get("is_truncated", False)
+                    s_copy["passages"] = list(scraped_meta.get("passages") or [])
+
+                    # If scrape failed but source has an abstract or snippet, honestly mark as snippet_only rather than full failure
+                    if s_copy["scrape_status"] != "success":
+                        has_snippet = bool((s_copy.get("abstract") or s_copy.get("snippet") or "").strip())
+                        if has_snippet and s_copy["extraction_quality"] == "inaccessible":
+                            s_copy["extraction_quality"] = "snippet_only"
+                cumulative_sources.append(s_copy)
+
+            existing_urls = {s.get("url") for s in cumulative_sources if s.get("url")}
+            for s_info in new_sources:
+                if s_info.get("url") and s_info["url"] not in existing_urls:
+                    cumulative_sources.append(s_info)
+                    existing_urls.add(s_info["url"])
+
+            scrape_update = {
+                "scraped_content": scraped_content,
+                "cumulative_sources": cumulative_sources
+            }
+        else:
+            scrape_update = {
+                "scraped_content": "(No URLs found to scrape)",
+                "cumulative_sources": list(existing_sources)
+            }
+
+        state.update(scrape_update)
+        yield "scrape", scrape_update, dict(state)
+
+        # --- PRISMA 2020 Systematic Review & Evidence Synthesis Ledger ---
+        logger.info("[ORCHESTRATOR - ACT] Executing PRISMA 2020 Review Accounting and Screening...")
+        prisma_update = dict(prisma_node(state))
+        state.update(prisma_update)
+        yield "prisma", prisma_update, dict(state)
 
     while True:
         if cancel_event and cancel_event.is_set():
@@ -506,6 +511,13 @@ def stream_research_pipeline(
         )
         if not state.get("report", "").startswith("> [!CAUTION]"):
             state["report"] = integrity_banner + state.get("report", "")
+
+    if (state.get("brief") or {}).get("review_mode", "scan") != "formal":
+        state["report"] = _honest_scan_methodology(state.get("report", ""), state)
+
+    # Phases 4/5/6 (vision §6.3, §8, §4): thinker perspective, originality, honest status.
+    for node_name, node_update in _run_rigour_passes(state):
+        yield node_name, node_update, dict(state)
 
     if cancel_event and cancel_event.is_set():
         logger.info("[ORCHESTRATOR] Cancel event detected before vault persistence.")
@@ -853,3 +865,96 @@ def run_research_pipeline(
     ):
         final_state = current_state
     return final_state
+
+
+def _run_scan_phase(state: Dict[str, Any]):
+    """Lightweight, abstract-level scan (vision §5.4). No snowball, no scraping, no PRISMA ledger."""
+    from backend.intellectual_rigour.lightweight_scan import (
+        MAX_SCAN_PAPERS,
+        formal_review_recommendation,
+        run_lightweight_scan,
+    )
+
+    sources = [dict(s) for s in state.get("cumulative_sources", [])][:MAX_SCAN_PAPERS]
+    for s in sources:
+        if s.get("extraction_quality") in (None, "", "unknown", "full"):
+            s["extraction_quality"] = "snippet_only"  # never upgrade: only abstracts were seen
+    state["cumulative_sources"] = sources
+    state["scraped_content"] = "\n\n".join(
+        f"[{n}] {s.get('title', '')}\n{s.get('abstract') or s.get('snippet') or ''}"
+        for n, s in enumerate(sources, 1)
+    ) or "(No abstracts available)"
+    # Depth when it matters: one revision at most for an exploratory scan.
+    state["max_retries"] = min(state.get("max_retries", 2), 1)
+
+    brief = state.get("brief") or {}
+    scan = run_lightweight_scan(sources, brief)
+    state["scan_result"] = scan
+    yield "scan_result", scan, dict(state)
+    if scan["recommend_formal_review"]:
+        yield "recommend_formal_review", formal_review_recommendation(scan, brief), dict(state)
+
+
+def _honest_scan_methodology(report: str, state: Dict[str, Any]) -> str:
+    """Vision §11: never fabricate methods. The writer LLM tends to invent
+    inclusion criteria; for a lightweight scan we state exactly what happened."""
+    scan = state.get("scan_result") or {}
+    apis = sorted({p.get("source_api") for p in scan.get("papers", []) if p.get("source_api")})
+    honest = (
+        "Lightweight literature scan (not a systematic review). One keyword search of "
+        f"{', '.join(apis) or 'the configured scholarly databases'} returned {scan.get('paper_count', 0)} papers "
+        f"(capped at {scan.get('cap', 20)}). Only titles and abstracts were read; no full texts were retrieved, "
+        "no citation snowballing was done, and no inclusion/exclusion screening was applied. Claims in this "
+        "report are therefore abstract-level and were checked by the Truth Guard against those abstracts only."
+    )
+    heading = re.compile(r"^\s*(#{1,4}\s*)?(\*\*)?\s*(\d+\.\s*)?Methodology\b.*$", re.I)
+    next_heading = re.compile(r"^\s*(#{1,4}\s+\S|\*\*[^*]{2,80}\*\*\s*$|(Conclusion|Bibliography|References|Limitations)\b)", re.I)
+    lines = report.split("\n")
+    for i, line in enumerate(lines):
+        if heading.match(line):
+            j = i + 1
+            while j < len(lines) and not next_heading.match(lines[j]):
+                j += 1
+            return "\n".join(lines[:i] + ["**Methodology**", honest, ""] + lines[j:])
+    return report.rstrip() + f"\n\n**Methodology**\n{honest}\n"
+
+
+def _run_rigour_passes(state: Dict[str, Any]):
+    brief = state.get("brief") or {}
+    topic = state.get("topic", "")
+
+    # The report the user reads is the final one (bibliography, integrity banner,
+    # honest scan methodology), never an intermediate writer draft.
+    yield "final_report", {"report": state.get("report", "")}
+
+    try:
+        from backend.intellectual_rigour.thinker_hook import invoke_thinker_when_useful
+        thinker = invoke_thinker_when_useful("critical_review", topic, state.get("report", ""), brief)
+    except Exception as exc:
+        thinker = {"stage": "critical_review", "invoked": False, "reason": f"Thinker unavailable: {exc}"}
+    state["thinker_perspective"] = thinker
+    yield "thinker_perspective", thinker
+
+    try:
+        import backend.scholarly as sch
+        from backend.intellectual_rigour.originality import assess_originality, generate_adjacent_queries
+
+        hypothesis = (brief.get("hypotheses") or [brief.get("research_question") or topic])[0]
+        queries = generate_adjacent_queries(topic, hypothesis)
+        adjacent: List[Dict[str, Any]] = []
+        for q in queries:
+            try:
+                found = asyncio.run(sch.search_scholarly_sources(q, max_results=5, min_scholarly_results=1))
+                adjacent.extend(c.to_dict() if hasattr(c, "to_dict") else dict(c) for c in (found or []))
+            except Exception as exc:
+                logger.warning(f"[ORIGINALITY] adjacent search failed for {q!r}: {exc}")
+        originality = assess_originality(hypothesis, state.get("cumulative_sources", []), adjacent, queries)
+    except Exception as exc:
+        originality = {"verdict": "insufficiently_assessed", "explanation": f"Originality check failed: {exc}"}
+    state["originality_assessment"] = originality
+    yield "originality_assessment", originality
+
+    from backend.reports.status import compute_report_status
+    status = compute_report_status(state)
+    state["report_status"] = status
+    yield "report_status", status

@@ -1,4 +1,4 @@
-.PHONY: help setup dev dev-web test test-ui eval lint migrate migrate-dry-run seed seed-reset cache-flush health diagnostics clean deploy
+.PHONY: help setup dev dev-web test test-ui eval lint migrate migrate-dry-run seed seed-reset cache-flush health diagnostics clean deploy test-vision test-legacy-all
 
 VENV ?= venv
 PYTHON ?= $(VENV)/bin/python
@@ -16,7 +16,9 @@ help:
 	@echo "  setup            Set up local virtual environment & install dependencies"
 	@echo "  dev              Start the FastAPI backend with hot reload (port 8000)"
 	@echo "  dev-web          Start the standalone frontend dev server (port 3000)"
-	@echo "  test             Run all test suites via pytest"
+	@echo "  test             Alias for test-vision (canonical gate)"
+	@echo "  test-vision      Run the vision-anchored scenario suite"
+	@echo "  test-legacy-all  Run every discoverable file under backend/tests/"
 	@echo "  test-ui          Run the Web API adapter test suite"
 	@echo "  eval             Run the production multi-agent DeepEval benchmark"
 	@echo "  lint             Verify code syntax and validate module imports"
@@ -60,9 +62,19 @@ dev-web:
 	@echo "Starting Thoth Frontend server on http://localhost:3000..."
 	@cd frontend && python3 -m http.server 3000
 
-test:
-	@echo "Running core unit, db, schema, and API adapter test suites..."
-	@$(PYTEST) backend/tests/test_pure_functions.py backend/tests/test_db.py backend/tests/test_ui_adapter.py backend/tests/test_schemas.py backend/tests/test_dispatcher.py backend/tests/test_all_ten_frameworks.py backend/tests/test_claim_evidence_integrity.py backend/tests/test_document_ingestion.py backend/tests/test_research_mandate_and_approval.py backend/tests/test_audit_forensic_invariants.py backend/tests/test_task_lifecycle_persistence.py backend/tests/test_evidence_provenance_and_verification.py backend/tests/test_evidence_audit_and_correctness_gate.py backend/tests/test_idea_hypothesis_lifecycle.py backend/tests/test_thinker_dialectic_and_counter_evidence.py backend/tests/test_prisma_review_and_evidence_synthesis.py backend/tests/test_project_workspace_and_manuscript_engine.py backend/tests/test_phase6_pdf_snowball_and_collaboration.py backend/tests/test_phase7_clustering_and_journal_engine.py backend/tests/test_working_model_core_journey.py -v
+test-vision:
+	@echo "Running vision-anchored scenario suite (canonical gate)..."
+	@$(PYTEST) backend/tests/scenarios/ -v
+
+# Phase 0 (2026-10-23) found that the previous `test` target referenced files
+# that had been deleted by an earlier commit. `make test` now aliases
+# `make test-vision`, which runs behavioural scenarios anchored on THOTH.docx.
+# `make test-legacy-all` runs anything else that happens to be under backend/tests/.
+test: test-vision
+
+test-legacy-all:
+	@echo "Running every discoverable pytest file under backend/tests/ ..."
+	@$(PYTEST) backend/tests/ -v
 
 test-all:
 	@echo "Running all pytest test suites..."

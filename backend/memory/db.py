@@ -125,6 +125,12 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
         except sqlite3.OperationalError:
             pass
 
+        # Phase 3 (vision §5.4): lightweight scan by default, formal PRISMA only on approval.
+        try:
+            conn.execute("ALTER TABLE research_briefs ADD COLUMN review_mode TEXT NOT NULL DEFAULT 'scan';")
+        except sqlite3.OperationalError:
+            pass
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS research_ideas (
                 idea_id TEXT PRIMARY KEY,
@@ -736,9 +742,9 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
                 objectives_json, hypotheses_json, assumptions_json, search_scope,
                 selection_criteria_json, thinker_context_json, unresolved_questions_json,
                 approval_status, approved_version, approved_at, created_at, updated_at, idea_id,
-                counter_evidence_queries_json, falsification_criteria_json
+                counter_evidence_queries_json, falsification_criteria_json, review_mode
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(brief_id) DO UPDATE SET
                 session_id=excluded.session_id,
                 topic=excluded.topic,
@@ -757,7 +763,8 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
                 updated_at=excluded.updated_at,
                 idea_id=COALESCE(excluded.idea_id, research_briefs.idea_id),
                 counter_evidence_queries_json=excluded.counter_evidence_queries_json,
-                falsification_criteria_json=excluded.falsification_criteria_json;
+                falsification_criteria_json=excluded.falsification_criteria_json,
+                review_mode=excluded.review_mode;
         """, (
             brief_data["brief_id"],
             brief_data.get("session_id", ""),
@@ -779,6 +786,7 @@ def save_brief_db(brief_data: dict, db_path: str = DEFAULT_DB_PATH) -> dict:
             brief_data.get("idea_id"),
             json.dumps(brief_data.get("counter_evidence_queries", [])),
             json.dumps(brief_data.get("falsification_criteria", [])),
+            brief_data.get("review_mode") or "scan",
         ))
     return get_brief_db(brief_data["brief_id"], db_path=db_path)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from backend.core.logging import get_logger
 from backend.workspace.project import (
@@ -67,10 +67,22 @@ router = APIRouter(prefix="/api", tags=["Workspace & Manuscripts"])
 # ==========================================
 
 class ProjectCreateRequest(BaseModel):
+    """Vision §10: forgive callers who use the common field name.
+    Accept either ``title`` (canonical) or ``name`` (alias) on input.
+    """
     title: str = Field(..., min_length=1, description="Title of research project")
     description: str = Field("", description="Detailed scope or description")
     session_id: str = Field("", description="Session context / owner")
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = {"extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_name_alias(cls, data):
+        if isinstance(data, dict) and "title" not in data and "name" in data:
+            return {**data, "title": data["name"]}
+        return data
 
 
 class ProjectMemberAddRequest(BaseModel):

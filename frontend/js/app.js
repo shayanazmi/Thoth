@@ -578,16 +578,10 @@ class ThothApp {
     const topic = this.heroPromptInput.value.trim();
     if (!topic || this.isGenerating) return;
     this.switchView('studio');
-
-    const casualPatterns = /^(hi|hello|hey|greetings|hola|howdy|sup|test|yo)(\s+.*|\!|\?)*$/i;
-    if (casualPatterns.test(topic) || topic.length < 4) {
-      this.setMode('fast_chat');
-      this.appendUserMessage(topic);
-      this.sendFollowup(topic);
-    } else {
-      this.setMode('deep_research');
-      this.startResearch(topic, true);
-    }
+    // Unified surface (vision §2): the server classifies the turn; no mode lanes.
+    this.heroPromptInput.value = '';
+    this.appendUserMessage(topic);
+    this.sendUnifiedTurn(topic);
   }
 
   isResearchDirective(text) {
@@ -611,12 +605,14 @@ class ThothApp {
   }
 
   handleChatSend() {
-    if (this.isGenerating) {
+    // Phase 1 unified entrypoint (vision §2, §10).
+    // No modes: the server classifies the turn and emits typed cards.
+    const text = this.chatInput.value.trim();
+    // Vision §10: the conversation stays live during a run — text always sends.
+    if (this.isGenerating && !text) {
       this.abortGeneration();
       return;
     }
-
-    const text = this.chatInput.value.trim();
     if (!text) return;
 
     this.chatInput.value = '';
@@ -628,21 +624,276 @@ class ThothApp {
     }
 
     this.appendUserMessage(text);
-
-    if (this.activeMode === 'brainstorm') {
-      this.sendBrainstormMessage(text);
+    if (/^approve\b/i.test(text) && this._pendingBrief) {
+      this.approvePendingBrief();
       return;
     }
+    // Phase 3: "run a formal review" escalates the last plan; the server needs its brief_id.
+    const wantsFormal = /\b(run|do|start|launch|begin|proceed with|go (?:for|with|ahead with)|want|need|let'?s do)\b[^?]{0,40}?\b(formal|systematic|prisma|proper|full)\b[^?]{0,20}?\breview\b/i.test(text);
+    this.sendUnifiedTurn(text, wantsFormal && this._lastBriefId ? { brief_id: this._lastBriefId } : {});
+  }
 
-    const hasActiveSession = Boolean(this.currentState && (this.currentState.topic || (this.currentState.chat_turns && this.currentState.chat_turns.length > 0)));
-
-    if (!hasActiveSession && (this.activeMode === 'deep_research' || this.isResearchDirective(text))) {
-      this.startResearch(text, false, true);
+  approvePendingBrief() {
+    // Vision §2/§10: explicit approval of the exact brief version shown.
+    const pending = this._pendingBrief;
+    if (!pending) {
+      this.appendAssistantMessage('There is no plan waiting for approval.');
       return;
     }
+    this._pendingBrief = null;
+    this._disableCardButtons('.approve-btn');
+    this.sendUnifiedTurn('', { approval: { brief_id: pending.brief_id, approved_version: pending.approved_version } });
+  }
 
-    this.sendFollowup(text);
+  /**
+   * Phase 1 — unified conversational turn.
+   * POSTs to /api/chat/stream and dispatches SSE events to card renderers.
+   * Vision §10: the input stays live during a run (setGenerating only swaps the icon).
+   */
+  async sendUnifiedTurn(text, extras = {}) {
+    this.setGenerating(true);
+    try {
+      const body = {
+        message: text,
+        session_id: this.sessionId || '',
+        chat_turns: (this.currentState && this.currentState.chat_turns) || [],
+        conversation_summary: (this.currentState && this.currentState.conversation_summary) || '',
+        ...extras,
+      };
+      const resp = await fetch(this._resolveUrl('/api/chat/stream'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok || !resp.body) {
+        this.appendAssistantMessage(`Could not reach Thoth: ${resp.status}`);
+        return;
+      }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        // sse-starlette frames lines with CRLF; normalise before splitting.
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+        let idx;
+        while ((idx = buffer.indexOf('\n\n')) >= 0) {
+          const frame = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          const dataLines = frame.split('\n').filter(l => l.startsWith('data: '));
+          if (!dataLines.length) continue;
+          try {
+            const payload = JSON.parse(dataLines.map(l => l.slice(6)).join('\n'));
+            this.renderChatEvent(payload);
+          } catch (_) {}
+        }
+      }
+    } catch (err) {
+      this.appendAssistantMessage(`A hiccup reaching Thoth: ${err && err.message || err}`);
+    } finally {
+      this.setGenerating(false);
+    }
+  }
 
+  /**
+   * Render a card for one SSE event from /api/chat/stream. Minimum viable Phase 1
+   * — later phases add richer card types (lightweight scan, originality verdict, etc.).
+   */
+  _disableCardButtons(selector) {
+    document.querySelectorAll(selector).forEach(b => { b.disabled = true; });
+  }
+
+  async promoteIdeaCandidate(title, hypothesis, rationale) {
+    this._disableCardButtons('.idea-btn');
+    // Phase 2 (vision §3.1): one explicit user action promotes a detected
+    // candidate. Reuses the unified chat endpoint — the server records the
+    // TENTATIVE → PROMOTED lifecycle atomically.
+    await this.sendUnifiedTurn('', {
+      idea_promotion: {
+        title: title,
+        hypothesis: hypothesis,
+        rationale: rationale,
+      },
+    });
+  }
+
+  dismissIdeaCandidate() {
+    this._pendingIdea = null;
+    this._disableCardButtons('.idea-btn');
+    this.appendAssistantMessage('_Noted. I won\'t capture that one._');
+  }
+
+    renderChatEvent(evt) {
+    if (!evt || typeof evt !== 'object') return;
+    const kind = evt.event;
+    const p = evt.payload || {};
+    switch (kind) {
+      case 'turn_start':
+      case 'plan_preparing':
+        // Non-blocking prep indicator. One ephemeral badge is enough.
+        if (kind === 'plan_preparing' && p.note) {
+          this.appendAssistantMessage(`_${p.note}_`);
+        }
+        break;
+      case 'direct_answer':
+        this.appendAssistantMessage(p.answer || '');
+        break;
+      case 'clarification_needed': {
+        const prompt = p.prompt || 'Could you say a bit more?';
+        const opts = Array.isArray(p.options) ? p.options : [];
+        const optList = opts.length ? '\n\n' + opts.map(o => `• ${o}`).join('\n') : '';
+        this.appendAssistantMessage(`${prompt}${optList}`);
+        break;
+      }
+      case 'plan_pending': {
+        const brief = p.brief || {};
+        const q = brief.research_question || brief.topic || '';
+        const objs = (brief.objectives || []).slice(0, 3);
+        const objList = objs.length ? '\n\n' + objs.map(o => `- ${o}`).join('\n') : '';
+        const cost = p.cost_estimate || {};
+        const mode = (brief.review_mode || 'scan') === 'formal' ? 'Formal PRISMA-aligned review' : 'Lightweight literature scan';
+        const costLines = cost.review_mode
+          ? `\n\n**Mode:** ${mode} (v${brief.version})\n\n**Estimated effort:** ${cost.papers_considered} · full texts: ${cost.full_text_attempts} · ${cost.llm_calls} LLM calls · ${cost.typical_duration}`
+          : '';
+        const text =
+          `**I've sketched a plan.** Review it and approve when you're ready — the chat stays live.\n\n` +
+          `**Question:** ${q}${objList}${costLines}\n\n` +
+          `<button type="button" class="proactive-pill approve-btn" onclick="window.app.approvePendingBrief()">Approve this plan</button>` +
+          `  _or reply "approve"._`;
+        this.appendAssistantMessage(text);
+        this._lastBriefId = brief.brief_id;
+        // Stash the pending brief so a plain "approve" from the user can hand it back.
+        this._pendingBrief = { brief_id: brief.brief_id, approved_version: brief.version };
+        break;
+      }
+      case 'idea_candidate': {
+        const cand = p.candidate || {};
+        const title = cand.title || 'Possible research direction';
+        const trigger = cand.trigger_label || '';
+        const rationale = cand.rationale || p.guidance || '';
+        // Stash so a short "promote" reply from the user can hand it back without re-typing.
+        this._pendingIdea = {
+          title: cand.title,
+          hypothesis: cand.hypothesis,
+          rationale: cand.rationale,
+        };
+        const safeTitle = (cand.title || '').replace(/'/g, "\\'");
+        const safeHypothesis = (cand.hypothesis || '').replace(/'/g, "\\'");
+        const safeRationale = (cand.rationale || '').replace(/'/g, "\\'");
+        const html =
+          `**Idea worth capturing?** ${title}\n\n` +
+          (trigger ? `_${trigger}_\n\n` : '') +
+          `${rationale}\n\n` +
+          `<button type="button" class="proactive-pill idea-btn" ` +
+          `onclick="window.app.promoteIdeaCandidate('${safeTitle}', '${safeHypothesis}', '${safeRationale}')">Promote to idea network</button>` +
+          `  <button type="button" class="proactive-pill idea-btn" onclick="window.app.dismissIdeaCandidate()">Not now</button>`;
+        this.appendAssistantMessage(html);
+        break;
+      }
+      case 'idea_promoted': {
+        const idea = p.idea || {};
+        this._pendingIdea = null;
+        this.appendAssistantMessage(`✓ Added **${idea.title || 'idea'}** to your idea network.`);
+        break;
+      }
+      case 'approval_recorded':
+        this.appendAssistantMessage(`✓ Approved (v${p.approved_version}). Starting the research pass — the chat stays live.`);
+        break;
+      case 'approval_rejected':
+        this.appendAssistantMessage(`Approval could not be recorded: ${p.reason || 'unknown reason'}`);
+        break;
+      case 'approval_verified':
+        this.appendAssistantMessage(`_Research pass running on plan v${p.version}…_`);
+        break;
+      case 'search':
+        this.appendAssistantMessage(`_Searching scholarly databases… found ${(p.cumulative_sources || []).length} candidate sources._`);
+        break;
+      case 'scan_result': {
+        this._progressShown = {};
+        const papers = (p.papers || []).slice(0, 8).map(x => `- ${x.title}${x.year ? ` (${x.year})` : ''} — _${x.reading_depth}_`).join('\n');
+        this.appendAssistantMessage(`**Lightweight scan:** ${p.paper_count} papers (cap ${p.cap}).\n\n${papers}\n\n_${p.reading_depth_note}_`);
+        break;
+      }
+      case 'recommend_formal_review': {
+        const reasons = (p.reasons || []).map(r => `- ${r}`).join('\n');
+        const e = p.effort || {};
+        this.appendAssistantMessage(`**I'd recommend a formal review.**\n\n${reasons}\n\n**Extra effort:** ${e.papers_considered} · ${e.full_text_attempts} · ${e.typical_duration}\n\n_${p.guidance}_`);
+        break;
+      }
+      case 'prisma': {
+        this._progressShown = {};
+        const c = (p.prisma_review || {}).flow_counts || {};
+        this.appendAssistantMessage(`**Formal PRISMA review recorded.** Identified ${c.total_identified ?? '?'} · screened ${c.records_screened ?? '?'} · included ${c.included_reports ?? '?'} reports. Counts come from the actual recorded ledger.`);
+        break;
+      }
+      case 'final_report':
+        this._lastReport = null;
+        if (p.report) this.appendAssistantMessage(p.report);
+        break;
+      case 'thinker_perspective': {
+        // Show the drafted report first, then the critical passes on it.
+        if (this._lastReport) { this.appendAssistantMessage(this._lastReport); this._lastReport = null; }
+        if (!p.invoked) { this.appendAssistantMessage(`_Thinker check: ${p.reason}_`); break; }
+        this.appendAssistantMessage(
+          `**${p.thinker_name}'s perspective** (${p.stage.replace('_', ' ')})\n\n_Why this thinker:_ ${p.why_this_thinker || ''}\n\n> ${p.opening_challenge || ''}` +
+          (p.verdict ? `\n\n**Verdict:** ${p.verdict} · severity gate: ${p.gate_severity} (advisory — no veto)` : '') +
+          (p.review_error ? `\n\n_${p.review_error}_` : ''));
+        break;
+      }
+      case 'originality_assessment': {
+        const prior = (p.closest_prior_work || []).slice(0, 3).map(x => `- ${x.title} (overlap ${x.overlap})`).join('\n');
+        this.appendAssistantMessage(
+          `**Originality:** \`${p.verdict}\`\n\n${p.explanation || ''}` +
+          (p.adjacent_queries ? `\n\n_Adjacent-field searches:_ ${p.adjacent_queries.join(' · ')} → ${p.adjacent_results} results` : '') +
+          (prior ? `\n\n**Closest prior work:**\n\n${prior}` : '') +
+          (p.limits ? `\n\n_${p.limits}_` : ''));
+        break;
+      }
+      case 'report_status': {
+        const counts = Object.entries(p.claim_counts || {}).map(([k, v]) => `${k}: ${v}`).join(' · ') || 'none audited';
+        const gaps = (p.gaps || []).map(g => `- ${g}`).join('\n');
+        const badge = p.report_status === 'fully_reviewed' ? '✅ FULLY REVIEWED' : '🟡 PROVISIONAL';
+        this.appendAssistantMessage(`**Report status: ${badge}**\n\n**Claims:** ${counts}${gaps ? `\n\n**Open gaps:**\n\n${gaps}` : ''}\n\n_${p.pdf_export}_`);
+        break;
+      }
+      case 'writer':
+      case 'verifier':
+      case 'critic':
+      case 'scrape':
+      case 'snowball':
+      case 'vault':
+      case 'mindmap':
+      case 'manuscript':
+        // Intermediate drafts and bookkeeping stay out of the chat; the final report is shown via follow_up.
+        if (kind === 'writer') this._lastReport = p.report || this._lastReport;
+        // Keep the user informed during the long write/verify stretch (one line per stage, not per retry).
+        if ((kind === 'writer' || kind === 'verifier') && !(this._progressShown || {})[kind]) {
+          this._progressShown = { ...(this._progressShown || {}), [kind]: true };
+          this.appendAssistantMessage(kind === 'writer'
+            ? '_Drafting the synthesis from the sources…_'
+            : '_Checking each claim against its source (Truth Guard) and scoring the draft…_');
+        }
+        break;
+      case 'follow_up':
+        if (this._lastReport) this.appendAssistantMessage(this._lastReport);
+        if (Array.isArray(p.follow_up_questions) && p.follow_up_questions.length) {
+          this.appendAssistantMessage('**Where we could go next:**\n\n' + p.follow_up_questions.map(q => `- ${q}`).join('\n'));
+        }
+        break;
+      case 'error':
+        this.appendAssistantMessage(`⚠ ${p.error || 'An error occurred.'}`);
+        break;
+      case 'complete':
+        // Nothing to render for a clean completion.
+        break;
+      default:
+        // Pipeline nodes (search, scrape, writer, truth_guard, …) — render as discreet log lines.
+        if (p && (p.report || p.answer || p.summary)) {
+          this.appendAssistantMessage(p.report || p.answer || p.summary);
+        }
+        break;
+    }
   }
 
   handleSlashCommand(cmd) {
@@ -1314,6 +1565,23 @@ class ThothApp {
     `;
     this.chatFeed.appendChild(row);
     if (window.lucide) lucide.createIcons();
+    if (window.ThothAnimations) window.ThothAnimations.animateNewMessage(row);
+    this.scrollToBottom(true);
+  }
+
+  appendAssistantMessage(text) {
+    // Card renderer for the unified /api/chat/stream events (Phases 1-3).
+    const row = document.createElement('div');
+    row.className = 'chat-message-row assistant';
+    row.innerHTML = `
+      <div class="chat-avatar">
+        <img src="/assets/thoth_bust.jpg" alt="Thoth">
+      </div>
+      <div class="chat-bubble">
+        <div class="message-prose prose">${marked.parse(text || '')}</div>
+      </div>
+    `;
+    this.chatFeed.appendChild(row);
     if (window.ThothAnimations) window.ThothAnimations.animateNewMessage(row);
     this.scrollToBottom(true);
   }

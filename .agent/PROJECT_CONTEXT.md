@@ -1,64 +1,37 @@
-# 🪶 Thoth: Autonomous Research Intelligence Studio — Project Context
+# Thoth — Agent Project Context (pointer)
 
-## 1. What is Thoth?
-**Thoth** (The Divine Scribe of Ma'at) is a production-grade autonomous multi-agent research intelligence system. Named after the ancient Egyptian deity of wisdom, science, truth, and equilibrium, Thoth is built to perform exhaustive, deep academic and technological research while eliminating hallucinations, bias, and epistemic drift.
+The authoritative context is `/CLAUDE.md`. Read it first — it is now the
+single comprehensive source for any Claude session (Claude Code CLI,
+claude.ai, or any other surface) picking up this project.
 
-## 2. Core Pillars
-1. **Multi-Agent Recursive Research:**
-   - Coordinated swarm of specialized agents: Searcher, Snowballer, Reader/Scraper, Scribe, Verifier, Critic, Mindmap Generator, and Vault Indexer.
-2. **Dual-Key Provenance & Grounding:**
-   - Every substantive claim must cite a verified source URL and extracted text passage.
-   - SLM Truth Guard verifies atomic assertions before reports are published.
-3. **10 Epistemological Frameworks:**
-   - Embeds classical and modern theories of knowledge into reasoning desks:
-     - Aristotle (Deduction & Categories)
-     - Bacon (Inductive Empiricism)
-     - Descartes (Foundational Doubt)
-     - Hume (Skepticism & Causation)
-     - Darwin (Evolutionary Hypothesis Testing)
-     - Popper (Falsificationism)
-     - Kuhn (Paradigm Shift Analysis)
-     - Simon (Bounded Rationality)
-     - Turing (Computability & Operationalism)
-     - Box (Fallibilism & Pragmatic Modeling)
-4. **Persistent Knowledge Vault Graph:**
-   - Bi-directional knowledge graph linking sources, atomic notes, topics, and claims with typed semantic edges (`cites`, `supports`, `contradicts`, `part_of`, `defines`, `related`).
-5. **Production Monorepo Topology:**
-   - **Frontend:** Independent static / SPA service on Railway.
-   - **Backend:** FastAPI Uvicorn service on Railway.
-   - **Auth & DB:** Supabase (Auth, PostgreSQL with RLS, pgvector).
-   - **Cache & Limits:** Redis (Railway add-on) for sub-millisecond query caching and token-bucket rate limiting.
+## One-paragraph summary
 
-## 3. Directory Map
-```
-thoth/
-├── .agent/              # Agent context, architecture specs, rules & workflows
-├── .agents/             # Mirror workspace customization root
-├── docs/                # Architecture, setup, auth, database, caching, deployment, runbooks, ADRs
-│   ├── archive/         # Preserved chat transcripts and historical notes
-│   └── decisions/       # Architecture Decision Records
-├── web/                 # Decoupled frontend client (Railway service)
-│   ├── components/      # Modular UI components
-│   ├── pages/           # View layouts
-│   ├── lib/             # Supabase client (anon key only), API wrapper, config
-│   ├── styles/          # Modern luxury dark-mode CSS
-│   └── assets/          # Emblem, bust, scales, hero imagery
-├── backend/             # Layered API, pipeline & services (Railway service)
-│   ├── api/             # FastAPI routes (/api/research, /api/followup, /api/brainstorm, /api/vault)
-│   ├── services/        # Orchestration, pipeline nodes, scholarly retrieval, thinker sparring
-│   ├── repositories/    # Supabase PostgreSQL persistence (sessions, reports, vault)
-│   ├── core/            # Config, Supabase JWT auth, Redis cache, rate limiting, logging, errors
-│   ├── models/          # Pydantic v2 schemas
-│   ├── intellectual_rigour/ # 10 Thinker framework specifications & matcher
-│   ├── conversation/    # Escalation intent, research mandate synthesis, clarification
-│   ├── memory/          # Vault graph, session memory, indexers
-│   └── supabase/        # SQL migrations (RLS, pgvector) & seed data
-├── scripts/             # Categorized utilities
-│   ├── dev/             # 7-layer diagnostic test, local runner
-│   ├── db/              # Migrations and seeders
-│   ├── ops/             # Cache flush, health verification
-│   └── eval/            # Pipeline evaluations & simulations
-├── evals/               # Evaluation sandbox, persona simulations, benchmarks
-├── tests/               # 360+ pytest integration and unit tests
-└── archive/             # Preserved reference repositories & legacy assets
-```
+Thoth is a research **companion** as defined by `THOTH.docx` (15 Oct 2026,
+v1.0). The only trusted spec is `THOTH.docx`. The engine on disk is denser
+than the status docs suggested, but the user experience was not vision-
+aligned when work began. As of 23 Oct 2026, **Phases 0, 1, and 2 are
+complete**: unified `/api/chat/stream` surface, mode UI removed, idea
+capture (detect-suggest-promote) landed. **Five of ten vision §3 stages
+are closed.** Phase 3 (lightweight scan vs formal PRISMA) is next. Gate:
+`make test-vision` → 14/14 passing.
+
+## Required reading, in order
+
+1. `THOTH.docx` — the only trusted spec.
+2. `/CLAUDE.md` — primary working context (updated 23 Oct 2026).
+3. `docs/archive/verify/BASELINE.md` — honest baseline.
+4. `docs/archive/verify/phase_1.md`, `phase_2.md` — what has shipped.
+5. `docs/SYSTEM_STATE.md` — current scorecard and next phase.
+
+## Treat as *unverified* (historical only)
+
+- `README.md`
+- `docs/roadmap-status.md`
+- `THOTH/THOTH_COMPREHENSIVE_ALIGNMENT_AUDIT.md`
+- Status claims in docstrings, comments, log lines
+
+## For a fresh Claude Code session
+
+See `/CLAUDE.md` §9 "Quick start for a fresh Claude Code session". The
+8-step bootstrap gets you from zero to picking up Phase 3 in roughly 45
+minutes.
