@@ -1,0 +1,116 @@
+/* Thoth design tokens: "Obsidian & Gold".
+   Thoth weighs questions: obsidian ground, gold leaf for Thoth and actions, lapis ink for links,
+   carnelian for what needs you or is not yet shown. Claim colours are semantic only and always
+   paired with a word. Dark is the brand default; light is papyrus with lapis ink (data-theme="light"). */
+:root {
+  --paper: #0e0d0b;
+  --surface: #17150f;
+  --surface-2: #1e1b14;
+  --sunken: #0a0908;
+  --ink: #ede6d6;
+  --ink-2: #bfb59f;
+  --ink-3: #a1977f;
+  --line: #2a261c;
+  --line-strong: #3a3426;
+
+  --accent: #d4a64a;
+  --accent-ink: #0e0d0b;
+  --accent-soft: #2a2213;
+  --lapis: #7d9ff0;
+  --rubric: #e0684b;
+  --rubric-soft: #3a1d14;
+  --moon: #6d6553;
+  --moon-fill: #d4a64a;
+  --moon-glow: rgba(212, 166, 74, .2);
+
+  --ok: #7cc49a;
+  --bad: #f08a72;
+  --unc: #e6b95c;
+  --na: #a3a6ae;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .45);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -12px rgba(0, 0, 0, .7);
+  --shadow-lg: 0 30px 70px -20px rgba(0, 0, 0, .85);
+  --glow: 0 0 40px rgba(212, 166, 74, .25);
+  --gold-grad: linear-gradient(135deg, #f3d58a 0%, #c99a3a 45%, #8a6420 100%);
+
+  --serif: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  --page: #14120d;
+  --page-2: #1a1711;
+  --brass: #d4a64a;
+  --brass-ink: #e8c77a;
+  --t-popper: #f08a72; --t-hume: #7cc49a; --t-nightingale: #e6b95c; --t-default: #d4a64a;
+  --scrim: rgba(4, 3, 2, .6);
+  --chip-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+
+  /* Always-dark surfaces (home hall, intro, tour chapter cards), the same in both themes. */
+  --night: #0a0907;
+  --night-2: #12100c;
+  --night-ink: #ede6d6;
+  --night-ink-2: rgba(237, 230, 214, .76);
+  --night-ink-3: rgba(237, 230, 214, .52);
+  --night-line: rgba(237, 230, 214, .2);
+  --night-hover: rgba(237, 230, 214, .08);
+  --gold: #d4a64a;
+  --gold-hi: #f3d58a;
+  --gold-soft: rgba(212, 166, 74, .14);
+  --gold-line: rgba(212, 166, 74, .5);
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --sidebar-w: 264px;
+  --rail-w: 60px;
+  --workspace-w: minmax(360px, 36%);
+  --ease: cubic-bezier(.2, .7, .2, 1);
+
+  /* Motion language. */
+  --t-quick: 160ms;
+  --t-base: 320ms;
+  --t-scene: 700ms;
+  --t-epic: 1400ms;
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-inout: cubic-bezier(.65, 0, .35, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --paper: #f4eedf;
+  --surface: #fbf8f0;
+  --surface-2: #efe7d4;
+  --sunken: #e8dfc9;
+  --ink: #1a1712;
+  --ink-2: #4a4337;
+  --ink-3: #5f5645;
+  --line: #ddd2ba;
+  --line-strong: #c9bc9f;
+  --accent: #1f3f8f;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2e7f4;
+  --lapis: #1f3f8f;
+  --rubric: #a8442a;
+  --rubric-soft: #f5e2d8;
+  --moon: #b3a685;
+  --moon-fill: #1f3f8f;
+  --moon-glow: rgba(31, 63, 143, .16);
+  --ok: #2d7046;
+  --bad: #b23a2b;
+  --unc: #835a0b;
+  --na: #5e6470;
+  --shadow-sm: 0 1px 2px rgba(40, 30, 10, .06), 0 1px 1px rgba(40, 30, 10, .04);
+  --shadow: 0 1px 2px rgba(40, 30, 10, .05), 0 6px 20px -8px rgba(40, 30, 10, .16);
+  --shadow-lg: 0 24px 60px -20px rgba(40, 30, 10, .3);
+  --glow: 0 0 30px rgba(31, 63, 143, .12);
+  --gold-grad: linear-gradient(135deg, #e7c46f 0%, #b0842c 45%, #6f4f15 100%);
+  --page: #fffcf3;
+  --page-2: #f8f2e3;
+  --brass: #9c7420;
+  --brass-ink: #7a5a16;
+  --t-popper: #a8442a; --t-hume: #2d7046; --t-nightingale: #835a0b; --t-default: #1f3f8f;
+  --scrim: rgba(26, 23, 18, .4);
+  --chip-shadow: 0 1px 3px rgba(40, 30, 10, .14);
+  color-scheme: light;
+}

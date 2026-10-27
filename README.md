@@ -1,167 +1,42 @@
 <div align="center">
 
-<img src="frontend/assets/thoth_logo.png" alt="Thoth Logo" width="130" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(201, 154, 107, 0.35); margin-bottom: 12px;"/>
+<img src="frontend/assets/thoth_logo.png" alt="Thoth" width="120"/>
 
-# THOTH · THE DIVINE SCRIBE
-### Autonomous Multi-Agent Academic Intelligence & Epistemic Synthesis Studio
+# Thoth
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Railway](https://img.shields.io/badge/deploy-Railway-0B0D0E.svg?style=flat-square&logo=railway&logoColor=white)](https://railway.app)
-[![Supabase](https://img.shields.io/badge/auth%20%26%20db-Supabase-3ECF8E.svg?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
-[![Redis](https://img.shields.io/badge/caching-Redis-DC382D.svg?style=flat-square&logo=redis&logoColor=white)](https://redis.io)
-[![Tests](https://img.shields.io/badge/tests-223%20passed-brightgreen.svg?style=flat-square)](backend/tests/)
-
-**Thoth** is an autonomous multi-agent academic research intelligence engine. It combines recursive scholarly retrieval (ArXiv, Semantic Scholar, Tavily), rigorous approval-gated research mandates, restart-resilient task lifecycle management, structured evidence ingestion with honest access-quality badges, dual-key claim-evidence provenance verification, 10 epistemic philosopher reasoning desks, a persistent knowledge vault graph, and an interactive celestial research studio.
-
-<br/>
-
-<img src="frontend/assets/thoth_hero.jpg" alt="Thoth Studio Preview" width="850" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);"/>
+**A research companion that helps you find the question worth asking, and records honestly what the evidence shows.**
 
 </div>
 
----
+Start with a hunch. Thoth talks it through with you and brings in historical thinkers to argue with it.
+It then helps you pin one hypothesis, puts that hypothesis on trial against the literature, runs a systematic
+review, designs a study you can actually run, and drafts a research proposal. Along the way it says plainly
+what it could not verify.
 
-## ⚡ Quickstart (5 Commands Max)
+- **Nothing costly runs without your approval.** Every trial, review and draft shows its plan and cost first.
+- **Honest about reading depth.** An abstract is never passed off as the full paper.
+- **Never falsely complete.** Drafts stay *provisional* until open gaps are closed.
 
-```bash
-git clone https://github.com/shayanazmi/Thoth.git && cd Thoth
-python3 -m venv venv && source venv/bin/activate
-pip install -r backend/requirements.txt
-cp .env.example .env  # Add your NVIDIA_API_KEY and TAVILY_API_KEY
-make dev              # Starts backend on http://localhost:8000
-```
-Open **`http://localhost:8000`** in your browser to launch the studio.
-
----
-
-## 🏛️ System Architecture
-
-```mermaid
-flowchart TD
-    Client["Client Browser<br/>(Research Studio)"]
-    
-    subgraph MandateLifecycle["Mandate & Lifecycle Gate"]
-        Brief["Editable Research Brief<br/>(Versioned & Server-Hashed)"]
-        ApprovalGate["Server-Side Approval Gate<br/>(Zero Spoofing Barrier)"]
-        TaskManager["Durable Task Manager<br/>(Atomic Transitions & Restart Recovery)"]
-    end
-
-    subgraph IngestionEngine["Evidence Ingestion & Provenance"]
-        DocIngest["Document Ingestion<br/>(PDF Page Demarcation & HTML Strip)"]
-        QualityBadge["Access Quality Tracker<br/>(Full | Partial | Snippet | Inaccessible)"]
-        PassageTracker["Bounded Passage Extractor<br/>(Stable Locators: [[src:pX-Y]])"]
-    end
-
-    subgraph MultiAgentCore["Multi-Agent Research Pipeline"]
-        SearchAgent["Scholar Discovery<br/>(ArXiv, Semantic Scholar, Tavily)"]
-        Scribe["Synthesis Writer<br/>(Evidence-Grounded Synthesis)"]
-        TruthGuard["Truth Guard Integrity Gate<br/>(4-Stage Adversarial Quote Defense)"]
-        Critic["Critic & Epistemic Desks<br/>(10 Philosophical Frameworks)"]
-    end
-
-    subgraph StorageLayer["Persistence & Knowledge Vault"]
-        SqliteDB[("SQLite Task & Brief Store")]
-        SupabaseDB[("Supabase Managed PostgreSQL<br/>(pgvector + RLS)")]
-        Vault[("Obsidian Knowledge Vault Graph")]
-    end
-
-    Client -->|1. Dialogue & Brainstorming| Brief
-    Brief -->|2. Explicit User Sign-Off| ApprovalGate
-    ApprovalGate -->|3. Atomic Task Claim| TaskManager
-    TaskManager -->|4. Orchestrate| SearchAgent
-    SearchAgent --> DocIngest
-    DocIngest --> QualityBadge --> PassageTracker
-    PassageTracker --> Scribe
-    Scribe --> TruthGuard
-    TruthGuard --> Critic
-    Critic --> Vault
-    Critic --> SupabaseDB
-    TaskManager -.->|Persist State| SqliteDB
-```
-
----
-
-## 🛡️ Foundational Guarantees
-
-1. **Research Mandate & Genuine Approval Gate:**
-   - Formal research does not launch without explicit user approval of an exact, server-validated research brief version.
-   - Any substantive brief edit automatically increments the version and invalidates prior approvals. Approval claims are cryptographically verified against server state to prevent client spoofing.
-2. **Durable Research Task Lifecycle:**
-   - Durable task lifecycle state machine (`QUEUED` → `CLAIMED` → `RUNNING` → `COMPLETED` / `FAILED` / `CANCELLED`) backed by SQLite ACID transactions.
-   - Atomic process-level claims prevent duplicate execution across worker instances.
-   - Cooperative cancellation checks halt interrupted runs promptly, and startup reconciliation automatically marks orphaned runs as failed.
-3. **Scholarly Evidence Ingestion & Provenance:**
-   - Reliable extraction for PDFs (preserving page boundaries via PyMuPDF) and HTML documents (cleaning web chrome and boilerplate).
-   - Silent truncation eliminated: source character limits are expanded up to 15,000 characters, and partial extractions are explicitly badged.
-   - Access outcome honesty: documents are classified into `full`, `partial`, `snippet_only`, `inaccessible`, `empty`, or `unsupported`. Inaccessible or snippet-only sources can never be represented as fully reviewed full text.
-4. **Adversarial Claim Verification (Truth Guard):**
-   - Moves beyond naive quotation matching. Evaluates whether cited source text semantically justifies the claim.
-   - Hardened with a 4-stage adversarial defense:
-     - **Overgeneralization:** Catches preliminary in-vitro or animal findings paired with claims of clinical human cures.
-     - **Direction Inversion:** Flags contradictory outcomes (e.g., claiming thermal escalation when source reports temperature decrease).
-     - **Causal Leaps:** Rejects causal conclusions drawn solely from observational correlations.
-     - **Predicate Drift:** Identifies claims with core predicates unsupported by cited quotes.
-5. **Inspectable Provenance in Research Output:**
-   - Final reports retain stable passage locators (`[[src-id:p1-1]]`).
-   - Deterministic bibliographies append verified access badges (e.g. `[Full Text (12 pages)]`, `[Search Snippet / Abstract Only]`, `[Inaccessible / Retrieval Failed]`).
-
----
-
-## 📚 Documentation Index
-
-All technical, operational, and architectural documentation is maintained in [`docs/`](docs/):
-
-- 🏛️ **[System Architecture](docs/architecture.md):** In-depth component breakdown, multi-agent pipeline, and data contracts.
-- 🛠️ **[Local Setup & Development](docs/setup.md):** Local setup, venv configuration, Supabase, Redis, and testing.
-- 🔑 **[Environment Variables](docs/env-vars.md):** Full configuration matrix, defaults, and secret rules.
-- 🔐 **[Authentication Flow](docs/auth-flow.md):** Supabase GoTrue Auth, client session handling, and backend JWT validation.
-- 🗄️ **[Database Schema & Migration](docs/database-schema.md):** PostgreSQL DDL, `pgvector` indexing, and Row Level Security (RLS).
-- ⚡ **[Caching & Rate Limiting](docs/caching.md):** Redis key namespaces, TTL policies, and fail-open in-memory fallback.
-- 🚀 **[Railway Deployment Guide](docs/deployment.md):** Multi-service Railway configuration, containerfiles, and networking.
-- 🛡️ **[API Limit & Vendor Resilience](docs/api-limits.md):** Token bucket limits, backoff strategies, and 3-tier LLM failover.
-- 📖 **[Operations Runbook](docs/runbook.md):** Health endpoints (`/health`, `/ready`), incident response, and diagnostics.
-- 📑 **[Architecture Decision Records](docs/decisions/):** ADR-001 (Monorepo), ADR-002 (Supabase), ADR-003 (Redis), ADR-004 (Decoupled Web).
-
----
-
-## 🧩 The 10 Epistemic Frameworks
-
-Thoth incorporates 10 classical and scientific frameworks into its critique and sparring tribunal:
-
-| Thinker | Core Epistemic Angle | Operational Role in Thoth |
-| :--- | :--- | :--- |
-| **Aristotle** | Deductive Certainty | Formal categorical taxonomy & syllogistic validation |
-| **Bacon** | Inductive Empiricism | Systematic elimination of preconceptions & idols |
-| **Descartes** | Foundational Doubt | Radical methodological skepticism & decomposition |
-| **Hume** | Empiricist Skepticism | Rigorous challenge to inductive inference & correlation |
-| **Darwin** | Evolutionary Selection | Competitive variation & hypothesis fitness testing |
-| **Popper** | Critical Falsification | Aggressive search for counterexamples & disproof |
-| **Kuhn** | Paradigm Dynamics | Detection of scientific anomalies & framework limits |
-| **Simon** | Bounded Rationality | Computational constraint audit & heuristic satisficing |
-| **Turing** | Computability | Operational state-machine testing & algorithmicity |
-| **Box** | Pragmatic Fallibilism | Model usefulness verification ("All models are wrong...") |
-
----
-
-## 🧪 Testing & Verification
+## Run it
 
 ```bash
-# Run all 12 core test suites (223 tests passing)
-make test
-
-# Run all pytest test suites
-make test-all
-
-# Run syntax validation and core module import check
-make lint
-
-# Run 7-layer system diagnostic
-make diagnostics
+make setup     # venv, dependencies, .env from .env.example
+               # add NVIDIA_API_KEY and TAVILY_API_KEY to .env for real runs
+make dev       # http://localhost:8000
 ```
 
----
+On the landing page, **Try the demo** plays a recorded real run of the whole journey in about three minutes.
 
-## 📜 License
-Released under the [MIT License](LICENSE).
+## Test
 
+```bash
+make test-vision
+```
+
+## Where things are
+
+- **Spec:** `THOTH/THOTH.docx`
+- **Working context:** folder map, rules and current state are in [`CLAUDE.md`](CLAUDE.md)
+- **Status:** [`docs/SYSTEM_STATE.md`](docs/SYSTEM_STATE.md)
+- **Feature specs:** [`docs/features/`](docs/features/README.md)
+- **Walkthroughs (evidence):** [`docs/archive/verify/`](docs/archive/verify/)

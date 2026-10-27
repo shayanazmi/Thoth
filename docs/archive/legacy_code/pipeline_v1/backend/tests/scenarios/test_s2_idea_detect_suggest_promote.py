@@ -122,6 +122,7 @@ def test_sharp_observation_emits_candidate_without_persisting(client):
     with client.stream("POST", "/api/chat/stream", json={
         "message": "rural anemia rates are higher despite similar iron intake — why?",
         "session_id": "s2-detect",
+        "step_accept": {"step": "scan"},  # docs/features/01: plans come from an accepted offer
     }) as r:
         events = _read_sse(r)
 
@@ -203,6 +204,7 @@ def test_approving_plan_does_not_auto_promote_detected_idea(client):
     with client.stream("POST", "/api/chat/stream", json={
         "message": "what if ribosome stalling drives neurodegeneration in these aging mutants?",
         "session_id": "s2-indep",
+        "step_accept": {"step": "scan"},  # docs/features/01: plans come from an accepted offer
     }) as r:
         prep = _read_sse(r)
     assert "idea_candidate" in _kinds(prep), "detector did not fire on 'what if' phrasing"

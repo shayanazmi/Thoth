@@ -108,10 +108,13 @@ def test_casual_greeting_routes_to_direct_answer(client):
 
 
 def test_research_intent_produces_plan_pending_without_launching(client):
-    """A substantive observation must produce a plan_pending card and wait."""
+    """An accepted research offer must produce a plan_pending card and wait.
+    (Since docs/features/01, a plain message goes to the conductor; plans come
+    only from an accepted offer: see test_s10.)"""
     with client.stream("POST", "/api/chat/stream", json={
         "message": "rural anemia rates are higher despite similar iron intake — why?",
         "session_id": "s",
+        "step_accept": {"step": "scan"},  # docs/features/01: plans come from an accepted offer
     }) as r:
         events = _read_sse(r)
     kinds = _kinds(events)
@@ -131,6 +134,7 @@ def test_approval_launches_pipeline_through_the_gate(client):
     with client.stream("POST", "/api/chat/stream", json={
         "message": "iron absorption varies in rural populations",
         "session_id": "s",
+        "step_accept": {"step": "scan"},  # docs/features/01: plans come from an accepted offer
     }) as r:
         prep = _read_sse(r)
     pending = next(e for e in prep if e.get("event") == "plan_pending")
@@ -176,7 +180,7 @@ def test_chat_input_stays_live_during_a_slow_prep(client):
 
     t_intent = threading.Thread(target=_call, kwargs={
         "name": "intent",
-        "payload": {"message": "iron absorption pathways in rural populations", "session_id": "live-a"},
+        "payload": {"message": "iron absorption pathways in rural populations", "session_id": "live-a", "step_accept": {"step": "scan"}},
     })
     t_intent.start()
     time.sleep(0.2)
@@ -200,6 +204,7 @@ def test_no_mode_lanes_leak_in_sse_payloads(client):
     with client.stream("POST", "/api/chat/stream", json={
         "message": "noticing an uptick in deployed-model drift after fine-tuning",
         "session_id": "mode-test",
+        "step_accept": {"step": "scan"},  # docs/features/01: plans come from an accepted offer
     }) as r:
         events = _read_sse(r)
     serialised = json.dumps(events)

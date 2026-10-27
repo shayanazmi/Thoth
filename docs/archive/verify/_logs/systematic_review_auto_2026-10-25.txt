@@ -1,0 +1,17 @@
+PROTOCOL 34s
+{
+ "population": "Studies of registered nurses (RN) or equivalent licensed nursing staff working in hospitals, clinics, or long-term care facilities. Exclude nursing students, aides, or non-clinical nursing roles.",
+ "exposure": "Studies comparing nurses assigned to permanent night shifts or rotating schedules that include night shifts versus nurses assigned to permanent day shifts. Must define shift type and duration (e.g., \u22651 month).",
+ "comparison": "Direct comparison group of nurses working permanent day shifts in the same or comparable setting.",
+ "outcomes": "Emotional exhaustion reported as a continuous score or categorical level using a validated scale (Maslach Burnout Inventory Emotional Exhaustion subscale, Copenhagen Burnout Inventory, or equivalent). Studies reporting only overall burnout without EE subscale are excluded.",
+ "designs": "Observational comparative designs: cross-sectional, cohort, case-control. Exclude qualitative studies, case reports, reviews, editorials, and intervention trials without a baseline comparison.",
+ "dates": "No date restriction; include all records up to search date.",
+ "languages": "English language full text required. Abstracts in other languages excluded unless full English translation available."
+}
+395s INCLUDED Shift Work and Burnout Among Oncology and Hematology Nurses in Palestinian Hospi
+571s ROW w= 0.45 ['not_', 'not_', 'not_', 'not_']
+571s judging {"trial_id": "trial_2b0e7899f668"}
+589s VERDICT insufficient_evidence | The single available witness (W1) does not address any of the four subclaims. It is a cross-sectional study of oncology/hematology nurses in Palestinian hospitals that does not measure circadian misalignment, does not compare emotional exhaustion by shift type, and does not test mediation. No adjace
+589s review_complete {"review_id": "rev_448291b13f7b", "trial_id": "trial_2b0e7899f668", "included": 1}
+COUNTS {"identified": 50, "by_source": {"OpenAlex": 25, "Europe PMC": 25}, "duplicates_removed": 3, "screened": 47, "excluded_title_abstract": 8, "excluded_title_abstract_reasons": {"designs": 5, "exposure": 2, "comparison": 1}, "unscreened": 0, "sought_for_retrieval": 39, "not_retrieved": 20, "awaiting_retrieval": 0, "assessed_full_text": 19, "excluded_full_text": 18, "excluded_full_text_reasons": {"exposure": 17, "unspecified": 1}, "full_text_unscreened": 0, "included": 1}
+AUDIT QUEUE ta: 10 ft: 1

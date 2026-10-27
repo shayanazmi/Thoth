@@ -1,0 +1,155 @@
+/* Motion: entrances (.fresh, driven by motion.js fresh()), View Transition scenes (html[data-scene]),
+   cinema bars, the ruling landing, the journey moon, and ambient touches. Reduced motion: all off. */
+
+/* ---------- Grain: obsidian with depth, not flat black ---------- */
+body::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .045; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+:root[data-theme="light"] body::before { opacity: .06; mix-blend-mode: multiply; }
+.app { position: relative; z-index: 1; }
+
+/* ---------- Entrances (play once; --age rewinds re-renders to the right frame) ---------- */
+.msg { animation: none; }
+.msg.fresh { animation: msgIn 560ms var(--ease-out) both; animation-delay: var(--age, 0ms); }
+@keyframes msgIn { from { opacity: 0; transform: translateY(10px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+.msg.user.fresh { animation-name: userIn; }
+@keyframes userIn { from { opacity: 0; transform: translate(14px, 6px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* Approval and next-step cards trace a gold line around themselves when they arrive. */
+.msg.fresh .card { position: relative; }
+.msg.fresh .card::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; padding: 1.5px;
+  background: conic-gradient(from var(--trace-a, 0deg), transparent 0 70%, var(--gold-hi) 85%, var(--gold) 92%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: trace 1500ms var(--ease-inout) both; animation-delay: calc(var(--age, 0ms) + 200ms); }
+@property --trace-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes trace { from { --trace-a: 0deg; opacity: 1; } 85% { opacity: 1; } to { --trace-a: 360deg; opacity: 0; } }
+
+/* Workspace page turn: a new panel arrives like the next leaf of a folio. */
+.ws-body.fresh { animation: pageIn 620ms var(--ease-out) both; animation-delay: var(--age, 0ms); transform-origin: left center; }
+@keyframes pageIn { from { opacity: 0; transform: perspective(1400px) rotateY(-9deg) translateX(18px); } to { opacity: 1; transform: none; } }
+.ws-body.fresh > * { animation: rise 520ms var(--ease-out) both; animation-delay: calc(var(--age, 0ms) + 120ms); }
+.ws-body.fresh > *:nth-child(2) { animation-delay: calc(var(--age, 0ms) + 180ms); }
+.ws-body.fresh > *:nth-child(3) { animation-delay: calc(var(--age, 0ms) + 240ms); }
+.ws-body.fresh > *:nth-child(n+4) { animation-delay: calc(var(--age, 0ms) + 300ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Journey: the moon you just reached fills with gold. */
+.stage.current.fresh { animation: moonReach 900ms var(--ease-spring) both; animation-delay: var(--age, 0ms); }
+@keyframes moonReach { 0% { box-shadow: 0 0 0 0 var(--moon-glow); transform: scale(.92); } 50% { box-shadow: 0 0 0 10px var(--moon-glow), var(--glow); transform: scale(1.06); } 100% { box-shadow: 0 0 0 4px var(--moon-glow); transform: none; } }
+.stage:hover svg { filter: drop-shadow(0 0 6px var(--moon-glow)); }
+
+/* ---------- The ruling lands ---------- */
+.ruling.fresh .seal { animation: sealDrop 1100ms var(--ease-spring) both; animation-delay: calc(var(--age, 0ms) + 350ms); }
+@keyframes sealDrop { from { opacity: 0; transform: translateY(-40px) scale(1.6) rotate(-25deg); filter: blur(4px); } 60% { opacity: 1; filter: none; } to { opacity: 1; transform: none; } }
+.ruling.fresh .seal::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--gold); pointer-events: none;
+  animation: ripple 1200ms var(--ease-out) both; animation-delay: calc(var(--age, 0ms) + 1000ms); }
+@keyframes ripple { from { opacity: .9; transform: scale(.9); } to { opacity: 0; transform: scale(2.2); } }
+.ruling.fresh .r-kicker, .ruling.fresh .r-verdict, .ruling.fresh .r-why, .ruling.fresh .scale, .ruling.fresh .facts { animation: rise 700ms var(--ease-out) both; }
+.ruling.fresh .r-kicker { animation-delay: calc(var(--age, 0ms) + 900ms); }
+.ruling.fresh .r-verdict { animation: inkIn 1000ms var(--ease-out) both; animation-delay: calc(var(--age, 0ms) + 1050ms); }
+.ruling.fresh .r-why { animation-delay: calc(var(--age, 0ms) + 1350ms); }
+.ruling.fresh .scale { animation-delay: calc(var(--age, 0ms) + 1500ms); }
+.ruling.fresh .facts { animation-delay: calc(var(--age, 0ms) + 1650ms); }
+@keyframes inkIn { from { opacity: 0; clip-path: inset(0 100% 0 0); letter-spacing: .02em; } to { opacity: 1; clip-path: inset(0 0 0 0); } }
+
+.letterbox { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+.letterbox i { position: absolute; left: 0; right: 0; height: 9vh; background: #000; animation: lb var(--lb-ms, 1100ms) var(--ease-inout) both; }
+.letterbox i:first-child { top: 0; transform-origin: top; }
+.letterbox i:last-child { bottom: 0; transform-origin: bottom; }
+@keyframes lb { 0% { transform: scaleY(0); } 25%, 70% { transform: scaleY(1); } 100% { transform: scaleY(0); } }
+
+/* ---------- Ambient ---------- */
+.send-btn, .chip.primary { transition: transform var(--t-quick) var(--ease-out), box-shadow var(--t-base) var(--ease-out); }
+.send-btn:active, .chip.primary:active { transform: scale(.94); }
+.chip.primary:hover, .send-btn:hover { box-shadow: var(--glow); }
+.composer:focus-within { box-shadow: 0 0 0 4px var(--gold-soft), var(--shadow); transition: box-shadow var(--t-base) var(--ease-out); }
+
+/* ---------- Scenes (View Transitions) ---------- */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--t-scene); animation-timing-function: var(--ease-inout); }
+
+/* Home → project: the hall recedes, the study irises open from the bust's moon. */
+html[data-scene="enter"]::view-transition-old(root) { animation: sceneRecede 900ms var(--ease-inout) both; }
+html[data-scene="enter"]::view-transition-new(root) { animation: irisOpen 1000ms var(--ease-inout) both; }
+@keyframes sceneRecede { to { opacity: 0; transform: scale(1.06); filter: blur(6px) brightness(1.6) sepia(.6); } }
+@keyframes irisOpen { from { clip-path: circle(0% at 72% 30%); } to { clip-path: circle(150% at 72% 30%); } }
+/* Project → home: the study folds back into the hall. */
+html[data-scene="leave"]::view-transition-old(root) { animation: irisClose 800ms var(--ease-inout) both; z-index: 2; }
+html[data-scene="leave"]::view-transition-new(root) { animation: none; }
+@keyframes irisClose { from { clip-path: circle(150% at 72% 30%); } to { clip-path: circle(0% at 72% 30%); } }
+
+/* Theme: night falls / dawn breaks from the toggle. */
+html[data-scene="theme"]::view-transition-old(root) { animation: none; }
+html[data-scene="theme"]::view-transition-new(root) { animation: themeReveal 900ms var(--ease-inout) both; }
+@keyframes themeReveal { from { clip-path: circle(0 at var(--vt-x, 90%) var(--vt-y, 4%)); } to { clip-path: circle(160vmax at var(--vt-x, 90%) var(--vt-y, 4%)); } }
+
+/* Layout Chat / Split / File: panes morph to their new widths. */
+html[data-scene="layout"] .sidebar { view-transition-name: sidebar; }
+html[data-scene="layout"] .main { view-transition-name: main; }
+html[data-scene="layout"] .workspace { view-transition-name: workspace; }
+html[data-scene="layout"]::view-transition-group(*) { animation-duration: var(--t-scene); animation-timing-function: var(--ease-inout); }
+html[data-scene="layout"]::view-transition-old(root), html[data-scene="layout"]::view-transition-new(root) { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .msg.fresh, .ws-body.fresh, .ws-body.fresh > *, .stage.current.fresh, .ruling.fresh *, .msg.fresh .card::after { animation: none !important; }
+  .letterbox { display: none; }
+}
+
+/* ---------- Intro: "The Weighing of the Question" (js/intro-cinema.js) ---------- */
+.intro.cinema { background: var(--night); color: var(--night-ink); z-index: 55; transition: opacity .6s var(--ease-out); clip-path: circle(150% at var(--ix, 55%) var(--iy, 30%)); }
+.intro.cinema.open { transition: clip-path 1.5s cubic-bezier(.6, 0, .2, 1); clip-path: circle(0% at var(--ix, 55%) var(--iy, 30%)); pointer-events: none; }
+.intro.cinema::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 40%, rgba(0, 0, 0, .65) 100%); z-index: 1; }
+.ic-dust { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+
+.ic-stage { position: absolute; left: 50%; top: 4vh; height: min(64vh, 92vw); aspect-ratio: 1; transform: translateX(-50%) scale(1.04); --lx: 50%; --ly: 22%; opacity: 0;
+  transition: opacity 2.2s var(--ease-out), transform 9s linear; }
+.ic-stage img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; filter: brightness(1.12) sepia(.35) saturate(1.2);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 36%, transparent 70%); mask-image: radial-gradient(circle at 50% 50%, #000 36%, transparent 70%); }
+.ic-light { position: absolute; inset: -30%; pointer-events: none;
+  background: radial-gradient(circle 260px at calc(var(--lx) * .625 + 18.75%) calc(var(--ly) * .625 + 18.75%), rgba(243, 213, 138, .1) 0, rgba(10, 9, 7, 0) 40%, rgba(10, 9, 7, .62) 100%); }
+.ic-disc { position: absolute; left: 55.5%; top: 21%; width: 14%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; }
+.intro.cinema[data-phase="bust"] .ic-stage, .intro.cinema[data-phase="cards"] .ic-stage, .intro.cinema[data-phase="ask"] .ic-stage { opacity: 1; transform: translateX(-50%) scale(1); }
+.intro.cinema[data-phase="cards"] .ic-stage { opacity: .4; }
+.intro.cinema.flare .ic-disc { animation: icFlare 1.1s ease-out forwards; }
+@keyframes icFlare { 0% { box-shadow: 0 0 0 0 rgba(243, 213, 138, 0); } 40% { box-shadow: 0 0 140px 80px rgba(243, 213, 138, .6); background: rgba(255, 236, 190, .6); } 100% { box-shadow: 0 0 280px 200px rgba(243, 213, 138, 0); background: rgba(255, 236, 190, 0); } }
+
+.ic-bars i { position: absolute; left: 0; right: 0; height: 10vh; background: #000; z-index: 3; transition: transform 1.2s var(--ease-inout); }
+.ic-bars i:first-child { top: 0; } .ic-bars i:last-child { bottom: 0; }
+.intro.cinema[data-phase="ask"] .ic-bars i:first-child, .intro.cinema.still .ic-bars i:first-child { transform: translateY(-100%); }
+.intro.cinema[data-phase="ask"] .ic-bars i:last-child, .intro.cinema.still .ic-bars i:last-child { transform: translateY(100%); }
+
+.ic-cards { position: absolute; inset: 0; z-index: 4; display: grid; place-content: center; gap: 2.4vh; text-align: center; pointer-events: none; }
+.ic-cards p { margin: 0; font: 300 clamp(1.8rem, 4.6vw, 3.6rem) / 1.1 var(--serif); letter-spacing: -.01em; opacity: 0; transform: translateY(12px); filter: blur(6px);
+  transition: opacity 1s var(--ease-out), transform 1.2s var(--ease-out), filter 1s var(--ease-out); transition-delay: calc(var(--i) * 1.1s); position: relative; }
+.ic-cards p:last-child span { background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-style: italic; }
+.ic-cards svg { display: block; width: min(320px, 60%); height: 12px; margin: 6px auto 0; overflow: visible; }
+.ic-cards path { fill: none; stroke: var(--gold); stroke-width: 1.4; stroke-linecap: round; stroke-dasharray: 320; stroke-dashoffset: 320; transition: stroke-dashoffset 1.2s var(--ease-out); transition-delay: calc(var(--i) * 1.1s + .5s); }
+.intro.cinema[data-phase="cards"] .ic-cards p { opacity: 1; transform: none; filter: none; }
+.intro.cinema[data-phase="cards"] .ic-cards path { stroke-dashoffset: 0; }
+.intro.cinema[data-phase="ask"] .ic-cards p { transition-delay: 0s; opacity: 0; transform: translateY(-14px); }
+
+.ic-ask { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; text-align: center; padding: 0 20px max(7vh, 40px); opacity: 0; transform: translateY(16px); pointer-events: none;
+  transition: opacity 1s var(--ease-out) .25s, transform 1.2s var(--ease-out) .25s; }
+.intro.cinema[data-phase="ask"] .ic-ask, .intro.cinema.still .ic-ask { opacity: 1; transform: none; pointer-events: auto; }
+.intro.cinema.weighing .ic-ask { opacity: 0; transition-delay: 0s; transition-duration: .5s; }
+.intro.cinema.weighing .ic-field input { color: transparent; }
+.ic-prompt { margin: 0; font: 300 clamp(1.5rem, 3.4vw, 2.5rem) / 1.2 var(--serif); }
+.ic-field { margin: 20px auto 0; width: min(640px, 100%); display: flex; align-items: center; gap: 12px; padding: 8px 4px; }
+.ic-field input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--night-ink); font: 400 1.4rem var(--serif); text-align: center; caret-color: var(--gold-hi); }
+.ic-field input::placeholder { color: var(--night-ink-3); font-style: italic; }
+.ic-go { width: 40px; height: 40px; border: 0; border-radius: 12px; background: var(--gold-grad); color: var(--night); display: grid; place-items: center; box-shadow: var(--glow); }
+.ic-go svg { width: 18px; height: 18px; }
+/* The field rests on the beam of a scale. */
+.ic-beam { position: relative; width: min(680px, 100%); height: 1px; margin: 0 auto; background: linear-gradient(90deg, transparent, var(--gold-line) 15%, var(--gold) 50%, var(--gold-line) 85%, transparent); }
+.ic-beam i { position: absolute; left: 50%; top: -4px; width: 9px; height: 9px; background: var(--gold); transform: translateX(-50%) rotate(45deg); box-shadow: var(--glow); }
+.intro.cinema.weighing .ic-beam { animation: beamTip 1.4s var(--ease-inout) both; }
+@keyframes beamTip { 40% { transform: rotate(-2.5deg); } 70% { transform: rotate(1deg); } 100% { transform: none; } }
+.ic-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 22px; }
+.ic-actions button { border-radius: 999px; padding: 9px 20px; font: 500 .9rem var(--sans); border: 1px solid var(--gold-line); background: transparent; color: var(--night-ink); transition: background var(--t-base), box-shadow var(--t-base), transform var(--t-quick); }
+.ic-actions .ic-begin { background: var(--gold-grad); color: var(--night); border-color: transparent; }
+.ic-actions button:hover { box-shadow: var(--glow); background-color: var(--gold-soft); }
+.ic-actions button:active { transform: scale(.96); }
+.ic-hint { margin: 14px 0 0; font-size: .78rem; letter-spacing: .06em; color: var(--night-ink-3); }
+.intro.cinema .intro-skip { z-index: 6; background: rgba(237, 230, 214, .05); border: 1px solid var(--night-line); color: var(--night-ink-2); }
+.intro.cinema .intro-skip:hover { background: var(--night-hover); }
+.intro.cinema.still .ic-stage { opacity: 1; transform: translateX(-50%); transition: none; }
+.intro.cinema.still .ic-cards { display: none; }
+@media (max-width: 760px) { .ic-stage { top: 6vh; height: min(48vh, 92vw); } .ic-cards p { font-size: clamp(1.5rem, 7vw, 2.2rem); } }

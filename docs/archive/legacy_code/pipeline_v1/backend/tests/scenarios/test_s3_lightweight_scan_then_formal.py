@@ -36,7 +36,7 @@ def _plan(events):
 
 
 def test_plan_defaults_to_scan_with_cost_estimate(client):
-    plan = _plan(_events(client, {"message": OBSERVATION, "session_id": "s3-a"}))
+    plan = _plan(_events(client, {"message": OBSERVATION, "session_id": "s3-a", "step_accept": {"step": "scan"}}))
     assert plan["brief"]["review_mode"] == "scan"
     assert plan["cost_estimate"]["review_mode"] == "scan"
     assert plan["cost_estimate"]["full_text_attempts"] == "none"
@@ -71,7 +71,7 @@ def test_scan_phase_is_bounded_labelled_and_skips_prisma():
 
 
 def test_formal_review_needs_its_own_approval(client):
-    brief = _plan(_events(client, {"message": OBSERVATION, "session_id": "s3-c"}))["brief"]
+    brief = _plan(_events(client, {"message": OBSERVATION, "session_id": "s3-c", "step_accept": {"step": "scan"}}))["brief"]
 
     formal = _plan(_events(client, {
         "message": "this is serious now, run a formal review",
@@ -118,7 +118,7 @@ def test_scan_only_report_is_provisional():
 
 def test_mentioning_prisma_does_not_escalate(client):
     """A side question about PRISMA must not silently turn the plan into a formal review."""
-    brief = _plan(_events(client, {"message": OBSERVATION, "session_id": "s3-d"}))["brief"]
+    brief = _plan(_events(client, {"message": OBSERVATION, "session_id": "s3-d", "step_accept": {"step": "scan"}}))["brief"]
     events = _events(client, {
         "message": "quick aside - what does PRISMA stand for?",
         "session_id": "s3-d",

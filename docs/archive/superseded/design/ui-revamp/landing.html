@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Thoth · intro and landing (UI prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --night: #070913; --night-2: #0d1020; --moonlight: #dfe3f5; --brass: #c9a45c; --brass-2: #e6c987;
+  --paper: #f4f1e9; --page: #fffdf8; --ink: #16130e; --ink-2: #4f4a40; --line: #e4dfd1;
+  --accent: #27306b; --rubric: #b5441f;
+  --serif: "Newsreader", "Iowan Old Style", Georgia, serif; --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --ease: cubic-bezier(.2,.7,.2,1);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--night); color: var(--moonlight); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+body.locked { overflow: hidden; height: 100vh; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 400; margin: 0; letter-spacing: -.02em; line-height: 1.04; text-wrap: balance; }
+p { margin: 0; } a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--brass-2); outline-offset: 3px; border-radius: 6px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.eyebrow { font: 600 .74rem/1 var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--brass); }
+em { font-style: italic; }
+.wrap { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
+
+/* ============ INTRO ============ */
+.intro { position: fixed; inset: 0; z-index: 100; background: var(--night); display: grid; grid-template-rows: minmax(0,1fr) auto; overflow: hidden; clip-path: circle(150% at var(--ix, 55%) var(--iy, 30%)); }
+.intro.open { transition: clip-path 1.5s cubic-bezier(.6,0,.2,1); clip-path: circle(0% at var(--ix, 55%) var(--iy, 30%)); pointer-events: none; }
+.intro.gone { display: none; }
+.stage { position: relative; height: min(66vh, 92vw); aspect-ratio: 1; margin: auto; align-self: center; }
+.stage img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; filter: saturate(1) brightness(1.15);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 38%, transparent 70%); mask-image: radial-gradient(circle at 50% 50%, #000 38%, transparent 70%); opacity: 0; animation: emerge 3.2s .2s var(--ease) forwards; }
+@keyframes emerge { from { opacity: 0; transform: scale(1.06); } to { opacity: 1; transform: none; } }
+.lantern { position: absolute; inset: -30%; pointer-events: none; background: radial-gradient(circle 240px at var(--lx, 50%) var(--ly, 40%), transparent 0, rgba(7,9,19,.0) 38%, rgba(7,9,19,.55) 100%); transition: background .05s; }
+.disc { position: absolute; left: 55.5%; top: 21%; width: 14%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(246,222,160,.0) 30%, rgba(246,222,160,.0) 100%); }
+.intro.flare .disc { animation: flare 1.1s ease-out forwards; }
+@keyframes flare { 0% { box-shadow: 0 0 0 0 rgba(246,222,160,.0); background: rgba(246,222,160,0); } 40% { box-shadow: 0 0 120px 70px rgba(246,222,160,.55); background: rgba(255,240,200,.55); } 100% { box-shadow: 0 0 260px 180px rgba(246,222,160,.0); background: rgba(255,240,200,0); } }
+.ask { text-align: center; padding: 0 20px 9vh; position: relative; z-index: 2; }
+.ask .p { font: 300 clamp(1.5rem, 3.4vw, 2.5rem)/1.2 var(--serif); opacity: 0; animation: fadeIn 1.6s 1.6s forwards; }
+.ask .field { margin: 22px auto 0; width: min(640px, 100%); display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(223,227,245,.28); padding: 8px 4px; opacity: 0; animation: fadeIn 1.2s 2.4s forwards; }
+.ask input { flex: 1; background: none; border: 0; outline: none; color: var(--moonlight); font: 400 1.4rem var(--serif); text-align: center; caret-color: var(--brass-2); min-width: 0; }
+.ask input::placeholder { color: rgba(223,227,245,.4); font-style: italic; }
+.ask .hint { margin-top: 12px; font-size: .78rem; letter-spacing: .06em; color: rgba(223,227,245,.45); opacity: 0; animation: fadeIn 1s 3s forwards; }
+@keyframes fadeIn { to { opacity: 1; } }
+.skip { position: absolute; right: 22px; bottom: 22px; z-index: 3; background: rgba(255,255,255,.06); border: 1px solid rgba(223,227,245,.2); color: rgba(223,227,245,.8); border-radius: 999px; padding: 7px 16px; font-size: .82rem; }
+.skip:hover { background: rgba(255,255,255,.12); }
+.mote { position: fixed; z-index: 120; pointer-events: none; font: 400 1.4rem var(--serif); color: var(--moonlight); will-change: transform, opacity; text-shadow: 0 0 14px rgba(223,227,245,.6); }
+.intro.typing .ask .p { opacity: .35; transition: opacity .6s; }
+
+/* ============ NAV ============ */
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: flex; align-items: center; gap: 22px; padding: 18px max(24px, calc((100% - 1180px)/2)); transition: background .4s, backdrop-filter .4s, border-color .4s; border-bottom: 1px solid transparent; }
+.nav.solid { background: rgba(7,9,19,.72); backdrop-filter: blur(14px); border-color: rgba(223,227,245,.1); }
+.nav .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; font: 500 1.2rem var(--serif); letter-spacing: .24em; }
+.nav .brand svg { width: 28px; height: 28px; color: var(--moonlight); }
+.nav .links { margin-left: auto; display: flex; gap: 6px; }
+.nav .links a { text-decoration: none; font-size: .88rem; padding: 7px 12px; border-radius: 999px; color: rgba(223,227,245,.72); } .nav .links a:hover { color: #fff; background: rgba(255,255,255,.07); }
+.cta { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; border: 1px solid var(--brass); color: var(--night); background: var(--brass); padding: 10px 20px; border-radius: 999px; font-weight: 600; font-size: .92rem; transition: transform .2s var(--ease), background .2s, box-shadow .3s; }
+.cta:hover { background: var(--brass-2); transform: translateY(-2px); box-shadow: 0 10px 30px -8px rgba(201,164,92,.6); }
+.cta.ghost { background: none; color: var(--moonlight); border-color: rgba(223,227,245,.3); } .cta.ghost:hover { background: rgba(255,255,255,.07); box-shadow: none; }
+
+/* ============ HERO ============ */
+.hero { position: relative; min-height: min(100vh, 1000px); display: grid; align-items: center; padding: 110px 0 70px; isolation: isolate; overflow: hidden; }
+.hero::before { content: ""; position: absolute; inset: 0; z-index: -2; background: radial-gradient(900px 700px at 74% 38%, rgba(58,70,160,.38), transparent 70%), radial-gradient(600px 500px at 10% 90%, rgba(181,68,31,.12), transparent 70%), var(--night); }
+.stars { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: 56px; align-items: center; }
+.hero h1 { font-size: clamp(2.8rem, 5.9vw, 5.3rem); font-weight: 300; line-height: 1.02; }
+.hero h1 em { color: var(--brass-2); font-weight: 400; }
+.hero h1 .line { display: block; overflow: hidden; white-space: nowrap; padding-bottom: .08em; } .hero h1 .line > span { display: inline-block; transform: translateY(105%); animation: lift 1.2s var(--ease) forwards; }
+.hero h1 .line:nth-child(2) > span { animation-delay: .12s; } .hero h1 .line:nth-child(3) > span { animation-delay: .24s; }
+@keyframes lift { to { transform: none; } }
+.hero .sub { margin-top: 26px; max-width: 46ch; font-size: 1.14rem; color: rgba(223,227,245,.78); }
+.ask-box { margin-top: 34px; max-width: 580px; display: flex; gap: 10px; align-items: flex-end; background: rgba(255,255,255,.05); border: 1px solid rgba(223,227,245,.2); border-radius: 22px; padding: 14px 12px 12px 20px; backdrop-filter: blur(10px); transition: border-color .25s, box-shadow .3s, background .25s; }
+.ask-box:focus-within { border-color: var(--brass); background: rgba(255,255,255,.08); box-shadow: 0 0 0 5px rgba(201,164,92,.14), 0 30px 70px -30px rgba(0,0,0,.9); }
+.ask-box textarea { flex: 1; resize: none; background: none; border: 0; outline: none; color: #fff; font: 400 1.18rem/1.4 var(--serif); min-height: 56px; }
+.ask-box textarea::placeholder { color: rgba(223,227,245,.45); font-style: italic; }
+.go { width: 44px; height: 44px; border: 0; border-radius: 14px; background: var(--brass); color: var(--night); display: grid; place-items: center; transition: transform .2s var(--ease), background .2s; } .go:hover { background: var(--brass-2); transform: translateY(-2px); }
+.go svg, .arrow svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.doors { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+.door { border: 1px solid rgba(223,227,245,.2); background: none; border-radius: 999px; padding: 8px 15px; font-size: .88rem; color: rgba(223,227,245,.85); transition: .2s; } .door:hover { border-color: var(--brass); color: #fff; background: rgba(201,164,92,.1); }
+.trust { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: .84rem; color: rgba(223,227,245,.62); } .trust span::before { content: "◦ "; color: var(--brass); }
+
+.arch { position: relative; justify-self: center; width: min(460px, 100%); aspect-ratio: 4/5; border-radius: 999px 999px 24px 24px; padding: 10px; border: 1px solid rgba(201,164,92,.5); background: linear-gradient(180deg, rgba(201,164,92,.08), transparent); animation: archIn 1.6s .3s var(--ease) both; }
+@keyframes archIn { from { opacity: 0; transform: translateY(40px) scale(.97); } }
+.arch-in { position: relative; width: 100%; height: 100%; border-radius: inherit; overflow: hidden; background: #05060d; transform: translate3d(var(--px, 0), var(--py, 0), 0); transition: transform .3s ease-out; }
+.arch-in img { filter: brightness(1.18) contrast(1.05); width: 112%; height: 112%; margin: -6%; object-fit: cover; object-position: 54% 36%; display: block; transform: translate3d(calc(var(--px, 0px) * -1.4), calc(var(--py, 0px) * -1.4), 0); transition: transform .3s ease-out; }
+.arch-in::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle 230px at var(--lx, 56%) var(--ly, 22%), transparent 0, rgba(5,6,13,.0) 30%, rgba(5,6,13,.5) 100%); pointer-events: none; }
+.orbit { position: absolute; left: 56%; top: 19%; width: 74%; aspect-ratio: 1; transform: translate(-50%, -50%); pointer-events: none; animation: spin 90s linear infinite; }
+@keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.orbit svg { width: 100%; height: 100%; overflow: visible; color: var(--brass-2); }
+.plaque { position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); background: var(--night); border: 1px solid rgba(201,164,92,.5); border-radius: 999px; padding: 6px 16px; font: 500 .72rem var(--sans); letter-spacing: .2em; text-transform: uppercase; color: var(--brass-2); white-space: nowrap; }
+.scroll-cue { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); font-size: .74rem; letter-spacing: .2em; text-transform: uppercase; color: rgba(223,227,245,.5); display: grid; justify-items: center; gap: 8px; }
+.scroll-cue i { width: 1px; height: 22px; background: linear-gradient(var(--brass), transparent); animation: drip 2.4s ease-in-out infinite; transform-origin: top; }
+@keyframes drip { 0% { transform: scaleY(0); } 60% { transform: scaleY(1); } 100% { transform: scaleY(1); opacity: 0; } }
+
+/* ============ NEVER marquee ============ */
+.never { background: var(--night-2); border-block: 1px solid rgba(223,227,245,.1); overflow: hidden; padding: 22px 0; }
+.track { display: flex; gap: 60px; width: max-content; animation: marquee 60s linear infinite; font: italic 300 1.6rem var(--serif); color: rgba(223,227,245,.8); }
+.never:hover .track { animation-play-state: paused; }
+.track span { white-space: nowrap; } .track b { font-style: normal; font-family: var(--sans); font-size: .74rem; letter-spacing: .2em; text-transform: uppercase; color: var(--rubric); margin-right: 14px; font-weight: 600; filter: brightness(1.5); }
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+/* ============ Paper sections ============ */
+.paper { background: var(--paper); color: var(--ink); position: relative; }
+.paper::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 90px; background: var(--night-2); clip-path: ellipse(60% 100% at 50% 0); }
+.sec { padding: 130px 0 110px; position: relative; }
+.sec h2 { font-size: clamp(2.2rem, 5vw, 4rem); margin: 16px 0 18px; max-width: 18ch; } .sec h2 em { color: var(--accent); }
+.sec .lede { color: var(--ink-2); max-width: 56ch; font-size: 1.1rem; }
+.sec .eyebrow { color: var(--rubric); }
+.reveal { opacity: 0; transform: translateY(26px); transition: opacity .9s var(--ease), transform .9s var(--ease); } .reveal.in { opacity: 1; transform: none; }
+
+/* sticky story */
+.story { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 70px; margin-top: 70px; align-items: start; }
+.steps { display: grid; gap: 0; } .step { min-height: 62vh; display: grid; align-content: center; gap: 12px; opacity: .3; transition: opacity .5s; } .step.on { opacity: 1; }
+.step .n { font: 300 4.4rem/1 var(--serif); color: var(--accent); opacity: .35; } .step h3 { font-size: 2rem; } .step p { color: var(--ink-2); max-width: 44ch; }
+.sticky { position: sticky; top: 14vh; height: 72vh; }
+.device { height: 100%; border-radius: 24px; background: var(--page); border: 1px solid var(--line); box-shadow: 0 50px 100px -40px rgba(22,19,14,.5); overflow: hidden; position: relative; }
+.device .bar { height: 40px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 7px; padding: 0 16px; } .device .bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.scene { position: absolute; inset: 40px 0 0; padding: 26px; opacity: 0; transform: translateY(18px); transition: opacity .6s, transform .7s var(--ease); pointer-events: none; display: grid; align-content: center; gap: 14px; } .scene.on { opacity: 1; transform: none; }
+.bub { max-width: 82%; padding: 11px 16px; border-radius: 18px; font-size: .95rem; } .bub.u { justify-self: end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; } .bub.t { background: var(--paper); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.take { border: 1px solid var(--line); border-top: 4px solid currentColor; border-radius: 14px; padding: 14px 16px; background: #fff; } .take b { font: 500 1.05rem var(--serif); color: var(--ink); } .take p { font: italic 1rem var(--serif); color: var(--ink); margin-top: 4px; }
+.seal-demo { display: grid; justify-items: center; gap: 8px; text-align: center; } .seal-demo svg { width: 150px; color: var(--rubric); } .seal-demo .v { font: 300 2.6rem var(--serif); color: var(--ink); } .seal-demo .v em { color: var(--rubric); }
+.minimat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; max-width: 280px; margin: 6px auto 0; } .minimat i { height: 20px; border-radius: 6px; background: #eceae1; } .minimat i.c { background: #bfe0cb; } .minimat i.n { background: #d9dbe2; }
+
+/* journey */
+.journey { margin-top: 70px; display: grid; grid-template-columns: repeat(7, 1fr); position: relative; }
+.journey::before, .journey .fill { content: ""; position: absolute; left: 7%; right: 7%; top: 31px; height: 2px; background: var(--line); } .journey .fill { right: auto; width: 0; background: var(--accent); transition: width 2.4s var(--ease); } .journey.in .fill { width: 86%; }
+.jm { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 0 6px; } .jm svg { width: 62px; height: 62px; background: var(--paper); border-radius: 50%; color: var(--accent); position: relative; } .jm b { font: 500 1.05rem var(--serif); } .jm small { color: var(--ink-2); font-size: .8rem; line-height: 1.4; }
+
+/* thinkers */
+.dark-sec { background: var(--night-2); color: var(--moonlight); } .dark-sec::before { display: none; }
+.dark-sec h2 em { color: var(--brass-2); } .dark-sec .lede { color: rgba(223,227,245,.7); } .dark-sec .eyebrow { color: var(--brass); }
+.ring-row { margin-top: 56px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+.tk { position: relative; text-align: center; display: grid; justify-items: center; gap: 10px; padding: 22px 8px 16px; border-radius: 20px; border: 1px solid rgba(223,227,245,.1); background: rgba(255,255,255,.02); transition: .35s var(--ease); cursor: default; }
+.tk:hover, .tk:focus-within { transform: translateY(-6px); border-color: var(--c); background: rgba(255,255,255,.05); box-shadow: 0 24px 60px -30px var(--c); }
+.tk .m { width: 64px; height: 64px; border-radius: 50%; border: 1.5px solid var(--c); color: var(--c); display: grid; place-items: center; font: 500 1.7rem var(--serif); transition: .35s; } .tk:hover .m { background: var(--c); color: var(--night); }
+.tk b { font: 500 1.1rem var(--serif); } .tk small { font-size: .78rem; color: rgba(223,227,245,.6); line-height: 1.35; min-height: 2.7em; } .tk q { font: italic 1rem/1.3 var(--serif); color: var(--moonlight); opacity: 0; max-height: 0; transition: .4s; quotes: "“" "”"; } .tk:hover q, .tk:focus-within q { opacity: 1; max-height: 5em; }
+
+/* pledge */
+.pledge { margin-top: 56px; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.pl { display: grid; grid-template-columns: 70px 1fr auto; align-items: baseline; gap: 20px; padding: 24px 0; border-bottom: 1px solid var(--line); }
+.pl .k { font: 300 1.2rem var(--serif); color: var(--rubric); } .pl h3 { font-size: clamp(1.4rem, 2.8vw, 2.2rem); position: relative; justify-self: start; display: inline; background: linear-gradient(var(--rubric), var(--rubric)) no-repeat 0 58% / 0 2px; transition: background-size 1.2s .3s var(--ease); } .pl.in h3 { background-size: 100% 2px; }
+.pl p { color: var(--ink-2); font-size: .94rem; max-width: 34ch; text-align: right; }
+
+/* final */
+.final { background: var(--night); text-align: center; padding: 150px 0 90px; position: relative; overflow: hidden; isolation: isolate; }
+.final::before { content: ""; position: absolute; left: 50%; top: 0; width: 900px; aspect-ratio: 1; transform: translate(-50%, -40%); border-radius: 50%; background: radial-gradient(circle, rgba(58,70,160,.5), transparent 65%); z-index: -1; }
+.final .crescent { width: 84px; height: 84px; margin: 0 auto 28px; color: var(--moonlight); filter: drop-shadow(0 0 30px rgba(223,227,245,.5)); }
+.final h2 { font-size: clamp(2.6rem, 6.4vw, 5.4rem); font-weight: 300; max-width: 16ch; margin: 0 auto; } .final h2 em { color: var(--brass-2); }
+.final .ask-box { margin: 36px auto 0; text-align: left; }
+footer { background: var(--night); color: rgba(223,227,245,.5); font-size: .84rem; padding: 26px 0 40px; border-top: 1px solid rgba(223,227,245,.08); } footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+@media (max-width: 960px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 50px; } .arch { width: min(380px, 86%); order: -1; } .hero { padding-top: 96px; } .nav .links { display: none; } .nav .cta { margin-left: auto; }
+  .story { grid-template-columns: 1fr; gap: 20px; } .sticky { position: relative; top: 0; height: 440px; order: -1; } .step { min-height: 36vh; }
+  .journey { grid-template-columns: repeat(4, 1fr); row-gap: 40px; } .journey::before, .journey .fill { display: none; }
+  .ring-row { grid-template-columns: repeat(2, 1fr); } .tk q { opacity: 1; max-height: 5em; }
+  .pl { grid-template-columns: 40px 1fr; } .pl p { grid-column: 2; text-align: left; } .sec { padding: 90px 0 70px; }
+}
+body.still .intro *, body.still .hero h1 .line > span, body.still .arch { animation: none !important; opacity: 1 !important; transform: none !important; }
+body.still .reveal { opacity: 1 !important; transform: none !important; }
+body.still .journey .fill { width: 86% !important; }
+body.still .pl h3 { background-size: 100% 2px !important; }
+body.still .intro .disc, body.still .intro .lantern { opacity: 1 !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: 0s !important; } .reveal { opacity: 1; transform: none; } .hero h1 .line > span { transform: none; } .intro { display: none; } }
+</style>
+</head>
+<body class="locked">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mark" viewBox="0 0 64 64"><mask id="mk"><rect width="64" height="64" fill="#fff"/><circle cx="39" cy="24" r="19" fill="#000"/></mask><circle cx="30" cy="30" r="22" fill="currentColor" mask="url(#mk)"/><path d="M45 47C45 47 40.5 53 40.5 56a4.5 4.5 0 0 0 9 0C49.5 53 45 47 45 47Z" fill="currentColor"/></symbol></svg>
+
+<!-- INTRO -->
+<div class="intro" id="intro" role="dialog" aria-label="Welcome to Thoth">
+  <div class="stage" id="stage"><img src="assets/bust.jpg" alt="" aria-hidden="true"><div class="lantern" id="lantern"></div><div class="disc" id="disc"></div></div>
+  <div class="ask"><p class="p">What’s been on your mind?</p>
+    <form class="field" id="introForm"><input id="introIn" autocomplete="off" aria-label="Your question" placeholder="Why do people trust a confident wrong answer?"><button class="go" style="width:38px;height:38px" aria-label="Begin"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
+    <p class="hint">Move the light. Type a question and press Enter.</p></div>
+  <button class="skip" id="skip">Skip</button>
+</div>
+
+<header class="nav" id="nav"><a class="brand" href="#top"><svg><use href="#mark"/></svg>THOTH</a>
+  <nav class="links" aria-label="Page"><a href="#how">How it works</a><a href="#journey">The journey</a><a href="#thinkers">Thinkers</a><a href="#pledge">What it won’t do</a></nav>
+  <a class="cta" href="index.html">Open Thoth</a></header>
+
+<main id="top">
+<section class="hero" id="hero">
+  <canvas class="stars" id="stars" aria-hidden="true"></canvas>
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">A research companion</p>
+      <h1 style="margin-top:20px" aria-label="Find the question worth asking."><span class="line"><span>Find the</span></span><span class="line"><span>question <em>worth</em></span></span><span class="line"><span>asking.</span></span></h1>
+      <p class="sub">Start with a hunch. Thoth thinks it through with you, reads what is already known, puts your hypothesis on trial, and tells you honestly what it could not verify.</p>
+      <form class="ask-box" id="heroForm"><textarea id="heroIn" rows="2" aria-label="Your thought" placeholder="I noticed something odd about night-shift nurses…"></textarea><button class="go" aria-label="Start"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></form>
+      <div class="doors" role="group" aria-label="Ways to begin"><button class="door">I have a hunch</button><button class="door">I have a hypothesis to test</button><button class="door">I’m reading a paper</button><button class="door">Surprise me</button></div>
+      <div class="trust"><span>Nothing costly runs without your approval</span><span>Abstract-only is never passed off as full text</span></div>
+    </div>
+    <div class="arch" id="arch"><div class="arch-in" id="archIn"><img src="assets/bust.jpg" alt="A black stone bust of Thoth, ibis-headed, crowned with a gold moon disc and crescent.">
+      <div class="orbit" aria-hidden="true"><svg viewBox="0 0 100 100" id="orbitSvg"></svg></div></div><span class="plaque">Thoth · keeper of the record</span></div>
+  </div>
+  <div class="scroll-cue" aria-hidden="true">Scroll<i></i></div>
+</section>
+
+<section class="never" aria-label="What Thoth will not do"><div class="track" id="track"></div></section>
+
+<div class="paper">
+<section class="sec" id="how"><div class="wrap">
+  <p class="eyebrow reveal">How it works</p><h2 class="reveal">A conversation that <em>grows a research file.</em></h2>
+  <p class="lede reveal">No forms, no modes. You talk; the page beside you fills in, one honest section at a time.</p>
+  <div class="story">
+    <div class="steps" id="steps">
+      <div class="step on" data-s="0"><span class="n">1</span><h3>Think out loud</h3><p>Brainstorm freely. When an idea firms up, Thoth offers to keep it. It never turns a passing thought into a plan.</p></div>
+      <div class="step" data-s="1"><span class="n">2</span><h3>Argue with people who thought hardest</h3><p>Ten thinkers, from Popper to Ostrom, read your hypothesis blind, then disagree where it matters.</p></div>
+      <div class="step" data-s="2"><span class="n">3</span><h3>Put it on trial</h3><p>Papers become witnesses. A neutral court rules, and says so plainly when the evidence is insufficient.</p></div>
+    </div>
+    <div class="sticky"><div class="device"><div class="bar"><i></i><i></i><i></i></div>
+      <div class="scene on" data-s="0"><div class="bub u">Do night nurses burn out faster, and is it the sleep?</div><div class="bub t">Possibly, but “because of sleep” is a separate claim. Want to keep it as a tentative hypothesis?</div><div class="bub u">Keep it.</div></div>
+      <div class="scene" data-s="1"><div class="take" style="color:#a8362a"><b>Karl Popper</b><p>“What would show you wrong?”</p></div><div class="take" style="color:#276a41"><b>David Hume</b><p>“You observe two things together, not one making the other.”</p></div><div class="take" style="color:#8a5d0a"><b>Florence Nightingale</b><p>“Compare like with like.”</p></div></div>
+      <div class="scene" data-s="2"><div class="seal-demo"><svg viewBox="0 0 160 160"><defs><path id="c2" d="M80 80 m-62 0 a62 62 0 1 1 124 0 a62 62 0 1 1 -124 0"/></defs><circle cx="80" cy="80" r="76" fill="none" stroke="currentColor" stroke-width="1.2"/><text font-family="IBM Plex Sans" font-size="10.5" font-weight="600" letter-spacing="3.6" fill="currentColor"><textPath href="#c2">THE RULING · NEUTRAL COURT · THE RULING · NEUTRAL COURT ·</textPath></text><g style="color:#27306b" transform="translate(52 52) scale(.8)"><use href="#mark" width="64" height="64"/></g></svg><div class="v">Insufficient <em>evidence</em></div><div class="minimat"><i></i><i></i><i class="c"></i><i></i><i></i><i></i><i class="n"></i><i></i><i></i><i></i><i></i><i></i></div><small style="color:var(--ink-2)">15 papers read · 9 in full text · originality not assessed</small></div></div>
+    </div></div>
+  </div>
+</div></section>
+
+<section class="sec" id="journey" style="padding-top:60px"><div class="wrap">
+  <p class="eyebrow reveal">The journey</p><h2 class="reveal">Seven phases of the moon, <em>one idea.</em></h2>
+  <div class="journey reveal" id="jr"><span class="fill"></span></div>
+</div></section>
+</div>
+
+<section class="sec dark-sec" id="thinkers" style="padding-top:110px"><div class="wrap">
+  <p class="eyebrow reveal">Co-authors, not tools</p><h2 class="reveal">Ten minds. <em>None of them agree.</em></h2>
+  <p class="lede reveal">Each has their own method and voice. Hover one to hear the question they always ask.</p>
+  <div class="ring-row reveal" id="rings"></div>
+</div></section>
+
+<div class="paper"><section class="sec" id="pledge"><div class="wrap">
+  <p class="eyebrow reveal">The pledge</p><h2 class="reveal">What Thoth <em>will never</em> do.</h2>
+  <div class="pledge" id="pledgeList"></div>
+</div></section></div>
+
+<section class="final"><div class="wrap">
+  <svg class="crescent" aria-hidden="true"><use href="#mark"/></svg>
+  <h2>So. What’s been on your <em>mind?</em></h2>
+  <form class="ask-box" id="finalForm"><textarea rows="2" aria-label="Your thought" placeholder="Start with an observation, a hunch, or a question you can’t quite phrase yet…"></textarea><button class="go" aria-label="Start"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></form>
+</div></section>
+</main>
+<footer><div class="wrap"><span>Thoth · the honest scribe</span><span>Prototype. Nothing here calls a model.</span></div></footer>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const q = new URLSearchParams(location.search); if (q.has('still')) document.body.classList.add('still');
+
+/* ---------- moons ---------- */
+function moon(i, n) { const f = i / (n - 1), cx = 10, cy = 10, r = 8.2; let lit = ''; if (f > 0) { const k = Math.cos(f * Math.PI), rx = Math.abs(k) * r, sw = k > 0 ? 0 : 1; lit = f >= 1 ? `<circle cx="10" cy="10" r="${r}" fill="currentColor"/>` : `<path d="M10 ${cy - r}A${r} ${r} 0 0 1 10 ${cy + r}A${rx.toFixed(2)} ${r} 0 0 ${sw} 10 ${cy - r}Z" fill="currentColor"/>`; } return `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="${r}" fill="none" stroke="currentColor" stroke-width=".9"/>${lit}</svg>`; }
+$('#orbitSvg').innerHTML = '<circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width=".25" stroke-dasharray="1 2" opacity=".6"/>' + Array.from({ length: 7 }, (_, i) => { const a = i / 7 * Math.PI * 2 - Math.PI / 2, x = 50 + 46 * Math.cos(a), y = 50 + 46 * Math.sin(a); return `<g transform="translate(${x - 3.2} ${y - 3.2}) scale(.32)">${moon(i, 7).replace('<svg viewBox="0 0 20 20" aria-hidden="true">', '').replace('</svg>', '')}</g>`; }).join('');
+const J = [['Explore', 'Think out loud'], ['Thinkers', 'Meet the room'], ['Hypothesis', 'Pin one claim'], ['Check', 'Put it on trial'], ['Review', 'Go deeper, if you choose'], ['Design', 'Plan the study'], ['Draft', 'Write the proposal']];
+$('#jr').insertAdjacentHTML('beforeend', J.map((j, i) => `<div class="jm">${moon(i, 7)}<b>${j[0]}</b><small>${j[1]}</small></div>`).join(''));
+
+/* ---------- content ---------- */
+const NEVER = ['Fabricate a citation', 'Pass an abstract off as the full paper', 'Call a report complete when evidence is missing', 'Declare an idea original because a model said so', 'Invent a research gap to keep you going', 'Make a PDF you did not ask for'];
+$('#track').innerHTML = [...NEVER, ...NEVER].map(t => `<span><b>Never</b>${t}</span>`).join('');
+const TK = [['Aristotle', 'A', '#c9a45c', 'What is the thing?', 'Before you test it, define it.'], ['Ibn al-Haytham', 'I', '#6fc9b4', 'Doubt, then test', 'Suspect even the authorities you admire.'], ['David Hume', 'H', '#78c794', 'What did you observe?', 'You see two things together, not one causing the other.'], ['Charles Darwin', 'D', '#b4c76f', 'Patient accumulation', 'Keep a notebook for the facts against your view.'], ['Florence Nightingale', 'N', '#e8b95f', 'Compare like with like', 'Numbers are moral instruments.'], ['Max Weber', 'W', '#c79bd6', 'Meaning, many causes', 'Why did they act as they did, in their terms?'], ['Karl Popper', 'P', '#f2897a', 'What would show you wrong?', 'A claim that cannot fail has not been tested.'], ['Thomas Kuhn', 'K', '#8fb4f0', 'Which paradigm?', 'What does your field stop you seeing?'], ['Herbert Simon', 'S', '#f0a77a', 'Real people, limited information', 'Design for how things actually work.'], ['Elinor Ostrom', 'O', '#7ad0c8', 'Field evidence first', 'There are no panaceas.']];
+$('#rings').innerHTML = TK.map(t => `<div class="tk" tabindex="0" style="--c:${t[2]}"><span class="m">${t[1]}</span><b>${t[0]}</b><small>${t[3]}</small><q>${t[4]}</q></div>`).join('');
+const PL = [['Fabricate a citation', 'Every source has a locator that points inside the passage.'], ['Pass an abstract off as full text', 'Each paper carries its read-depth badge, forever.'], ['Say “complete” when it isn’t', 'Unresolved evidence makes a report provisional, with the gaps listed.'], ['Call you original because a model did', 'Originality needs an adjacent-field search, or it says “not assessed”.'], ['Spend your time without asking', 'Big runs show scope and time first. You approve; then it runs.']];
+$('#pledgeList').innerHTML = PL.map((p, i) => `<div class="pl reveal"><span class="k">0${i + 1}</span><h3>${p[0]}</h3><p>${p[1]}</p></div>`).join('');
+
+/* ---------- starfield ---------- */
+(function stars() { const c = $('#stars'), x = c.getContext('2d'); let w, h, S = []; const fit = () => { w = c.width = c.offsetWidth; h = c.height = c.offsetHeight; S = Array.from({ length: Math.round(w * h / 9000) }, () => ({ x: Math.random() * w, y: Math.random() * h, r: Math.random() * 1.1 + .2, p: Math.random() * 6 })); }; fit(); addEventListener('resize', fit);
+  (function f(t) { x.clearRect(0, 0, w, h); for (const s of S) { x.globalAlpha = reduced ? .5 : .25 + .45 * Math.abs(Math.sin(t / 2200 + s.p)); x.fillStyle = '#dfe3f5'; x.beginPath(); x.arc(s.x, s.y, s.r, 0, 6.3); x.fill(); } if (!reduced) requestAnimationFrame(f); })(0); })();
+
+/* ---------- lantern / parallax ---------- */
+addEventListener('pointermove', e => {
+  const st = $('#stage'); if (st && !$('#intro').classList.contains('gone')) { const r = st.getBoundingClientRect(); st.style.setProperty('--lx', ((e.clientX - r.left) / r.width * 100) + '%'); st.style.setProperty('--ly', ((e.clientY - r.top) / r.height * 100) + '%'); $('#lantern').style.setProperty('--lx', ((e.clientX - r.left + r.width * .3) / (r.width * 1.6) * 100) + '%'); $('#lantern').style.setProperty('--ly', ((e.clientY - r.top + r.height * .3) / (r.height * 1.6) * 100) + '%'); }
+  const a = $('#archIn'); if (a) { const r = a.getBoundingClientRect(); a.style.setProperty('--lx', ((e.clientX - r.left) / r.width * 100) + '%'); a.style.setProperty('--ly', ((e.clientY - r.top) / r.height * 100) + '%'); if (!reduced) { a.style.setProperty('--px', ((e.clientX / innerWidth - .5) * 10) + 'px'); a.style.setProperty('--py', ((e.clientY / innerHeight - .5) * 8) + 'px'); } }
+});
+
+/* ---------- nav, reveal, story ---------- */
+addEventListener('scroll', () => $('#nav').classList.toggle('solid', scrollY > 40), { passive: true });
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .2 });
+$$('.reveal, .journey').forEach(el => io.observe(el));
+const so = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const s = e.target.dataset.s; $$('.step').forEach(x => x.classList.toggle('on', x.dataset.s === s)); $$('.scene').forEach(x => x.classList.toggle('on', x.dataset.s === s)); } }), { rootMargin: '-45% 0px -45% 0px' });
+$$('.step').forEach(s => so.observe(s));
+
+/* ---------- intro ---------- */
+const intro = $('#intro'); let finished = false;
+const SAMPLES = ['Why do people trust a confident wrong answer?', 'Why do some memories fade while others stay sharp?', 'Why do cities feel faster at night?'];
+function finish(text) {
+  if (finished) return; finished = true;
+  const done = () => { intro.classList.add('gone'); document.body.classList.remove('locked'); try { sessionStorage.setItem('thoth.intro', '1'); } catch (_) {} if (text) { $('#heroIn').value = text; } };
+  if (reduced || !text) { done(); return; }
+  const input = $('#introIn'), r = input.getBoundingClientRect(), disc = $('#disc').getBoundingClientRect();
+  const tx = disc.left + disc.width / 2, ty = disc.top + disc.height / 2;
+  intro.classList.add('typing'); input.style.visibility = 'hidden';
+  const chars = [...text].slice(0, 70), span = Math.min(r.width, 560), x0 = r.left + r.width / 2 - span / 2;
+  chars.forEach((ch, i) => {
+    if (ch === ' ') return;
+    const m = document.createElement('span'); m.className = 'mote'; m.textContent = ch; document.body.appendChild(m);
+    const sx = x0 + (i / chars.length) * span, sy = r.top + r.height / 2 - 14;
+    const mx = sx + (Math.random() - .5) * 140, my = sy - 120 - Math.random() * 120;
+    m.animate([{ transform: `translate(${sx}px,${sy}px) scale(1)`, opacity: 1 }, { transform: `translate(${mx}px,${my}px) scale(.9)`, opacity: .9, offset: .45 }, { transform: `translate(${tx}px,${ty}px) scale(.2)`, opacity: 0 }], { duration: 1500 + Math.random() * 500, delay: i * 22, easing: 'cubic-bezier(.5,0,.3,1)', fill: 'forwards' }).onfinish = () => m.remove();
+  });
+  const total = 1500 + 500 + chars.length * 22;
+  setTimeout(() => intro.classList.add('flare'), total - 500);
+  setTimeout(() => { intro.style.setProperty('--ix', ((disc.left + disc.width / 2) / innerWidth * 100) + '%'); intro.style.setProperty('--iy', ((disc.top + disc.height / 2) / innerHeight * 100) + '%'); intro.classList.add('open'); document.body.classList.remove('locked'); }, total);
+  setTimeout(() => { done(); }, total + 1600);
+}
+$('#introForm').addEventListener('submit', e => { e.preventDefault(); finish($('#introIn').value.trim() || SAMPLES[0]); });
+$('#skip').onclick = () => finish('');
+let idle = setTimeout(() => { const t = SAMPLES[0]; let i = 0; const typer = setInterval(() => { $('#introIn').value = t.slice(0, ++i); if (i >= t.length) { clearInterval(typer); setTimeout(() => finish(t), 900); } }, 55); }, q.has('auto') ? 5200 : 1e9);
+$('#introIn').addEventListener('input', () => clearTimeout(idle));
+if (q.has('skipintro') || reduced) { intro.classList.add('gone'); document.body.classList.remove('locked'); finished = true; }
+else setTimeout(() => $('#introIn').focus({ preventScroll: true }), 2600);
+addEventListener('keydown', e => { if (e.key === 'Escape' && !finished) finish(''); });
+
+if (q.get('only')) { let el = $(q.get('only')); while (el && el !== document.body) { [...el.parentElement.children].forEach(c => { if (c !== el && !c.matches('script,svg,.nav')) c.style.display = 'none'; }); el = el.parentElement; } document.body.classList.add('still'); window.scrollTo(0, 0); }
+if (q.get('scene')) { $$('.step, .scene').forEach(x => x.classList.toggle('on', x.dataset.s === q.get('scene'))); }
+if (q.get('at')) setTimeout(() => { const el = $(q.get('at')); if (el) window.scrollTo(0, el.getBoundingClientRect().top + scrollY + Number(q.get('dy') || 0)); }, 60);
+/* ---------- forms: hand off to the app ---------- */
+['heroForm', 'finalForm'].forEach(id => $('#' + id).addEventListener('submit', e => { e.preventDefault(); location.href = 'index.html'; }));
+$$('.ask-box textarea').forEach(t => t.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); t.form.requestSubmit(); } }));
+</script>
+</body>
+</html>

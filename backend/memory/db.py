@@ -538,6 +538,120 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_submissions_manuscript ON journal_submissions(manuscript_id);
+
+        """)
+        conn.executescript("""
+            -- Conversation core (docs/features/01): server-side turn memory, rolling
+            -- summaries, and the proposals/offers the conductor shows the user.
+            CREATE TABLE IF NOT EXISTS conversation_turns (
+                turn_id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                meta_json TEXT NOT NULL DEFAULT '{}',
+                created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_turns_thread ON conversation_turns(thread_id, created_at);
+
+            CREATE TABLE IF NOT EXISTS thread_summaries (
+                thread_id TEXT PRIMARY KEY,
+                summary TEXT NOT NULL,
+                turns_covered INTEGER NOT NULL,
+                updated_at REAL NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS conductor_proposals (
+                proposal_id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                created_at REAL NOT NULL,
+                resolved_at REAL
+            );
+            CREATE INDEX IF NOT EXISTS idx_proposals_thread ON conductor_proposals(thread_id, status);
+
+            CREATE TABLE IF NOT EXISTS notebook_sections (
+                section_id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                author TEXT NOT NULL,
+                created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_notebook_thread ON notebook_sections(thread_id, kind, version);
+
+            -- Thinkers as co-authors (docs/features/03): each thinker's stance on a project.
+            CREATE TABLE IF NOT EXISTS thinker_memory (
+                thread_id TEXT NOT NULL,
+                thinker_id TEXT NOT NULL,
+                stance TEXT NOT NULL,
+                changes INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY (thread_id, thinker_id)
+            );
+
+            -- The trial (docs/features/05, 06): a hypothesis on trial, its witnesses and the verdict.
+            CREATE TABLE IF NOT EXISTS trials (
+                trial_id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                hypothesis TEXT NOT NULL,
+                subclaims_json TEXT NOT NULL,
+                status TEXT NOT NULL,
+                strategy_json TEXT NOT NULL DEFAULT '{}',
+                verdict_json TEXT NOT NULL DEFAULT '{}',
+                adjacent_json TEXT NOT NULL DEFAULT '[]',
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_trials_thread ON trials(thread_id, created_at);
+
+            CREATE TABLE IF NOT EXISTS trial_papers (
+                paper_id TEXT PRIMARY KEY,
+                trial_id TEXT NOT NULL,
+                meta_json TEXT NOT NULL,
+                access TEXT NOT NULL DEFAULT 'pending',
+                text_source TEXT NOT NULL DEFAULT '',
+                record_json TEXT NOT NULL DEFAULT '{}',
+                row_json TEXT NOT NULL DEFAULT '{}',
+                weight REAL,
+                i_say_user TEXT,
+                status TEXT NOT NULL DEFAULT 'found',
+                created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_trial_papers_trial ON trial_papers(trial_id, created_at);
+
+            -- Systematic review (docs/features/05 tier 3): a protocol-driven PRISMA review whose included
+            -- studies feed a linked trial. Counts are always computed from these records.
+            CREATE TABLE IF NOT EXISTS sys_reviews (
+                review_id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                hypothesis TEXT NOT NULL,
+                protocol_json TEXT NOT NULL,
+                subclaims_json TEXT NOT NULL DEFAULT '[]',
+                mode TEXT NOT NULL DEFAULT 'copilot',
+                status TEXT NOT NULL,
+                stage TEXT NOT NULL DEFAULT 'planned',
+                trial_id TEXT,
+                note TEXT NOT NULL DEFAULT '',
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_sys_reviews_thread ON sys_reviews(thread_id, created_at);
+
+            CREATE TABLE IF NOT EXISTS sys_review_records (
+                record_id TEXT PRIMARY KEY,
+                review_id TEXT NOT NULL,
+                meta_json TEXT NOT NULL,
+                source TEXT NOT NULL,
+                dup_of TEXT,
+                screening_json TEXT NOT NULL DEFAULT '{}',
+                ft_access TEXT,
+                paper_id TEXT,
+                created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_sys_records_review ON sys_review_records(review_id, created_at);
         """)
 
     return conn

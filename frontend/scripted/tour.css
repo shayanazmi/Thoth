@@ -1,0 +1,155 @@
+/* The guided tour's surfaces: spotlight, captions, beats, control bar, chapter cards, sheets.
+   Always night-toned (it sits over both themes), gold for Thoth, carnelian for "your turn". */
+#tour { position: fixed; inset: 0; z-index: 90; pointer-events: none; font-family: var(--sans); color: var(--night-ink); }
+#tour button { font: inherit; color: inherit; cursor: pointer; }
+#tour .muted { color: var(--night-ink-2); }
+#tour .faint { color: var(--night-ink-3); }
+
+/* Spotlight: dims everything but the framed element; the rim is gold. */
+.t-spot { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity var(--t-scene) var(--ease-inout); }
+#tour.spot .t-spot { opacity: 1; }
+.t-dim { fill: rgba(5, 4, 3, .55); }
+.t-rim { fill: none; stroke: var(--gold); stroke-width: 1.5; filter: drop-shadow(0 0 10px rgba(212, 166, 74, .55)); }
+#tourHole, #tourRim { transition: x var(--t-scene) var(--ease-inout), y var(--t-scene) var(--ease-inout), width var(--t-scene) var(--ease-inout), height var(--t-scene) var(--ease-inout); }
+
+.t-badge { position: absolute; right: 16px; top: 60px; padding: 6px 12px; border-radius: 999px; font-size: .74rem; letter-spacing: .02em;
+  background: rgba(10, 9, 7, .82); border: 1px solid var(--gold-line); backdrop-filter: blur(8px); color: var(--night-ink-2); }
+.t-badge b { color: var(--gold-hi); font-weight: 600; }
+.t-badge.live { border-color: var(--rubric); }
+.t-badge.live b { color: var(--rubric); }
+
+/* Captions: Newsreader, word by word. */
+.t-caption { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); width: min(760px, calc(100% - 32px)); text-align: center;
+  padding: 14px 22px; border-radius: 16px; background: rgba(10, 9, 7, .78); backdrop-filter: blur(10px); box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .8); }
+.t-caption:not(.in) { opacity: 0; }
+.t-cap { margin: 0; font: 400 clamp(1.05rem, 2.2vw, 1.35rem) / 1.35 var(--serif); }
+.t-cap span { display: inline-block; opacity: 0; transform: translateY(4px); animation: tWord .5s var(--ease-out) forwards; animation-delay: calc(var(--w) * 45ms); }
+@keyframes tWord { to { opacity: 1; transform: none; } }
+.t-sub { margin: 4px 0 0; font-size: .82rem; color: var(--night-ink-3); }
+.t-sub:empty { display: none; }
+
+/* Your turn / Live hint */
+.t-beat, .t-live { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); pointer-events: auto; display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px 10px 16px; border-radius: 14px; background: rgba(10, 9, 7, .9); border: 1px solid var(--rubric); box-shadow: 0 0 0 4px rgba(224, 104, 75, .15); max-width: calc(100% - 32px); }
+.t-live { border-color: var(--gold-line); box-shadow: none; font-size: .9rem; padding-right: 16px; }
+.t-beat p { margin: 0; font-size: .9rem; }
+.t-beat b { color: var(--rubric); }
+.t-beat div { display: flex; gap: 6px; flex: none; }
+.t-beat button { border: 1px solid var(--gold-line); background: var(--gold-soft); border-radius: 999px; padding: 5px 12px; font-size: .8rem; }
+.t-beat button.ghost { background: none; border-color: var(--night-line); }
+.t-beat.nudge [data-t="showme"] { animation: tNudge 1.4s var(--ease-inout) infinite; }
+@keyframes tNudge { 50% { box-shadow: 0 0 0 6px var(--gold-soft); } }
+.t-beat-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--rubric); flex: none; animation: tPulse 1.4s infinite; }
+.t-live .t-beat-dot { background: var(--gold); }
+@keyframes tPulse { 50% { box-shadow: 0 0 0 6px transparent; transform: scale(.8); } 0% { box-shadow: 0 0 0 0 rgba(224, 104, 75, .6); } }
+
+/* Hotspots */
+.t-spotinfo { position: absolute; pointer-events: auto; width: 22px; height: 22px; border-radius: 50%; border: 0; padding: 0; background: var(--gold-grad); color: var(--night);
+  font: 600 .72rem var(--serif); font-style: italic; box-shadow: 0 0 0 4px rgba(212, 166, 74, .25); animation: tPop .5s var(--ease-spring) both; }
+.t-spotinfo em { position: absolute; right: 0; top: 28px; width: max-content; max-width: 260px; text-align: left; font: 400 .8rem/1.4 var(--sans); font-style: normal; color: var(--night-ink);
+  background: rgba(10, 9, 7, .94); border: 1px solid var(--gold-line); border-radius: 10px; padding: 8px 10px; opacity: 0; transform: translateY(-4px); transition: opacity .2s, transform .2s; pointer-events: none; }
+.t-spotinfo:hover em, .t-spotinfo:focus em { opacity: 1; transform: none; }
+@keyframes tPop { from { transform: scale(0); } }
+.t-click { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid var(--gold-hi); animation: tClick .7s var(--ease-out) forwards; }
+@keyframes tClick { from { transform: scale(.4); opacity: 1; } to { transform: scale(3.2); opacity: 0; } }
+
+/* Control bar: hides when idle, returns on pointer move or pause. */
+.t-bar { position: absolute; left: 50%; bottom: 18px; transform: translate(-50%, 0); pointer-events: auto; display: flex; align-items: center; gap: 4px; padding: 6px;
+  border-radius: 999px; background: rgba(10, 9, 7, .9); border: 1px solid var(--night-line); backdrop-filter: blur(10px); max-width: calc(100% - 24px);
+  transition: opacity .35s var(--ease-out), transform .35s var(--ease-out); }
+#tour:not(.awake):not(.paused) .t-bar { opacity: .25; transform: translate(-50%, 8px); }
+.t-bar > button { height: 34px; min-width: 34px; border: 0; border-radius: 999px; background: none; display: grid; place-items: center; padding: 0 10px; font-size: .78rem; color: var(--night-ink-2); }
+.t-bar > button:hover { background: var(--night-hover); color: var(--night-ink); }
+.t-bar > button svg { width: 16px; height: 16px; }
+.t-bar [data-t="toggle"] { background: var(--gold-grad); color: var(--night); }
+.t-bar [aria-pressed="false"] { opacity: .5; }
+.t-dots { display: flex; gap: 2px; padding: 0 6px; }
+.t-dots button { width: 22px; height: 22px; border: 0; background: none; padding: 2px; border-radius: 50%; }
+.t-dots button[aria-selected="true"] { box-shadow: 0 0 0 2px var(--gold-line); }
+.t-dots svg { width: 100%; height: 100%; }
+.t-now { font-size: .78rem; color: var(--night-ink-2); padding: 0 8px; white-space: nowrap; }
+.t-mode { border: 1px solid var(--gold-line) !important; }
+.t-mode.live { border-color: var(--rubric) !important; color: var(--rubric) !important; }
+
+/* Chapter cards: letterbox, gold numeral. */
+.t-card { position: absolute; inset: 0; pointer-events: auto; display: grid; place-items: center; text-align: center; background: radial-gradient(ellipse at 50% 45%, var(--night-2), var(--night) 70%); }
+.t-card .lb { position: absolute; left: 0; right: 0; height: 11vh; background: #000; }
+.t-card .lb:first-child { top: 0; } .t-card .lb:nth-child(2) { bottom: 0; }
+.t-card.in { animation: tCardIn .7s var(--ease-out) both; }
+.t-card.in > div > * { animation: rise .8s var(--ease-out) both; }
+.t-card.in h2 { animation-delay: .15s; } .t-card.in p { animation-delay: .35s; }
+.t-card.out { animation: tCardOut .6s var(--ease-inout) forwards; }
+@keyframes tCardIn { from { clip-path: inset(50% 0 50% 0); } to { clip-path: inset(0); } }
+@keyframes tCardOut { to { clip-path: inset(50% 0 50% 0); } }
+.t-num { display: block; font: 500 .8rem var(--sans); letter-spacing: .3em; text-transform: uppercase; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.t-card h2 { margin: 14px 0 10px; font: 300 clamp(2.2rem, 6vw, 4.4rem) / 1.02 var(--serif); letter-spacing: -.02em; color: var(--night-ink); }
+.t-card p { margin: 0 auto; max-width: 36ch; font: 400 1.1rem var(--serif); font-style: italic; color: var(--night-ink-2); }
+
+/* Sheets */
+.t-sheet { position: absolute; inset: 0; pointer-events: auto; display: grid; place-items: center; padding: 20px; background: rgba(5, 4, 3, .72); backdrop-filter: blur(6px); animation: fadeIn .3s both; overflow-y: auto; }
+.t-sheet-in { width: min(860px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 28px; border-radius: 20px; background: var(--night-2); border: 1px solid var(--gold-line); box-shadow: 0 40px 100px -30px #000, var(--glow); animation: dialogIn .4s var(--ease-out) both; }
+.t-sheet h2 { font: 300 clamp(1.7rem, 3.6vw, 2.5rem) / 1.1 var(--serif); margin: 6px 0 8px; color: var(--night-ink); }
+.t-sheet h3 { font: 500 1rem var(--serif); margin: 22px 0 10px; color: var(--gold-hi); }
+.t-kicker { margin: 0; font: 600 .7rem var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--gold); }
+.t-notice { color: var(--rubric); font-size: .88rem; }
+.t-hunches { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 18px; }
+.t-hunch { text-align: left; display: grid; gap: 6px; align-content: start; padding: 16px; border-radius: 14px; border: 1px solid var(--night-line); background: rgba(237, 230, 214, .03);
+  transition: border-color var(--t-base), transform var(--t-base) var(--ease-out), box-shadow var(--t-base); }
+.t-hunch:not([aria-disabled="true"]):hover { border-color: var(--gold); transform: translateY(-3px); box-shadow: var(--glow); }
+.t-hunch[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.t-hunch b { font: 400 1.08rem/1.3 var(--serif); color: var(--night-ink); }
+.t-hunch-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--c); color: var(--c); font-size: 1rem; }
+.t-outcome { font-size: .76rem; color: var(--gold-hi); }
+.t-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 20px; }
+.t-link { border: 0; background: none; padding: 0; color: var(--night-ink-2) !important; text-decoration: underline; text-underline-offset: 3px; font-size: .88rem; }
+.t-link:hover { color: var(--gold-hi) !important; }
+.t-switch { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--night-ink-2); cursor: pointer; }
+.t-switch input { accent-color: var(--rubric); }
+.t-cta { border: 0; border-radius: 999px; padding: 10px 20px; background: var(--gold-grad); color: var(--night) !important; font-weight: 600 !important; }
+.t-lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.t-tile { display: grid; gap: 4px; justify-items: start; text-align: left; padding: 12px; border-radius: 12px; border: 1px solid var(--night-line); background: none; }
+.t-tile svg { width: 20px; height: 20px; }
+.t-tile b { font: 400 .98rem var(--serif); color: var(--night-ink); }
+.t-tile .t-num { font-size: .66rem; }
+.t-tile:hover, .t-reel:hover { border-color: var(--gold); }
+.t-reels { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.t-reel { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--night-line); background: none; }
+.t-reel b { font-weight: 500; font-size: .9rem; }
+.t-gloss { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: .86rem; }
+.t-gloss dt { color: var(--gold-hi); font-family: var(--serif); }
+.t-gloss dd { margin: 0; color: var(--night-ink-2); }
+.t-quiz { display: grid; gap: 8px; margin-top: 16px; }
+.t-quiz button { text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--night-line); background: none; font-size: .95rem; }
+.t-quiz button:not(:disabled):hover { border-color: var(--gold); }
+.t-quiz button.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.t-quiz button.right::after { content: "  ✓ right"; color: var(--ok); }
+.t-quiz button.wrong { border-color: var(--rubric); }
+.t-quiz button.wrong::after { content: "  ✗ not quite"; color: var(--rubric); }
+.t-why { margin: 14px 0 0; color: var(--night-ink-2); font-size: .92rem; }
+.t-finale { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr); gap: 26px; align-items: center; }
+.t-finale img { width: 100%; border-radius: 14px; border: 1px solid var(--gold-line); }
+.t-moons { display: flex; gap: 6px; margin: 12px 0; }
+.t-moons svg { width: 22px; height: 22px; }
+@media (max-width: 700px) {
+  .t-finale { grid-template-columns: 1fr; } .t-finale img { max-height: 30vh; object-fit: cover; }
+  .t-now, .t-bar [data-t="cc"], .t-bar [data-t="speed"] { display: none; }
+  .t-caption { bottom: 84px; } .t-badge { font-size: .68rem; left: 16px; text-align: center; }
+}
+
+/* Film for screen recording */
+.tour-clean .t-bar, .tour-clean .t-badge { display: none; }
+.tour-clean, .tour-clean * { cursor: none !important; }
+
+/* The only entry point for people: "Try the demo" on the landing page */
+.tour-invite { display: flex; align-items: center; gap: 12px; margin-top: 6px; padding: 8px 16px 8px 8px; border-radius: 999px; border: 1px solid var(--gold-line);
+  background: var(--gold-soft); color: var(--night-ink); text-align: left; transition: box-shadow var(--t-base), transform var(--t-base) var(--ease-out); }
+.tour-invite:hover { box-shadow: var(--glow); transform: translateY(-2px); }
+.tour-invite b { display: block; font-weight: 500; font-size: .92rem; }
+.tour-invite small { display: block; color: var(--night-ink-3); font-size: .78rem; }
+.tour-play { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--gold-grad); color: var(--night); flex: none; }
+.tour-play svg { width: 13px; height: 13px; margin-left: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #tour *, .t-card.in, .t-card.out { animation: none !important; transition: none !important; }
+  .t-cap span { opacity: 1; transform: none; }
+}

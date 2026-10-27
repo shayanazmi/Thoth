@@ -1,0 +1,73 @@
+[2026-10-23 12:54:48] [INFO] [ThothApp] Initializing Thoth Research Intelligence Service (env=production)...
+[2026-10-23 12:54:48] [WARNING] [ThothRedisCache] Redis unreachable (Error -3 connecting to soft-lichen-milkwood-97876.db.redis.io:15156. Temporary failure in name resolution.). Running in fail-open in-memory fallback mode.
+/sessions/rcw-01dhxuyjydzchyr8xuperye8/thoth-probe-endpoints.py:13: StarletteDeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+  r = c.request(method, path, timeout=15, **kw)
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+health                         GET   /health                                            -> 200  {"status":"ok","app":"Thoth Research Intelligence"}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/ready "HTTP/1.1 200 OK"
+ready                          GET   /ready                                             -> 200  {"status":"ready","database":"sqlite_local","redis":"memory_fallback","timestamp":"2026-10-23T12:54:48.614152+00:00"}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/status "HTTP/1.1 200 OK"
+status                         GET   /api/status                                        -> 200  {"status":"online","deepeval_tracing":false,"circuit_breaker_state":"CLOSED","scholarly_breaker_state":"CLOSED","s2_brea
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/brainstorm/thinkers "HTTP/1.1 200 OK"
+/sessions/rcw-01dhxuyjydzchyr8xuperye8/thoth-probe-endpoints.py:13: StarletteDeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+  r = c.request(method, path, timeout=15, **kw)
+brainstorm.thinkers            GET   /api/brainstorm/thinkers                           -> 200  {"thinkers":[{"id":"aristotle","name":"Aristotle","tradition":"Classical Logic & Ontology","archetype":"Categorical Arch
+[2026-10-23 12:54:48] [ERROR] [ThothLLM] [LLM Call] Primary provider (NVIDIA-Nemotron-30B) failed: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden'))). No fallback provider configured.
+[2026-10-23 12:54:48] [ERROR] [ThothIntellectualRigour.Matcher] [MATCHER LLM ERROR] Fallback to heuristic or Popper: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: POST http://testserver/api/brainstorm/match "HTTP/1.1 200 OK"
+/sessions/rcw-01dhxuyjydzchyr8xuperye8/thoth-probe-endpoints.py:13: StarletteDeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+  r = c.request(method, path, timeout=15, **kw)
+brainstorm.match               POST  /api/brainstorm/match                              -> 200  {"thinker_id":"popper","name":"Karl Popper","tradition":"Critical Rationalism & Falsificationism","archetype":"Falsifica
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/ideas "HTTP/1.1 200 OK"
+/sessions/rcw-01dhxuyjydzchyr8xuperye8/thoth-probe-endpoints.py:13: StarletteDeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+  r = c.request(method, path, timeout=15, **kw)
+ideas.list                     GET   /api/ideas                                         -> 200  {"ideas":[]}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: POST http://testserver/api/ideas/tentative "HTTP/1.1 201 Created"
+ideas.tentative                POST  /api/ideas/tentative                               -> 201  {"success":true,"idea":{"idea_id":"idea-c41156c98cf0","session_id":"probe-sess","title":"Rural anemia anomaly","descript
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: POST http://testserver/api/research/brief/prepare "HTTP/1.1 200 OK"
+research.brief.prepare         POST  /api/research/brief/prepare                        -> 200  {"success":true,"brief":{"brief_id":"brief-4120d7b392d3","session_id":"probe-sess","topic":"rural anemia and iron absorp
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/research/brief/brief-4120d7b392d3 "HTTP/1.1 200 OK"
+research.brief.get             GET   /api/research/brief/brief-4120d7b392d3             -> 200  {"success":true,"brief":{"brief_id":"brief-4120d7b392d3","session_id":"probe-sess","topic":"rural anemia and iron absorp
+[2026-10-23 12:54:48] [INFO] [ThothWebServer] [SSE STREAM] Request for topic: 'rural anemia and iron absorption' (mode=auto, papers=15, inherited_turns=0)
+[2026-10-23 12:54:48] [INFO] [ThothWebServer] [SSE APPROVAL BARRIER] Execution halted for topic 'rural anemia and iron absorption'. Brief 'brief-7855f67f3fab' (v1) status='PENDING_APPROVAL': No research brief provided. Formal research requires an explicit, approved Research Brief.
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: POST http://testserver/api/research/stream "HTTP/1.1 200 OK"
+research.stream                POST  /api/research/stream  -> 200
+  first events:
+    event: message
+    data: {"node": "approval_barrier", "update": {"approval_status": "PENDING_APPROVAL", "requires_approval": true, "barrier_reason": "No research brief provided. F
+    event: message
+    data: {"node": "complete", "state": {}}
+[2026-10-23 12:54:48] [INFO] [ThothWebServer] [SSE FOLLOWUP] Follow-up query: 'what next?' (mode=auto)
+[2026-10-23 12:54:48] [ERROR] [ThothWebServer] [SSE FOLLOWUP ERROR] 'NoneType' object has no attribute 'get'
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: POST http://testserver/api/followup/stream "HTTP/1.1 200 OK"
+followup.stream                POST  /api/followup/stream  -> 200
+    event: message
+    data: {"event": "error", "payload": {"error": "'NoneType' object has no attribute 'get'"}}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/prisma/reviews "HTTP/1.1 200 OK"
+/sessions/rcw-01dhxuyjydzchyr8xuperye8/thoth-probe-endpoints.py:13: StarletteDeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+  r = c.request(method, path, timeout=15, **kw)
+prisma.list                    GET   /api/prisma/reviews                                -> 200  []
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/projects "HTTP/1.1 200 OK"
+/sessions/rcw-01dhxuyjydzchyr8xuperye8/thoth-probe-endpoints.py:13: StarletteDeprecationWarning: You should not use the 'timeout' argument with the TestClient. See https://github.com/Kludex/starlette/issues/1108 for more information.
+  r = c.request(method, path, timeout=15, **kw)
+projects.list                  GET   /api/projects                                      -> 200  {"status":"success","projects":[]}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: POST http://testserver/api/projects "HTTP/1.1 422 Unprocessable Content"
+projects.create                POST  /api/projects                                      -> 422  {"detail":[{"type":"missing","loc":["body","title"],"msg":"Field required","input":{"name":"probe","description":"test"}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/manuscripts "HTTP/1.1 200 OK"
+manuscripts.list               GET   /api/manuscripts                                   -> 200  {"status":"success","manuscripts":[]}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/manuscripts/journal-presets "HTTP/1.1 200 OK"
+manuscripts.presets            GET   /api/manuscripts/journal-presets                   -> 200  {"status":"success","presets":[{"preset":"acm","display_name":"ACM Conference Proceedings (acmart / sigconf)","publisher
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/vault/notes "HTTP/1.1 200 OK"
+vault.notes                    GET   /api/vault/notes                                   -> 200  {"notes":[]}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/vault/graph "HTTP/1.1 200 OK"
+vault.graph                    GET   /api/vault/graph                                   -> 200  {"nodes":[],"edges":[]}
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/sessions "HTTP/1.1 200 OK"
+sessions.list                  GET   /api/sessions                                      -> 200  []
+[2026-10-23 12:54:48] [INFO] [httpx2] HTTP Request: GET http://testserver/api/reports "HTTP/1.1 200 OK"
+reports.list                   GET   /api/reports                                       -> 200  []
+[2026-10-23 12:54:48] [INFO] [ThothApp] Shutting down Thoth Research Intelligence Service...
+
+=== SUMMARY ===
+  200: 18
+  201: 1
+  422: 1

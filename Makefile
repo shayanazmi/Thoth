@@ -1,4 +1,4 @@
-.PHONY: help setup dev dev-web test test-ui eval lint migrate migrate-dry-run seed seed-reset cache-flush health diagnostics clean deploy test-vision test-legacy-all
+.PHONY: help setup dev dev-web test lint migrate migrate-dry-run seed seed-reset cache-flush health clean deploy test-vision
 
 VENV ?= venv
 PYTHON ?= $(VENV)/bin/python
@@ -18,9 +18,6 @@ help:
 	@echo "  dev-web          Start the standalone frontend dev server (port 3000)"
 	@echo "  test             Alias for test-vision (canonical gate)"
 	@echo "  test-vision      Run the vision-anchored scenario suite"
-	@echo "  test-legacy-all  Run every discoverable file under backend/tests/"
-	@echo "  test-ui          Run the Web API adapter test suite"
-	@echo "  eval             Run the production multi-agent DeepEval benchmark"
 	@echo "  lint             Verify code syntax and validate module imports"
 	@echo ""
 	@echo "Database & Ops:"
@@ -30,7 +27,6 @@ help:
 	@echo "  seed-reset       Reset and re-seed demo data"
 	@echo "  cache-flush      Flush or inspect Redis / local memory cache"
 	@echo "  health           Probe backend health and database reachability"
-	@echo "  diagnostics      Run full 7-layer agentic diagnostic suite"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  deploy           Instructions and checks for deploying to Railway"
@@ -66,33 +62,14 @@ test-vision:
 	@echo "Running vision-anchored scenario suite (canonical gate)..."
 	@$(PYTEST) backend/tests/scenarios/ -v
 
-# Phase 0 (2026-10-23) found that the previous `test` target referenced files
-# that had been deleted by an earlier commit. `make test` now aliases
-# `make test-vision`, which runs behavioural scenarios anchored on THOTH.docx.
-# `make test-legacy-all` runs anything else that happens to be under backend/tests/.
+# `make test` is the same gate: behavioural scenarios anchored on THOTH.docx.
 test: test-vision
-
-test-legacy-all:
-	@echo "Running every discoverable pytest file under backend/tests/ ..."
-	@$(PYTEST) backend/tests/ -v
-
-test-all:
-	@echo "Running all pytest test suites..."
-	@$(PYTEST) backend/tests/ -v
-
-test-ui:
-	@echo "Running Web API adapter test suite..."
-	@$(PYTEST) backend/tests/test_ui_adapter.py -v
-
-eval:
-	@echo "Running Thoth DeepEval Benchmark..."
-	@$(PYTHON) backend/evals/run_production_evals.py
 
 lint:
 	@echo "Validating Python syntax and imports..."
 	@$(PYTHON) -m py_compile backend/main.py
-	@$(PYTHON) -m py_compile backend/workspace/project.py backend/workspace/manuscript.py backend/workspace/exporter.py backend/workspace/pdf_compiler.py backend/workspace/journal_formatter.py backend/workspace/traceability.py backend/api/routes_workspace.py backend/intellectual_rigour/snowball.py backend/intellectual_rigour/clustering.py backend/collaboration/membership.py backend/collaboration/sync.py
-	@$(PYTHON) -c "import backend.main; import backend.core.config; import backend.workspace; import backend.workspace.pdf_compiler; import backend.workspace.journal_formatter; import backend.intellectual_rigour.snowball; import backend.intellectual_rigour.clustering; import backend.collaboration; print('All core modules imported successfully.')"
+	@$(PYTHON) -m py_compile backend/workspace/project.py backend/workspace/manuscript.py backend/workspace/exporter.py backend/workspace/pdf_compiler.py backend/workspace/journal_formatter.py backend/workspace/traceability.py backend/api/routes_workspace.py backend/collaboration/membership.py backend/collaboration/sync.py
+	@$(PYTHON) -c "import backend.main; import backend.core.config; import backend.workspace; import backend.workspace.pdf_compiler; import backend.workspace.journal_formatter; import backend.collaboration; print('All core modules imported successfully.')"
 
 
 
@@ -121,10 +98,6 @@ cache-flush:
 health:
 	@echo "Probing Thoth health..."
 	@$(PYTHON) scripts/ops/health_check.py --url http://localhost:8000
-
-diagnostics:
-	@echo "Running 7-layer diagnostic audit..."
-	@$(PYTHON) scripts/dev/diagnostic_test.py
 
 deploy:
 	@echo "========================================================================"

@@ -116,7 +116,37 @@ class FallbackLLMWrapper(Runnable):
             fallback_name=self.fallback_name
         )
 
-_primary_llm = ChatNVIDIA(
+class _UnavailableLLM:
+    """Stands in for a provider whose client could not be built at import (no network, a TLS-intercepting
+    proxy, a bad key). Every call raises, so FallbackLLMWrapper moves to the fallback and the app still boots."""
+
+    def __init__(self, name: str, reason: str):
+        self.name, self.reason = name, reason
+
+    def _fail(self, *a: Any, **kw: Any) -> Any:
+        raise RuntimeError(f"{self.name} is unavailable: {self.reason}")
+
+    invoke = ainvoke = stream = astream = batch = _fail
+
+    def bind_tools(self, *a: Any, **kw: Any) -> "_UnavailableLLM":
+        return self
+
+    def bind(self, *a: Any, **kw: Any) -> "_UnavailableLLM":
+        return self
+
+
+def _nim_client(**kwargs: Any) -> Any:
+    """ChatNVIDIA validates the model against NVIDIA's model list over the network as it is constructed.
+    That must never stop the server from booting (fail open): degrade to an unavailable stand-in instead."""
+    try:
+        return ChatNVIDIA(**kwargs)
+    except Exception as exc:
+        reason = sanitize_log_message(str(exc))[:300]
+        logger.warning("[LLM setup] NVIDIA client for %s could not be built; continuing without it: %s", kwargs.get("model"), reason)
+        return _UnavailableLLM(f"NVIDIA {kwargs.get('model')}", reason)
+
+
+_primary_llm = _nim_client(
     model="nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key=os.getenv("NVIDIA_API_KEY"),
     temperature=0.6,
@@ -128,7 +158,7 @@ _primary_llm = ChatNVIDIA(
     }
 )
 
-_primary_verifier_llm = ChatNVIDIA(
+_primary_verifier_llm = _nim_client(
     model="nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key=os.getenv("NVIDIA_API_KEY"),
     temperature=0.1,
@@ -162,6 +192,73 @@ verifier_llm = FallbackLLMWrapper(primary_llm=_primary_verifier_llm, fallback_ll
 
 def get_llm():
     return llm
+
+
+# Per-role models (docs/features/09-agents-and-prompts.md, model map). All free NVIDIA NIM.
+NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
+NIM_ULTRA = "nvidia/nemotron-3-ultra-550b-a55b"
+NIM_FALLBACK = "openai/gpt-oss-20b"
+ROLE_MODELS: Dict[str, Dict[str, Any]] = {
+    "conductor": {"model": NIM_ULTRA, "temperature": 0.5, "max_tokens": 1200, "timeout": 60},
+    "thinker": {"model": NIM_ULTRA, "temperature": 0.8, "max_tokens": 900, "timeout": 90},
+    # Memory updates, review envelopes, debate distillation. Doc 09 planned Lightning; Ultra at
+    # temperature 0 is used instead because Lightning spends small token budgets on hidden reasoning.
+    "thinker_support": {"model": NIM_ULTRA, "temperature": 0.0, "max_tokens": 1500, "timeout": 60, "thinking": False},
+    # Trial roles (docs/features/05, 06).
+    # Extraction roles run with Ultra's hidden reasoning off: on long papers it spent the whole token
+    # budget reasoning and the JSON was cut off (seen 24 Oct 2026: 3000 tokens, 199 visible characters).
+    "librarian": {"model": NIM_ULTRA, "temperature": 0.2, "max_tokens": 1200, "timeout": 60, "thinking": False},
+    "reader": {"model": NIM_ULTRA, "temperature": 0.0, "max_tokens": 3000, "timeout": 120, "thinking": False},
+    "analyst": {"model": NIM_ULTRA, "temperature": 0.2, "max_tokens": 2000, "timeout": 120, "thinking": False},
+    "judge": {"model": NIM_ULTRA, "temperature": 0.2, "max_tokens": 4000, "timeout": 180},
+    # Systematic-review screening: extraction-style judgement on records, many calls, so no hidden reasoning.
+    "screener": {"model": NIM_ULTRA, "temperature": 0.0, "max_tokens": 6000, "timeout": 120, "thinking": False},
+    # Three full design candidates are long JSON; hidden reasoning would eat the budget (see Reader).
+    "designer": {"model": NIM_ULTRA, "temperature": 0.4, "max_tokens": 6000, "timeout": 180, "thinking": False},
+    # Proposal roles (docs/features/08). Sections and the review are long JSON, so hidden reasoning is off
+    # (see Reader); the Verifier judges one sentence against one record.
+    "writer": {"model": NIM_ULTRA, "temperature": 0.4, "max_tokens": 3000, "timeout": 150, "thinking": False},
+    "verifier": {"model": NIM_ULTRA, "temperature": 0.0, "max_tokens": 700, "timeout": 60, "thinking": False},
+    "reviewer": {"model": NIM_ULTRA, "temperature": 0.3, "max_tokens": 4000, "timeout": 180, "thinking": False},
+    # Offline evaluations (e.g. the blind-attribution drift test): long reasoning over many replies.
+    "evaluator": {"model": NIM_ULTRA, "temperature": 0.0, "max_tokens": 4000, "timeout": 180},
+}
+
+
+# NIM's free tier answers 429 when ~10 requests arrive at once (seen 24 Oct 2026), and the fallback would
+# then silently answer with a different model. Every role call that can fan out takes one of these slots.
+import threading as _threading
+MODEL_SLOTS = _threading.BoundedSemaphore(4)
+
+
+def get_role_llm(role: str, allow_fallback: bool = True) -> FallbackLLMWrapper:
+    """Build the LLM for one agent role: Ultra → gpt-oss-20b (both NIM) → the configured
+    Groq/OpenAI fallback. Keys are read at call time so tests with empty env fail open.
+    allow_fallback=False gives the primary model only (evaluations must not be answered by another model)."""
+    cfg = ROLE_MODELS[role]
+    key = os.getenv("NVIDIA_API_KEY") or ""
+    # Two retries with the client's backoff before falling back: a 429 is usually a passing rate limit,
+    # and the fallback model is weaker.
+    common = {"temperature": cfg["temperature"], "max_tokens": cfg["max_tokens"], "timeout": cfg["timeout"], "max_retries": 2}
+    if not allow_fallback:
+        common["max_retries"] = 6
+        extra = {} if cfg.get("thinking", True) else {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
+        return FallbackLLMWrapper(ChatOpenAI(model=cfg["model"], api_key=key, base_url=NIM_BASE_URL, **common, **extra), None,
+                                  primary_name=f"NIM {cfg['model']}")
+    tail = _fallback_llm
+    if key:
+        backup = FallbackLLMWrapper(
+            ChatOpenAI(model=NIM_FALLBACK, api_key=key, base_url=NIM_BASE_URL, **common),
+            tail, primary_name=f"NIM {NIM_FALLBACK}", fallback_name=_fb_name,
+        )
+        primary_extra = {} if cfg.get("thinking", True) else {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
+        return FallbackLLMWrapper(
+            ChatOpenAI(model=cfg["model"], api_key=key, base_url=NIM_BASE_URL, **common, **primary_extra),
+            backup, primary_name=f"NIM {cfg['model']}", fallback_name=f"NIM {NIM_FALLBACK}",
+        )
+    if tail is None:
+        raise RuntimeError("No LLM provider configured (NVIDIA_API_KEY is empty and no fallback key)")
+    return FallbackLLMWrapper(tail, None, primary_name=_fb_name)
 
 def build_search_agent():
     import datetime
@@ -528,11 +625,15 @@ Draft the section expansion now. Start immediately with the `### ` heading.""")
 report_expander_chain = report_expander_prompt | llm | StrOutputParser()
 
 direct_chat_prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are Thoth (Djehuty), the ancient Egyptian deity of wisdom, truth, mathematics, and writing, operating as an autonomous multi-agent research intelligence.
-- For greetings or casual conversation, respond with dignity, warmth, and concise elegance in 2-3 sentences.
-- Inform the user that you are ready to conduct deep, verified autonomous research on any scientific, technical, or humanities topic.
-- Offer 2-3 specific example research topics they can ask you to investigate (e.g., Quantum Error Correction, CRISPR Prime Editing, LLM Alignment).
-- Keep responses concise, direct, and free of fluff or artificial filler."""),
+    ("system", """You are Thoth, a research companion that helps people find the questions worth asking.
+Voice, in order of priority:
+1. Socratic: usually answer with one short, sharpening question that helps the person think more precisely.
+2. Knowledgeable colleague: say plainly what is known when it helps, without overclaiming.
+3. Warm companion: be encouraging; never push formal research before the idea is ready.
+Rules:
+- Keep replies short (2-4 sentences). No greetings like "Greetings, Scholar", no talk of being a deity, oracle or divine.
+- Never invent facts, citations, or results. Say when something is uncertain.
+- If the person seems curious about something, help them notice what is puzzling or worth investigating about it."""),
     ("human", "{user_query}")
 ])
 

@@ -26,12 +26,11 @@ from backend.core.errors import register_exception_handlers
 from backend.core.cache import cache_manager
 
 from backend.api.routes_health import router as health_router
-from backend.api.routes_research import router as research_router, is_casual_query
-from backend.api.routes_followup import router as followup_router
-from backend.api.routes_brainstorm import router as brainstorm_router
-from backend.api.routes_vault import router as vault_router
-from backend.api.routes_ideas import router as ideas_router
-from backend.api.routes_prisma import router as prisma_router
+from backend.api.routes_thinkers import router as thinkers_router
+from backend.api.routes_trial import router as trial_router
+from backend.api.routes_design import router as design_router
+from backend.api.routes_review import router as review_router
+from backend.api.routes_proposal import router as proposal_router
 from backend.api.routes_workspace import router as workspace_router
 from backend.api.routes_chat import router as chat_router
 
@@ -49,6 +48,13 @@ async def lifespan(app: FastAPI):
     orphaned_count = task_manager.reconcile_orphaned_tasks()
     if orphaned_count > 0:
         logger.warning(f"[RECOVERY] Reconciled {orphaned_count} abandoned/interrupted research task(s) into FAILED_ORPHANED state.")
+    from backend.research.store import reconcile_orphaned_trials
+    from backend.research.review_store import reconcile_orphaned as reconcile_orphaned_reviews
+    if reconcile_orphaned_reviews():
+        logger.warning("[RECOVERY] Marked systematic review(s) interrupted by a restart as stopped.")
+    stopped = reconcile_orphaned_trials()
+    if stopped:
+        logger.warning(f"[RECOVERY] Marked {stopped} trial(s) interrupted by a restart as stopped.")
     # Verify Redis connectivity in background
     try:
         await cache_manager.get_client()
@@ -75,19 +81,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# The UI is plain ES modules imported without version tags; make browsers revalidate them
+# (unchanged files come back as 304) so a reload never mixes old and new modules.
+@app.middleware("http")
+async def revalidate_frontend_assets(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith(("/js/", "/styles/", "/scripted/")) or request.url.path == "/":
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 # Global Exception Handlers
 register_exception_handlers(app)
 
 # Include API Routers
 app.include_router(health_router)
-app.include_router(research_router)
-app.include_router(followup_router)
-app.include_router(brainstorm_router)
-app.include_router(vault_router)
-app.include_router(ideas_router)
-app.include_router(prisma_router)
+app.include_router(thinkers_router)
+app.include_router(trial_router)
+app.include_router(design_router)
+app.include_router(review_router)
+app.include_router(proposal_router)
 app.include_router(workspace_router)
-# Phase 1 — unified conversational entrypoint (vision §2, §10)
 app.include_router(chat_router)
 
 
@@ -97,7 +110,8 @@ if not os.path.exists(_FRONTEND_DIR):
     _FRONTEND_DIR = os.path.join(_PROJECT_ROOT, "web")
 
 if os.path.exists(_FRONTEND_DIR):
-    for sub in ["styles", "lib", "components", "js", "assets"]:
+    # "scripted" is the optional guided tour; when that folder is deleted it is simply skipped.
+    for sub in ["styles", "lib", "components", "js", "assets", "scripted"]:
         subdir = os.path.join(_FRONTEND_DIR, sub)
         if os.path.exists(subdir):
             app.mount(f"/{sub}", StaticFiles(directory=subdir), name=sub)

@@ -21,6 +21,13 @@ from backend.agents import (
 logger = logging.getLogger("ThothIntegrityGate")
 
 
+
+def _slugify(text: str, max_len: int = 40) -> str:
+    """Same id scheme the source ids were minted with: lowercase, [a-z0-9_-], underscores collapsed."""
+    cleaned = re.sub(r"[^a-zA-Z0-9_-]", "_", text.strip().lower())
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+    return cleaned[:max_len] if cleaned else "note"
+
 def normalize_text(text: str) -> str:
     """Standardize punctuation, dashes, quotes, and whitespace for deterministic quote searching."""
     if not text:
@@ -74,7 +81,6 @@ def _resolve_source_record(source_id: str, cumulative_sources: List[Dict[str, An
         s_id = (s.get("id") or "").strip().lower()
         if not s_id:
             s_title = s.get("title") or s.get("url") or ""
-            from backend.orchestrator import _slugify
             s_id = f"src-{_slugify(s_title, 35)}".lower()
 
         s_under = s_id.replace("-", "_")

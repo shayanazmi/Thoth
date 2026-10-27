@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Thoth · The Folio (UI prototype)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cmask id='c'%3E%3Crect width='64' height='64' fill='%23fff'/%3E%3Ccircle cx='39' cy='24' r='19'/%3E%3C/mask%3E%3Ccircle fill='%2327306b' cx='30' cy='30' r='22' mask='url(%23c)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,400..500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z M14 3v4h4 M9 12h6 M9 16h6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-up2" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="mark" viewBox="0 0 64 64"><mask id="mk"><rect width="64" height="64" fill="#fff"/><circle cx="39" cy="24" r="19" fill="#000"/></mask><circle cx="30" cy="30" r="22" fill="currentColor" mask="url(#mk)"/><path d="M45 47C45 47 40.5 53 40.5 56a4.5 4.5 0 0 0 9 0C49.5 53 45 47 45 47Z" fill="currentColor"/></symbol>
+</svg>
+
+<div class="shell" id="shell" data-mode="split" data-stage="check">
+  <header class="bar">
+    <a class="brand" href="#" aria-label="Thoth home"><svg><use href="#mark"/></svg><b>THOTH</b><span class="crumb">Night-shift nurses &amp; burnout · <strong>v1</strong></span></a>
+    <nav aria-label="Research journey"><ol class="journey" id="journey"></ol></nav>
+    <div class="tools">
+      <button class="cmdk-btn" id="cmdkBtn" aria-label="Open command palette"><svg class="icon"><use href="#i-search"/></svg>Jump to… <span class="kbd">⌘K</span></button>
+      <div class="seg" role="group" aria-label="Layout">
+        <button data-mode="chat" aria-pressed="false" title="Conversation only">Chat</button>
+        <button data-mode="split" aria-pressed="true" title="Chat and file side by side">Split</button>
+        <button data-mode="folio" aria-pressed="false" title="Give the file the whole screen">File</button>
+      </div>
+      <button class="ibtn" id="theme" aria-label="Switch light or dark theme"><svg class="icon"><use href="#i-theme"/></svg></button>
+    </div>
+  </header>
+
+  <div class="area">
+    <section class="chat" id="chat" aria-label="Conversation">
+      <div class="pin" id="pin" data-open="false">
+        <p class="hyp">Night-shift nurses have higher emotional exhaustion than day-shift nurses because of circadian misalignment.</p>
+        <p class="meta">Hypothesis · v1 · proposed by Thoth, accepted by you · refined after Hume</p>
+        <button class="btn small go" data-stage="check">Check <svg class="icon" style="width:14px;height:14px"><use href="#i-arrow"/></svg></button>
+      </div>
+      <div class="msgs" id="msgs" aria-live="polite">
+        <div class="msg user"><div class="prose">The matrix is mostly empty dots. Is that the literature, or just our sample?</div></div>
+        <div class="msg"><div class="who"><svg><use href="#mark"/></svg></div><div>
+          <div class="name">Thoth <small>just now</small></div>
+          <div class="prose"><p>Mostly the sample, and I should be honest about both halves. Of the 15 papers, <em>only two</em> say anything about emotional exhaustion in nurses by shift, and both are cross-sectional. Nine were read in full, six only as abstracts, so a silent abstract is not proof of a silent paper.</p>
+          <p>That is why the ruling is <em>insufficient evidence</em> rather than <em>contested</em>. Nobody has argued against you; nobody has measured the mechanism either.</p></div>
+          <button class="inline-card" data-stage="check"><span class="tag rub">Ruling</span><span><span class="big">Insufficient evidence</span><br><span class="sub">15 witnesses · 9 read in full · originality not assessed</span></span><svg class="icon"><use href="#i-arrow"/></svg></button>
+          <div class="chips"><button class="chip hot" data-stage="design">Design a study that would settle it</button><button class="chip" data-stage="thinkers">Ask the thinkers what is missing</button><button class="chip" data-act="adjacent">Search adjacent fields</button></div>
+        </div></div>
+        <div class="trace">Karl Popper joined the conversation</div>
+        <div class="msg"><div class="who t-popper">P</div><div>
+          <div class="name">Karl Popper <small>asked to speak · critical review</small></div>
+          <div class="prose"><p>Before anyone designs anything: what observation would make you abandon this?</p>
+          <div class="quote">If night nurses with <em>low</em> circadian misalignment are just as exhausted, your “because” is gone, and the hypothesis is only a fact about burnout.</div>
+          <p>Write the falsifier first. A study that cannot embarrass the hypothesis has not tested it.</p></div>
+          <div class="chips"><button class="chip" data-act="falsifier">Draft the falsifier with me</button><button class="chip" data-stage="thinkers">See the full debate</button></div>
+        </div></div>
+      </div>
+      <div class="composer-dock">
+        <form class="composer" id="composer"><textarea id="input" rows="1" aria-label="Message" placeholder="Think out loud, or press / for thinkers, checks and reviews"></textarea><button class="send" aria-label="Send"><svg class="icon"><use href="#i-up"/></svg></button></form>
+        <p class="dock-hint">Nothing costly runs without your approval.</p>
+      </div>
+    </section>
+
+    <section class="folio" id="folio" aria-label="Research file">
+      <div class="folio-scroll" id="folioScroll">
+        <div class="folio-head"><h2 id="folioTitle">The trial</h2><span class="spacer"></span><button class="btn small" id="share"><svg class="icon" style="width:15px;height:15px"><use href="#i-file"/></svg>Export proposal</button></div>
+
+        <!-- EXPLORE / HYPOTHESIS placeholders -->
+        <div class="panel" data-panel="explore"><div class="empty"><svg><use href="#mark"/></svg><h3>Questions you are circling</h3><p>Nothing to file yet. Keep talking; when a direction is worth keeping, Thoth will offer to pin it here.</p></div></div>
+        <div class="panel" data-panel="hypothesis">
+          <div class="sheet-page" style="padding:34px 44px 34px 56px">
+            <span class="eyebrow">Hypothesis · v1</span>
+            <h1 style="font-size:2.2rem;font-weight:400;margin:12px 0 18px;max-width:22ch">Night-shift nurses have higher emotional exhaustion than day-shift nurses because of circadian misalignment.</h1>
+            <p class="prose" style="color:var(--ink-2)">Refined once, after David Hume asked what you actually observe versus what you infer. The causal “because” is the part still unexamined.</p>
+          </div>
+        </div>
+
+        <!-- THINKERS -->
+        <div class="panel" data-panel="thinkers">
+          <div class="section" style="margin-top:6px"><h3>Who is in the room</h3><p class="lede">Ten co-authors, each with their own mind. Pick up to three to read your hypothesis independently, without seeing one another.</p>
+            <div class="roster" id="roster"></div></div>
+          <div class="section"><h3>Independent readings</h3><p class="lede">Written blind. Where they disagree is more useful than where they agree.</p>
+            <div class="debate">
+              <article class="take t-popper" style="color:#a8362a"><header><span class="who t-popper">P</span><div><h4>Karl Popper</h4><small>Objecting · 2 critical</small></div></header>
+                <p class="ask">“What would show you wrong?”</p>
+                <ul><li>No falsifier is stated for the mediation claim.</li><li>“Circadian misalignment” can absorb any result: it needs an operational measure.</li></ul>
+                <div class="foot"><span class="tag bad">Objecting</span><button class="btn small ghost" data-act="reply">Reply</button></div></article>
+              <article class="take t-hume" style="color:#276a41"><header><span class="who t-hume">H</span><div><h4>David Hume</h4><small>Mixed</small></div></header>
+                <p class="ask">“You observe two things that go together, not one that makes the other.”</p>
+                <ul><li>Shift and exhaustion co-occur in W3 and W15. Nothing observed links the cause.</li><li>Willing to grant the association; withholds the “because”.</li></ul>
+                <div class="foot"><span class="tag unc">Mixed</span><button class="btn small ghost" data-act="reply">Reply</button></div></article>
+              <article class="take t-night" style="color:#8a5d0a"><header><span class="who t-night">N</span><div><h4>Florence Nightingale</h4><small>Objecting · 1 critical</small></div></header>
+                <p class="ask">“Compare like with like, or the figures will lie politely.”</p>
+                <ul><li>Day and night wards differ in acuity and staffing before anyone is tired.</li><li>Asks for the same hospitals and the same wards.</li></ul>
+                <div class="foot"><span class="tag bad">Objecting</span><button class="btn small ghost" data-act="reply">Reply</button></div></article>
+            </div>
+            <div class="clash"><svg class="m icon" style="stroke-width:1.4"><use href="#mark"/></svg><div><span class="eyebrow">Thoth's reading of the disagreement</span><p style="margin-top:8px;max-width:70ch">All three agree the exhaustion gap is plausible. They split on <b>what would count as proof</b>: Popper wants a falsifier, Hume wants temporal order, Nightingale wants matched wards. One design could satisfy all three, a prospective cohort within the same hospitals, and it is among the candidates on the Design stage.</p><div class="chips"><button class="chip hot" data-stage="design">See the design candidates</button></div></div></div>
+          </div>
+        </div>
+
+        <!-- CHECK -->
+        <div class="panel" data-panel="check">
+          <div class="sheet-page">
+            <div class="ruling">
+              <div class="seal" aria-hidden="true"><svg viewBox="0 0 160 160"><defs><path id="circ" d="M80 80 m-62 0 a62 62 0 1 1 124 0 a62 62 0 1 1 -124 0"/></defs>
+                <g class="ring"><circle cx="80" cy="80" r="76" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="80" cy="80" r="46" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 4"/><text font-family="IBM Plex Sans" font-size="10.5" font-weight="600" letter-spacing="3.6" fill="currentColor"><textPath href="#circ">THE RULING · NEUTRAL COURT · THE RULING · NEUTRAL COURT ·</textPath></text></g>
+                <g class="moon" transform="translate(52 52) scale(.8)"><use href="#mark" width="64" height="64"/></g></svg></div>
+              <div><span class="eyebrow">Verdict on your hypothesis · 15 witnesses</span><h1>Insufficient <em>evidence</em></h1>
+                <p class="why">Low-certainty evidence that night nurses report more exhaustion, but nobody measured circadian misalignment in nurses, tested its effect, or tested the mediation. Every primary study is cross-sectional.</p></div>
+              <div class="scale" role="img" aria-label="Verdict scale: contradicted, contested, insufficient evidence (selected), supported within limits, already established"><div>Contradicted</div><div>Contested</div><div class="here">Insufficient evidence</div><div>Supported within limits</div><div>Already established</div></div>
+            </div>
+            <div class="facts">
+              <div class="fact"><b>15</b><span>witnesses read</span></div>
+              <div class="fact"><b>9<small style="font-size:1rem;color:var(--ink-3)"> / 15</small></b><span>read in full text</span><div class="depth" aria-hidden="true"><i class="f" style="flex:9"></i><i class="a" style="flex:6"></i></div></div>
+              <div class="fact"><b>2</b><span>studies speak to your outcome</span></div>
+              <div class="fact warn"><b>Not assessed</b><span>originality: adjacent-field search did not run</span></div>
+            </div>
+          </div>
+
+          <div class="section"><h3>Your claim, in four parts</h3><p class="lede">The hypothesis was split into the claims it is made of. Each paper was read against each one.</p>
+            <ol class="subclaims">
+              <li class="sc"><span class="n">1</span><span>Night-shift work causes greater circadian misalignment than day-shift work.</span><span class="tag unc">Insufficient evidence</span></li>
+              <li class="sc"><span class="n">2</span><span>Greater circadian misalignment causes higher emotional exhaustion.</span><span class="tag unc">Insufficient evidence</span></li>
+              <li class="sc"><span class="n">3</span><span>Night-shift nurses have higher emotional exhaustion than day-shift nurses.</span><span class="tag ok">Supported within limits</span></li>
+              <li class="sc"><span class="n">4</span><span>Circadian misalignment mediates the relationship between shift type and exhaustion.</span><span class="tag unc">Insufficient evidence</span></li>
+            </ol></div>
+
+          <div class="section"><h3>The matrix</h3><p class="lede">Rows are papers, columns are your four claims. Weight is design strength times how much of the paper was read.</p>
+            <div class="legend"><span><span class="cell conv"><svg viewBox="0 0 16 16"><path d="M3 12l5-8 5 8z"/></svg></span>Convergent</span><span><span class="cell div"><svg viewBox="0 0 16 16"><path d="M3 4l5 8 5-8z"/></svg></span>Divergent</span><span><span class="cell nul"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4"/></svg></span>Null</span><span><span class="cell none">·</span>Not addressed</span>
+              <label style="margin-left:auto;display:flex;gap:8px;align-items:center;font-size:.82rem"><input type="checkbox" id="onlySignal" checked> Only papers that say something</label></div>
+            <div class="matrix-wrap"><table class="matrix" id="matrix"><caption class="sr">Witnesses against sub-claims</caption></table></div>
+            <p class="note">A trial reads a sample of the literature. These are gaps in the sample, which may point to gaps in the literature; a systematic review would tell.</p></div>
+
+          <div class="section"><h3>Not covered by these 15 papers</h3><div class="gaps">
+            <div class="gap">None measured circadian misalignment (melatonin onset, actigraphy phase, core temperature) in night versus day nurses.<div class="refs">W3 · W10 · W15 · W12 · W4</div></div>
+            <div class="gap">None tested whether misalignment mediates the shift-to-exhaustion link.<div class="refs">W3 · W10 · W15 · W9</div></div>
+            <div class="gap">None used a longitudinal or experimental design, so temporal order is untested.<div class="refs">W3 · W10 · W9 · W15</div></div>
+            <div class="gap">None paired a validated exhaustion scale with a circadian measure in the same nurses.<div class="refs">W3 · W10 · W15</div></div></div></div>
+
+          <div class="section"><h3>What would strengthen the hypothesis</h3><div class="chips" style="margin-top:0"><span class="tag rub">No falsifier stated</span><span class="tag rub">“Night shift” undefined</span><span class="tag rub">“Circadian misalignment” not operationalised</span><span class="tag rub">Alternative pathways not separated</span></div>
+            <div class="chips"><button class="btn primary" data-stage="design">Design the study</button><button class="btn" data-act="adjacent">Search adjacent fields</button><button class="btn" data-act="weigh">Weigh again</button></div></div>
+        </div>
+
+        <!-- REVIEW / DRAFT -->
+        <div class="panel" data-panel="review"><div class="empty"><svg><use href="#mark"/></svg><h3>No formal review yet</h3><p>A lightweight scan has been done. A formal systematic review takes longer and is optional: Thoth will estimate the time before you decide.</p><button class="btn" data-act="adjacent">Estimate a formal review</button></div></div>
+
+        <!-- DESIGN -->
+        <div class="panel" data-panel="design">
+          <div class="section" style="margin-top:6px"><h3>Three ways to find out</h3><p class="lede">Each answers a different part of the ruling. Compare them on what you can actually do, then choose one to carry into the proposal.</p>
+            <div class="cands">
+              <article class="cand"><h4>Cross-sectional survey, actigraphy subsample</h4><p class="sum">One survey wave across 6 wards, with wrist actigraphy on 60 nurses to estimate phase.</p>
+                <div class="meters"><div class="meter"><span>Answers claim</span><span class="pips warn"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span><span class="num">2/5</span></div><div class="meter"><span>Feasibility</span><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span><span class="num">5/5</span></div><div class="meter"><span>Time</span><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span><span class="num">4m</span></div></div>
+                <p class="obj"><b>Popper:</b> repeats the design of W3 and W10; cannot surprise the hypothesis.</p>
+                <div class="foot"><button class="btn small" data-choose="Cross-sectional survey">Choose</button><button class="btn small ghost">Details</button></div></article>
+              <article class="cand rec"><span class="ribbon">Best fit for the ruling</span><h4>Prospective cohort, same hospitals</h4><p class="sum">Follow 180 new-graduate nurses for 12 months. Exhaustion each month; phase markers at baseline and month 6.</p>
+                <div class="meters"><div class="meter"><span>Answers claim</span><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span><span class="num">4/5</span></div><div class="meter"><span>Feasibility</span><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span><span class="num">3/5</span></div><div class="meter"><span>Time</span><span class="pips warn"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span><span class="num">14m</span></div></div>
+                <p class="obj"><b>Nightingale:</b> wards must be matched on acuity. <b>Hume:</b> temporal order finally observed.</p>
+                <div class="foot"><button class="btn small primary" data-choose="Prospective cohort">Choose</button><button class="btn small ghost">Details</button></div></article>
+              <article class="cand"><h4>Natural experiment: fixed-schedule policy</h4><p class="sum">Compare wards before and after a hospital moves from rotating to fixed shifts.</p>
+                <div class="meters"><div class="meter"><span>Answers claim</span><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span><span class="num">5/5</span></div><div class="meter"><span>Feasibility</span><span class="pips warn"><i class="on"></i><i></i><i></i><i></i><i></i></span><span class="num">1/5</span></div><div class="meter"><span>Time</span><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span><span class="num">?</span></div></div>
+                <p class="obj"><b>Ostrom:</b> depends on a policy change you cannot schedule. Needs a partner hospital.</p>
+                <div class="foot"><button class="btn small" data-choose="Natural experiment">Choose</button><button class="btn small ghost">Details</button></div></article>
+            </div></div>
+        </div>
+        <div class="panel" data-panel="draft"><div class="empty"><svg><use href="#mark"/></svg><h3>Nothing to draft yet</h3><p>The proposal is written from the design you choose. Choose one and it appears here, section by section.</p></div></div>
+      </div>
+
+          <aside class="drawer" id="drawer" aria-label="Witness detail" data-open="false"><div class="drawer-in" id="drawerIn"></div></aside>
+    </section>
+  </div>
+  <nav class="tabbar" aria-label="Sections"><button data-mode="chat" aria-current="true"><svg class="icon"><use href="#i-chat"/></svg>Conversation</button><button data-mode="split" aria-current="false"><svg class="icon"><use href="#i-file"/></svg>Research file</button></nav>
+</div>
+
+<div class="scrim" id="choose"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="chooseT"><span class="eyebrow">Design</span><h3 id="chooseT">Choose this design</h3><p style="color:var(--ink-2)" id="chooseSub"></p>
+  <label class="lbl" for="chooseNotes">Changes or notes (optional)</label><textarea class="field" id="chooseNotes" placeholder="e.g. Restrict to two hospitals; add a sleep diary at every wave."></textarea>
+  <div class="row"><button class="btn ghost" data-close>Not yet</button><button class="btn primary" id="chooseGo">Use this design</button></div></div></div>
+<div class="scrim" id="palette"><div class="modal palette" role="dialog" aria-modal="true" aria-label="Command palette"><input id="pIn" placeholder="Jump to a stage, a thinker or an action…" aria-label="Search commands"><ul id="pList"></ul></div></div>
+<div class="toast" id="toast" role="status"></div>
+<script src="prototype.js"></script>
+</body>
+</html>

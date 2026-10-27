@@ -1,0 +1,35 @@
+[LLM Call] Primary provider (NIM nvidia/nemotron-3-ultra-550b-a55b) failed: Error code: 429 - {'status': 429, 'title': 'Too Many Requests'}. Retrying with fallback (NIM openai/gpt-oss-20b)...
+[LLM Call] Primary provider (NIM nvidia/nemotron-3-ultra-550b-a55b) failed: Error code: 429 - {'status': 429, 'title': 'Too Many Requests'}. Retrying with fallback (NIM openai/gpt-oss-20b)...
+[LLM Call] Primary provider (NIM nvidia/nemotron-3-ultra-550b-a55b) failed: Error code: 429 - {'status': 429, 'title': 'Too Many Requests'}. Retrying with fallback (NIM openai/gpt-oss-20b)...
+[LLM Call] Primary provider (NIM nvidia/nemotron-3-ultra-550b-a55b) failed: Error code: 429 - {'status': 429, 'title': 'Too Many Requests'}. Retrying with fallback (NIM openai/gpt-oss-20b)...
+PLAN 9s: ['Night-shift nurses experience greater circadian misalignment than day-shift nurses.', 'Greater circadian misalignment is associated with higher emotional exhaustion.', 'Night-shift nurses have higher emotional exhaustion than day-shift nurses.', 'Circadian misalignment mediates the relationship between night shift work and emotional exhaustion.']
+50s STRATEGY degraded= False adjacent= ['physician shift work', 'emergency medical services']
+64s READ abstract_only design= narrative_review results= 1 by ra-550b-a55b
+71s READ abstract_only design= None results= 8 by /gpt-oss-20b
+75s READ abstract_only design= cross_sectional results= 2 by ra-550b-a55b
+90s READ abstract_only design= systematic_review results= 2 by ra-550b-a55b
+95s READ abstract_only design= cross_sectional results= 4 by ra-550b-a55b
+121s READ full_text design= cross_sectional results= 4 by ra-550b-a55b
+129s READ full_text design= cross_sectional results= 7 by ra-550b-a55b
+140s READ full_text design= systematic_review results= 6 by ra-550b-a55b
+166s READ full_text design= other:crossover results= 3 by ra-550b-a55b
+168s ROW w= 0.17 ['not_', 'not_', 'not_', 'not_'] by ra-550b-a55b
+179s READ full_text design= None results= 0 by /gpt-oss-20b
+193s ROW w= 0.17 ['not_', 'conv', 'not_', 'not_'] by /gpt-oss-20b
+200s ROW w= 0.52 ['not_', 'conv', 'not_', 'not_'] by ra-550b-a55b
+218s ROW w= 0.25 ['not_', 'not_', 'not_', 'not_'] by ra-550b-a55b
+227s ROW w= 0.45 ['conv', 'not_', 'not_', 'not_'] by ra-550b-a55b
+229s ROW w= 0.25 ['not_', 'not_', 'conv', 'not_'] by ra-550b-a55b
+247s ROW w= 0.95 ['not_', 'not_', 'not_', 'not_'] by ra-550b-a55b
+248s ROW w= 0.3 ['not_', 'not_', 'not_', 'not_'] by /gpt-oss-20b
+250s ROW w= 0.45 ['not_', 'not_', 'not_', 'not_'] by ra-550b-a55b
+280s ROW w= 0.3 ['not_', 'conv', 'not_', 'not_'] by ra-550b-a55b
+280s ADJACENT {'ran': True, 'fields': [{'field': 'physician shift work', 'papers': 4}, {'field': 'emergency medical services', 'papers': 4}]}
+416s VERDICT insufficient_evidence | The hypothesis requires four linked pieces of evidence: (1) night-shift nurses have greater circadian misalignment than day-shift nurses, (2) circadian misalignment associates with emotional exhaustion, (3) night-shift nurses have higher emotional exhaustion, and (4) circadian misalignment mediates 
+  originality: partial_overlap | Adjacent-field search found physician shift-work literature linking sleep impairment, night shifts, and burnout (e.g., resident physician extended hours, sleep-related impairment and medical errors, urine metabolomics for burnout and night-shift stre
+  sub 1 insufficient_evidence very_low | for: ['W3'] against: []
+  sub 2 supported_within_limits low | for: ['W1', 'W4', 'W10'] against: []
+  sub 3 insufficient_evidence very_low | for: ['W5'] against: []
+  sub 4 insufficient_evidence very_low | for: [] against: []
+  notes: [] | judged_by: nvidia/nemotron-3-ultra-550b-a55b
+ACCESS Counter({'abstract_only': 5, 'full_text': 5}) | full-text rows with design: 4 / 5

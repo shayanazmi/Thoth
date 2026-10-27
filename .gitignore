@@ -1,62 +1,20 @@
+# ---------- Python ----------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-
-/bin/
-/build/
-develop-eggs/
-dist/
-downloads/
-eggs/
+*.egg-info/
+*.egg
 .eggs/
+/build/
+/dist/
 /lib/
 /lib64/
-!frontend/lib/
-parts/
-sdist/
-var/
 wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
 pip-log.txt
 pip-delete-this-directory.txt
 
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-store.db
-*.db
-*.db-journal
-*.sqlite
-*.sqlite3
-*.sqlite3-journal
-
-.ipynb_checkpoints
-profile_default/
-ipython_config.py
-
-.env
-.env.*
-*.env
-!.env.example
-.env.local
-.env.*.local
+# ---------- Virtualenvs ----------
 venv/
 .venv/
 env/
@@ -64,44 +22,72 @@ ENV/
 env.bak/
 venv.bak/
 
+# ---------- Tests, coverage, type checkers ----------
+.pytest_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
 .pyre/
 .pytype/
+.deepeval/
+.deepeval_cache/
 
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# ---------- Secrets (keys live only in .env; .env.example lists names) ----------
+.env
+.env.*
+*.env
+!.env.example
 
+# ---------- Local data ----------
+# SQLite stores (db/store.db and test DBs). Postgres schema lives in db/migrations/.
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+# Generated vault notes (per-user research output).
+vault/topics/*.md
+vault/sources/*.md
+supabase/.temp/
+# Results from the archived pipeline evaluations.
+docs/archive/legacy_code/pipeline_v1/backend/evals/production_eval_results.json
+
+# ---------- Logs ----------
+*.log
+# Raw tool output kept as verification evidence.
+!docs/archive/verify/_logs/*.log
+
+# ---------- Runtime artefacts ----------
+# backend/main.py creates backend/backend -> backend at startup (Railway deploys rooted at /backend).
+backend/backend
+
+# ---------- Editors, OS, local tool settings ----------
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+.ipynb_checkpoints
+.gemini/
+# Claude Code: launch.json is shared; personal settings are not.
+.claude/settings.local.json
 
+# ---------- Node (only if tooling is ever added; the UI has no build step) ----------
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-.deepeval/
-.deepeval_cache/
-
-thoth_modification_plan.md
-backend/evals/production_eval_results.json
-backend/evals/.deepeval/
-
-vault/topics/*.md
-vault/sources/*.md
-
-.gemini/
-
-*.log
-supabase/.temp/
-backend/backend
-

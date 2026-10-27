@@ -1,0 +1,81 @@
+[2026-10-23 12:55:14] [INFO] [ThothApp] Initializing Thoth Research Intelligence Service (env=production)...
+[2026-10-23 12:55:14] [WARNING] [ThothRedisCache] Redis unreachable (Error -3 connecting to soft-lichen-milkwood-97876.db.redis.io:15156. Temporary failure in name resolution.). Running in fail-open in-memory fallback mode.
+[2026-10-23 12:55:14] [INFO] [httpx2] HTTP Request: POST http://testserver/api/research/brief/prepare "HTTP/1.1 200 OK"
+prepare: 200
+brief_id: brief-a757c8946b23 v 1
+[2026-10-23 12:55:14] [INFO] [httpx2] HTTP Request: POST http://testserver/api/research/brief/approve "HTTP/1.1 200 OK"
+approve: 200 {"success":true,"message":"Research brief 'brief-a757c8946b23' (version 1) approved successfully.","brief":{"brief_id":"brief-a757c8946b23","session_id":"probe","topic":"rural anemia and iron absorpti
+--- streaming (first 10s or 15 events) ---
+[2026-10-23 12:55:14] [INFO] [ThothWebServer] [SSE STREAM] Request for topic: 'rural anemia and iron absorption' (mode=auto, papers=15, inherited_turns=0)
+[2026-10-23 12:55:15] [INFO] [ThothOrchestrator] [ORCHESTRATOR - PLAN] Initiating search for topic: 'rural anemia and iron absorption'
+
+= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
+Step 1 - Search Agent is querying scholarly databases & web...
+==================================================
+[2026-10-23 12:55:15] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 1/3 failed with ProxyError: 403 Forbidden. Retrying in 1.32s...
+
+[WARNING] [DISPATCHER] Attempt 1/3 failed (ProxyError: 403 Forbidden). Retrying in 1.32s...
+[2026-10-23 12:55:15] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 1/3 failed with ProxyError: 403 Forbidden. Retrying in 1.42s...
+
+[WARNING] [DISPATCHER] Attempt 1/3 failed (ProxyError: 403 Forbidden). Retrying in 1.42s...
+[2026-10-23 12:55:15] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 1/3 failed with ProxyError: 403 Forbidden. Retrying in 1.35s...
+
+[WARNING] [DISPATCHER] Attempt 1/3 failed (ProxyError: 403 Forbidden). Retrying in 1.35s...
+[2026-10-23 12:55:15] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 1/3 failed with ProxyError: 403 Forbidden. Retrying in 3.77s...
+
+[WARNING] [DISPATCHER] Attempt 1/3 failed (ProxyError: 403 Forbidden). Retrying in 3.77s...
+[2026-10-23 12:55:15] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 1/3 failed with ProxyError: 403 Forbidden. Retrying in 1.14s...
+
+[WARNING] [DISPATCHER] Attempt 1/3 failed (ProxyError: 403 Forbidden). Retrying in 1.14s...
+[2026-10-23 12:55:16] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] 5 consecutive failures hit limit (5). Tripping to OPEN for 30.0s.
+
+[WARNING] [DISPATCHER] Circuit Breaker TRIPPED -> OPEN for 30.0s (5 consecutive failures).
+[2026-10-23 12:55:16] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 2/3 failed and Circuit Breaker is now OPEN.
+[2026-10-23 12:55:16] [WARNING] [ThothScholarly] [SCHOLARLY] PubMed search failed for 'rural anemia and iron absorption': 403 Forbidden
+[2026-10-23 12:55:16] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 30.0s remaining in cooloff.
+[2026-10-23 12:55:16] [WARNING] [ThothScholarly] [SCHOLARLY] arXiv search failed for 'rural anemia and iron absorption': Circuit Breaker is OPEN. Blocked for cooloff (30.0s remaining).
+[2026-10-23 12:55:16] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 29.9s remaining in cooloff.
+[2026-10-23 12:55:16] [WARNING] [ThothScholarly] [SCHOLARLY] Europe PMC search failed for 'rural anemia and iron absorption': Circuit Breaker is OPEN. Blocked for cooloff (29.9s remaining).
+[2026-10-23 12:55:16] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 29.8s remaining in cooloff.
+[2026-10-23 12:55:16] [WARNING] [ThothScholarly] [SCHOLARLY] OpenAlex search failed for 'rural anemia and iron absorption': Circuit Breaker is OPEN. Blocked for cooloff (29.8s remaining).
+[2026-10-23 12:55:19] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 2/3 failed with ProxyError: 403 Forbidden. Retrying in 8.60s...
+
+[WARNING] [DISPATCHER] Attempt 2/3 failed (ProxyError: 403 Forbidden). Retrying in 8.60s...
+[2026-10-23 12:55:27] [WARNING] [ThothDispatcher] [DISPATCHER] All 3 attempts failed for _fetch_semantic_scholar_raw.
+[2026-10-23 12:55:27] [WARNING] [ThothScholarly] [SCHOLARLY] Semantic Scholar search failed/rate-limited for 'rural anemia and iron absorption': 403 Forbidden
+[2026-10-23 12:55:27] [INFO] [ThothScholarly] [SCHOLARLY] Only 0 academic results found. Supplementing with Tavily web search...
+[2026-10-23 12:55:27] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 18.7s remaining in cooloff.
+[2026-10-23 12:55:27] [WARNING] [ThothScholarly] [SCHOLARLY] Tavily search failed for 'rural anemia and iron absorption': Circuit Breaker is OPEN. Blocked for cooloff (18.7s remaining).
+[2026-10-23 12:55:27] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 18.7s remaining in cooloff.
+[2026-10-23 12:55:27] [WARNING] [ThothScholarly] [SCHOLARLY] arXiv search failed for 'rural anemia and iron absorption failure to replicate OR null effect': Circuit Breaker is OPEN. Blocked for cooloff (18.7s remaining).
+[2026-10-23 12:55:27] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 18.7s remaining in cooloff.
+[2026-10-23 12:55:27] [WARNING] [ThothScholarly] [SCHOLARLY] OpenAlex search failed for 'rural anemia and iron absorption failure to replicate OR null effect': Circuit Breaker is OPEN. Blocked for cooloff (18.7s remaining).
+[2026-10-23 12:55:27] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 18.7s remaining in cooloff.
+[2026-10-23 12:55:27] [WARNING] [ThothScholarly] [SCHOLARLY] Europe PMC search failed for 'rural anemia and iron absorption failure to replicate OR null effect': Circuit Breaker is OPEN. Blocked for cooloff (18.7s remaining).
+[2026-10-23 12:55:27] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 18.7s remaining in cooloff.
+[2026-10-23 12:55:27] [WARNING] [ThothScholarly] [SCHOLARLY] PubMed search failed for 'rural anemia and iron absorption failure to replicate OR null effect': Circuit Breaker is OPEN. Blocked for cooloff (18.7s remaining).
+[2026-10-23 12:55:29] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 1/3 failed with ProxyError: 403 Forbidden. Retrying in 3.88s...
+
+[WARNING] [DISPATCHER] Attempt 1/3 failed (ProxyError: 403 Forbidden). Retrying in 3.88s...
+[2026-10-23 12:55:33] [WARNING] [ThothDispatcher] [DISPATCHER] Call attempt 2/3 failed with ProxyError: 403 Forbidden. Retrying in 7.71s...
+
+[WARNING] [DISPATCHER] Attempt 2/3 failed (ProxyError: 403 Forbidden). Retrying in 7.71s...
+[2026-10-23 12:55:41] [WARNING] [ThothDispatcher] [DISPATCHER] All 3 attempts failed for _fetch_semantic_scholar_raw.
+[2026-10-23 12:55:41] [WARNING] [ThothScholarly] [SCHOLARLY] Semantic Scholar search failed/rate-limited for 'rural anemia and iron absorption failure to replicate OR null effect': 403 Forbidden
+[2026-10-23 12:55:41] [INFO] [ThothScholarly] [SCHOLARLY] Only 0 academic results found. Supplementing with Tavily web search...
+[2026-10-23 12:55:41] [WARNING] [ThothDispatcher] [DISPATCHER CIRCUIT BREAKER] Blocked call: State is OPEN. 5.5s remaining in cooloff.
+[2026-10-23 12:55:41] [WARNING] [ThothScholarly] [SCHOLARLY] Tavily search failed for 'rural anemia and iron absorption failure to replicate OR null effect': Circuit Breaker is OPEN. Blocked for cooloff (5.5s remaining).
+[2026-10-23 12:55:41] [INFO] [ThothPipeline] [SEARCH NODE] Falling back to standard web search agent...
+[2026-10-23 12:55:41] [ERROR] [ThothLLM] [LLM Call] Primary provider (NVIDIA-Nemotron-30B) failed: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden'))). No fallback provider configured.
+[2026-10-23 12:55:41] [ERROR] [ThothWebServer] [SSE ERROR] Pipeline worker exception: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+[2026-10-23 12:55:41] [INFO] [httpx2] HTTP Request: POST http://testserver/api/research/stream "HTTP/1.1 200 OK"
+status: 200
+   event: message
+   data: {"node": "approval_verified", "update": {"task_id": "task_brief-a757c8946b23_1792760115002", "brief_id": "brief-a757c8946b23", "version": 1, "approved_at": "2026-10-23T12:55:14.973825+00:00", "t
+   : ping - 2026-10-23 12:55:30.015281+00:00
+   event: message
+   data: {"node": "error", "update": {"error": "HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connec
+   event: message
+   data: {"node": "complete", "state": {}}
+got 7 events in 0.0s
+[2026-10-23 12:55:41] [INFO] [ThothApp] Shutting down Thoth Research Intelligence Service...
