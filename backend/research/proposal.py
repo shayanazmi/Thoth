@@ -265,9 +265,23 @@ def _earlier(thread: str, outline: List[Dict[str, str]], before: str) -> List[Di
     return out
 
 
-async def write_all(thread: str, outline: List[Dict[str, str]], only_missing: bool = True) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
+def _to_write(thread: str, outline: List[Dict[str, str]], only_missing: bool) -> List[str]:
+    out = []
+    for s in outline:
+        cur = get_section(thread, s["key"]) if s["key"] != writer.REFERENCES else None
+        if s["key"] == writer.REFERENCES or (cur and cur.get("user_edited")) or (only_missing and cur and cur.get("verification")):
+            continue
+        out.append(s["key"])
+    return out
+
+
+async def write_all(thread: str, outline: List[Dict[str, str]], only_missing: bool = True,
+                    one_at_a_time: bool = False) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
+    """Autopilot: every missing section, then the review. Co-pilot (one_at_a_time): the next missing section only,
+    then wait for the researcher's approval of the next one; the review runs once the last one is written."""
     rf = writer.research_file(thread)
     yield "research_file", {"witnesses": len(rf["witnesses"]), "trial": rf["trial_available"], "design": bool(rf["design"])}
+    wrote = 0
     for s in outline:
         if s["key"] == writer.REFERENCES:
             continue
@@ -278,8 +292,15 @@ async def write_all(thread: str, outline: List[Dict[str, str]], only_missing: bo
         if only_missing and cur and cur.get("verification"):
             yield "section_kept", {"key": s["key"], "reason": "already written"}
             continue
+        if one_at_a_time and wrote:
+            left = _to_write(thread, outline, only_missing)
+            yield "awaiting_next", {"next": s["key"], "title": s["title"], "remaining": len(left),
+                                    "message": f"Co-pilot: read this section, then approve “{s['title']}” when you're ready."}
+            yield "status", status(thread)
+            return
         yield "section_writing", {"key": s["key"], "title": s["title"]}
         sec = await write_and_verify(thread, s, outline, rf, _earlier(thread, outline, s["key"]))
+        wrote += 1
         if not sec:
             yield "section_failed", {"key": s["key"], "message": "The Writer couldn't be reached; nothing was written in its place."}
             continue

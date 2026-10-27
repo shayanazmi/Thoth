@@ -48,7 +48,9 @@ def _state(thread: str) -> Dict[str, Any]:
     rf = writer.research_file(thread)
     meta = proposal.get_meta(thread)
     outline = proposal.outline_of(thread)
+    from backend.conversation import projects
     return {"outline": outline, "has_outline": bool(meta.get("outline")), "approved": meta.get("approved"),
+            "mode": projects.step_mode(thread, "proposal"),
             "estimate": proposal.estimate(outline, thread),
             "sections": {s["key"]: s for s in proposal.sections(thread, outline)},
             "review": meta.get("review"), "thinkers": meta.get("thinkers"), "status": proposal.status(thread),
@@ -97,10 +99,12 @@ async def write(request: Request):
     proposal.update_meta(thread, author="user", outline=outline,
                          approved={"at": time.time(), "estimate": proposal.estimate(outline, thread), "sections": [s["key"] for s in outline]})
     only_missing = body.get("only_missing", True) is not False
+    from backend.conversation import projects
+    one_at_a_time = projects.step_mode(thread, "proposal") == "copilot"
 
     async def events():
         try:
-            async for name, payload in proposal.write_all(thread, outline, only_missing):
+            async for name, payload in proposal.write_all(thread, outline, only_missing, one_at_a_time):
                 yield _sse(name, payload)
         except Exception as exc:
             yield _sse("error", {"error": sanitize_log_message(str(exc))})

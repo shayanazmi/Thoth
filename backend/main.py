@@ -32,6 +32,7 @@ from backend.api.routes_design import router as design_router
 from backend.api.routes_review import router as review_router
 from backend.api.routes_proposal import router as proposal_router
 from backend.api.routes_workspace import router as workspace_router
+from backend.api.routes_projects import router as projects_router
 from backend.api.routes_chat import router as chat_router
 
 logger = get_logger("ThothApp")
@@ -100,6 +101,7 @@ app.include_router(trial_router)
 app.include_router(design_router)
 app.include_router(review_router)
 app.include_router(proposal_router)
+app.include_router(projects_router)
 app.include_router(workspace_router)
 app.include_router(chat_router)
 

@@ -1,13 +1,15 @@
 // Boot: projects sidebar (collapsible), home (open question + doors), moon-phase journey,
 // theme, workspace toggle, phone bottom bar, first-visit intro.
 import { getJSON, postJSON } from './api.js';
-import { state, project, emit, subscribe, stageState, STAGES, peek, rememberProject, lastProject, setHypothesis } from './store.js';
+import { state, project, emit, subscribe, stageState, STAGES, peek, rememberProject, lastProject, setHypothesis, hydrate, forgetProject } from './store.js';
 import { register, renderConversation, initComposer, say, prefill, openPanel, startCheck, startReview, actions, COMMANDS } from './chat.js';
-import { toast } from './ui.js';
+import { toast, askText } from './ui.js';
 import './thinkers.js';
 import './trial.js';
 import './design.js';
 import './proposal.js';
+import './hypothesis.js';
+import './mode.js';
 import './review.js';
 import { renderWorkspace, resetStageMemory } from './workspace.js';
 import { $, esc, brandMark, moonSVG } from './util.js';
@@ -94,7 +96,7 @@ const cleanTitle = (t) => String(t || 'Untitled').replace(/^project:\s*/i, '').t
 async function loadProjects() {
   try {
     const res = await getJSON('/api/projects');
-    state.projects = (res.projects || []).map((p) => ({ id: p.project_id || p.id, title: cleanTitle(p.title), updated: p.updated_at || p.created_at || '' }));
+    state.projects = (res.projects || []).map((p) => ({ id: p.project_id || p.id, title: cleanTitle(p.title), updated: p.updated_at || p.created_at || '', kind: p.kind || 'thread' }));
   } catch (_) {
     state.projects = [];
   }
@@ -108,7 +110,7 @@ async function createProject(title) {
     id = res.project?.project_id || res.project?.id;
   } catch (_) { /* fall back to a local-only project */ }
   id = id || `local_${Date.now().toString(36)}`;
-  state.projects.unshift({ id, title: clean, updated: new Date().toISOString() });
+  state.projects.unshift({ id, title: clean, updated: new Date().toISOString(), kind: 'thread' });
   await selectProject(id);
   return id;
 }
@@ -122,6 +124,7 @@ function selectProject(id) {
     project();
     app.classList.remove('sb-open');
     emit();
+    hydrate(id); // the server's copy: question, hypothesis versions, rivals, and the chat in a new browser
   };
   if (fromHome) return scene('enter', go);
   go();
@@ -155,13 +158,8 @@ function renderSidebar() {
       <button class="icon-btn collapse-btn" data-act="toggleSidebar" aria-label="${collapsed ? 'Expand' : 'Collapse'} sidebar" title="${collapsed ? 'Expand' : 'Collapse'} sidebar">${ICON.collapse}</button>
     </div>
     <form class="new-project" id="newProject"><input id="newProjectName" placeholder="New project…" aria-label="New project name"><button aria-label="Create project">+</button></form>
-    <div class="side-label">Projects</div>
-    <ul class="project-list">${state.projects.map((p) => {
-      const s = stageOf(p.id);
-      return `<li><button data-act="selectProject" data-arg="${esc(p.id)}" aria-current="${p.id === state.projectId}" title="${esc(p.title)} · ${esc(s.label)}">
-        <span class="p-moon">${moonSVG(s.i, STAGES.length)}</span>
-        <span class="p-text"><span class="p-title">${esc(p.title)}</span><span class="p-stage">${esc(s.label)}</span></span></button></li>`;
-    }).join('') || '<li class="faint" style="padding:8px 10px;font-size:.85rem">No projects yet.</li>'}</ul>
+    ${sideGroup('Projects', state.projects.filter((p) => p.kind === 'project'), 'A chat becomes a project when you accept a hypothesis.', stageOf)}
+    ${sideGroup('Threads', state.projects.filter((p) => p.kind !== 'project'), 'No open threads.', stageOf)}
     <div class="side-foot">Papers, notes and drafts stay inside their project. <button class="link-btn" data-act="replayIntro">Replay intro</button></div>`;
   $('#newProject').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -169,6 +167,42 @@ function renderSidebar() {
     if (v) createProject(v);
   });
 }
+
+// A chat is a thread until a hypothesis is accepted; then it is a project (docs/features/02).
+function sideGroup(label, items, emptyText, stageOf) {
+  return `<div class="side-label">${label}</div>
+    <ul class="project-list">${items.map((p) => {
+      const s = stageOf(p.id);
+      return `<li class="p-row"><button data-act="selectProject" data-arg="${esc(p.id)}" aria-current="${p.id === state.projectId}" title="${esc(p.title)} · ${esc(s.label)}">
+        <span class="p-moon">${moonSVG(s.i, STAGES.length)}</span>
+        <span class="p-text"><span class="p-title">${esc(p.title)}</span><span class="p-stage">${esc(s.label)}</span></span></button>
+        <button class="icon-btn p-delete" data-act="deleteProject" data-arg="${esc(p.id)}" aria-label="Delete ${esc(p.title)}" title="Delete…">×</button></li>`;
+    }).join('') || `<li class="faint" style="padding:8px 10px;font-size:.85rem">${emptyText}</li>`}</ul>`;
+}
+
+// Deleting removes everything the project holds, after one confirmation that lists it.
+register('deleteProject', async (id) => {
+  const p = state.projects.find((x) => x.id === id);
+  if (!p) return;
+  let summary = 'everything stored in this browser';
+  if (!id.startsWith('local_')) {
+    try { summary = (await getJSON(`/api/projects/${encodeURIComponent(id)}/footprint`)).summary; } catch (_) { return toast("Couldn't reach the server; nothing was deleted."); }
+  }
+  const typed = await askText({ title: `Delete “${p.title}”?`, confirm: 'Delete everything',
+    body: `This removes ${summary} from this project, for good. Nothing is kept in a global library.`,
+    label: 'Type “delete” to confirm' });
+  if (typed === null) return;
+  if (typed.trim().toLowerCase() !== 'delete') return toast('Not deleted: type “delete” to confirm.');
+  if (!id.startsWith('local_')) {
+    const res = await fetch(`${window.THOTH_API_BASE || ''}/api/projects/${encodeURIComponent(id)}?confirm=true`, { method: 'DELETE' }).catch(() => null);
+    if (!res || (!res.ok && res.status !== 404)) return toast("Couldn't delete it; nothing was removed.");
+  }
+  forgetProject(id);
+  state.projects = state.projects.filter((x) => x.id !== id);
+  if (state.projectId === id) { state.projectId = null; rememberProject(''); }
+  toast(`Deleted “${p.title}”.`);
+  emit();
+});
 
 // ---------- Home ----------
 const DOOR_ICONS = {

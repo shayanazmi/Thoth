@@ -19,20 +19,21 @@ Evidence for each step is in `docs/archive/verify/`: `conversation_core`, `think
 
 ## Gate
 
-`make test-vision`: 57 passed, 1 skipped (the live-model test).
+`make test-vision`: 72 passed, 1 skipped (the live-model test), 27 Oct 2026.
 
 ## Open gaps (from the walkthroughs)
 
 | Gap | Where it shows | Spec |
 |---|---|---|
-| Project state (hypothesis, question, panels) lives in browser localStorage; a project is created on the first message, not when a hypothesis is accepted | Switching browsers loses client state | `features/02` |
+| ~~Project state lives in browser localStorage~~ (27 Oct: question, hypothesis versions, rivals and the conversation are on the server; chats are threads until a hypothesis is accepted; delete removes everything after a count confirmation: `verify/projects_on_server.md`). Chat cards are still only in the browser | A second browser gets the conversation text, not the cards | `features/02` |
 | Thinker replies are not written to the conductor's server-side memory | The conductor can't refer to what a thinker said on a new thread | `features/01`, `03` |
+| Hypothesis (27 Oct: strength markers, rivals on the server, version-tied trials and re-map built: `verify/hypothesis.md`): the Judge isn't given the computed markers; Writer and Designer don't check the trial is for the current version | Proposal / design after a swap | `features/04` |
 | Free-tier speed: ~1 analysed paper per minute; designer and writer slow down under 429s | A 15-paper trial takes 8–10 min | `features/06` |
 | Fallback-model output is labelled (`written_by`, `checked_by`) but not treated as weaker | Proposal status | `features/08` |
 | Reviews can't be revised and re-screened; a not-retrieved review record can't take an uploaded PDF | Systematic review | `features/05` |
 | The design guardrail checks that assumptions are stated, not that they are sourced | Study design | `features/07` |
 | Vault notes are global, not project-scoped | `vault/` | vision §9 |
-| Demo tour: only the nurses hunch is recorded; there are no frontend tests | `frontend/scripted/` | — |
+| Demo tour: "nurses" is recorded in full; "trust" is recorded but its trial has no verdict; "cities" is not recorded. There are no frontend tests | `frontend/scripted/` | — |
 
 ## Retired (25 Oct 2026)
 

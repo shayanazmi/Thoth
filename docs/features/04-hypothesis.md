@@ -71,3 +71,18 @@ Sub-claim splitting is part of the Analyst prompt: [09 § Analyst](09-agents-and
 3. Park a rival, swap it in → the library is reused, only the mapping reruns, and the old verdict is labelled stale.
 
 Scenario test: `test_s13_hypothesis_versions_and_rivals.py`.
+
+## Build note (27 Oct 2026)
+
+Built: strength markers (`backend/research/hypothesis.py`, cached per version in the notebook), rivals on the
+server with park / retire / swap (`backend/conversation/projects.py`), trials tied to `hypothesis_version` with a
+stale label, and re-mapping a finished trial's library to the current hypothesis (`trial.remap_plan`; runs on
+approval, no search, no Reader). Migration `011_trial_hypothesis_version.sql`. Frontend `frontend/js/hypothesis.js`.
+Walkthrough: `docs/archive/verify/hypothesis.md`. Scenario: `test_s13_hypothesis_versions_and_rivals.py`.
+
+Departures: rivals are notebook versions (`rival_hypothesis` + `rivals_retired`), not a `hypotheses` table; the
+entry bar is two named constructs (vague placeholders rejected), stricter than "named constructs", after
+"Things just get worse at night" passed with one; a scope must add words beyond the constructs and the
+comparison. Old trials get their version inferred from their text. Not yet: the Judge is not given the markers,
+and the Writer and Designer don't check the trial's version.
+

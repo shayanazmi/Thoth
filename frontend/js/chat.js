@@ -10,6 +10,8 @@ import { fresh, seen } from './motion.js';
 export const actions = {};
 // Other modules (e.g. trial.js) render their own message kinds here.
 export const cardRenderers = {};
+// Extra lines under the pinned hypothesis (e.g. strength markers, hypothesis.js): fn(d, version, isCurrent) → html.
+export const hypCardExtras = [];
 export function register(name, fn) { actions[name] = fn; }
 
 document.addEventListener('click', (e) => {
@@ -197,7 +199,7 @@ async function resolveProposal(pid, action, value) {
 function applyNotebook(section, value, how) {
   const d = project();
   if (section === 'question') d.question = value;
-  else if (section === 'hypothesis') { setHypothesis(value, how, 'thoth'); openPanel('hypothesis'); }
+  else if (section === 'hypothesis') { setHypothesis(value, how, 'thoth', { saved: true }); openPanel('hypothesis'); }
   else if (section === 'rival_hypothesis') d.rivals.push(value);
   emit();
 }
@@ -452,6 +454,7 @@ function renderHypothesisCard(d) {
       <span class="versions"><button data-act="hypPrev" ${view === 0 ? 'disabled' : ''} aria-label="Previous version">◀</button>v${view + 1}${isCurrent ? '' : ' (older)'}<button data-act="hypNext" ${isCurrent ? 'disabled' : ''} aria-label="Next version">▶</button></span></div>
     <div class="hyp-text" id="hypText" data-act="hypToggle" title="Tap to expand">${esc(v.text)}</div>
     <div class="hyp-trail">${esc(v.reason || '')}${trail.length ? ` · refined after ${esc(trail.join(', '))}` : ''}</div>
+    ${hypCardExtras.map((f) => f(d, v, isCurrent)).join('')}
     <div class="hyp-actions">
       <button class="link-btn strong" data-act="check">Check this →</button>
       <button class="link-btn" data-act="hypEdit">Edit</button>

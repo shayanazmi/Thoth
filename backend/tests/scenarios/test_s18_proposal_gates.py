@@ -132,6 +132,9 @@ def _seed(thread, design=True):
 
 
 def _write(client, thread, approve=True, **extra):
+    # These gates are about the whole pipeline, so the project writes in Autopilot (Co-pilot, one section per
+    # approval, is covered in S14).
+    client.put(f"/api/projects/{thread}/mode", json={"mode": "autopilot"})
     with client.stream("POST", "/api/proposal/write", json={"project_id": thread, "approve": approve, "outline": OUTLINE, **extra}) as r:
         if r.status_code != 200:
             return r.status_code, []

@@ -15,12 +15,14 @@ def _conn():
     return _db.get_connection(path)
 
 
-def create_trial(thread_id: str, hypothesis: str, subclaims: List[Dict[str, Any]]) -> str:
+def create_trial(thread_id: str, hypothesis: str, subclaims: List[Dict[str, Any]],
+                 hypothesis_version: Optional[int] = None, remapped_from: Optional[str] = None) -> str:
     trial_id = f"trial_{uuid.uuid4().hex[:12]}"
     now = time.time()
     with _conn() as c:
-        c.execute("INSERT INTO trials (trial_id, thread_id, hypothesis, subclaims_json, status, created_at, updated_at) "
-                  "VALUES (?, ?, ?, ?, 'planned', ?, ?)", (trial_id, thread_id, hypothesis, json.dumps(subclaims), now, now))
+        c.execute("INSERT INTO trials (trial_id, thread_id, hypothesis, subclaims_json, status, created_at, updated_at, "
+                  "hypothesis_version, remapped_from) VALUES (?, ?, ?, ?, 'planned', ?, ?, ?, ?)",
+                  (trial_id, thread_id, hypothesis, json.dumps(subclaims), now, now, hypothesis_version, remapped_from))
     return trial_id
 
 
@@ -49,13 +51,13 @@ def claim_for_reanalysis(trial_id: str) -> bool:
 
 def get_trial(trial_id: str) -> Optional[Dict[str, Any]]:
     c = _conn()
-    r = c.execute("SELECT trial_id, thread_id, hypothesis, subclaims_json, status, strategy_json, verdict_json, adjacent_json "
-                  "FROM trials WHERE trial_id = ?", (trial_id,)).fetchone()
+    r = c.execute("SELECT trial_id, thread_id, hypothesis, subclaims_json, status, strategy_json, verdict_json, adjacent_json, "
+                  "hypothesis_version, remapped_from FROM trials WHERE trial_id = ?", (trial_id,)).fetchone()
     if not r:
         return None
     return {"trial_id": r[0], "thread_id": r[1], "hypothesis": r[2], "subclaims": json.loads(r[3]), "status": r[4],
             "strategy": json.loads(r[5]), "verdict": json.loads(r[6]), "adjacent": json.loads(r[7]),
-            "papers": list_papers(trial_id)}
+            "hypothesis_version": r[8], "remapped_from": r[9], "papers": list_papers(trial_id)}
 
 
 def add_paper(trial_id: str, meta: Dict[str, Any]) -> str:
@@ -95,4 +97,7 @@ def reconcile_orphaned_trials() -> int:
     A re-analysis cut short goes back to 'complete': its records are intact and "Edit sub-claims" can be redone."""
     with _conn() as c:
         c.execute("UPDATE trials SET status = 'complete', updated_at = ? WHERE status = 'reanalysing'", (time.time(),))
+        # Papers that were queued or in flight when the process died were not run (docs/features/02 § Stop).
+        c.execute("UPDATE trial_papers SET status = 'not_run' WHERE status NOT IN ('done', 'unreadable', 'failed', 'not_run') "
+                  "AND trial_id IN (SELECT trial_id FROM trials WHERE status IN ('running', 'stopped'))")
         return c.execute("UPDATE trials SET status = 'stopped', updated_at = ? WHERE status = 'running'", (time.time(),)).rowcount

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from contextvars import ContextVar
+from typing import Any, Dict, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -17,6 +18,17 @@ SHARED = """You are part of Thoth, a research companion. Shared rules:
 - Distinguish what a source states, what you infer, and what is unknown. Label inferences.
 - Plain, modern English. No flattery, no filler.
 - When asked for JSON, return only JSON: no markdown fences, no commentary."""
+
+
+# Model calls made by the current run (the live-work header: "model calls used"). A run sets a fresh dict;
+# tasks it starts share it. Calls outside a run are not counted.
+USAGE: ContextVar[Optional[Dict[str, int]]] = ContextVar("thoth_usage", default=None)
+
+
+def start_usage() -> Dict[str, int]:
+    usage = {"model_calls": 0, "fallback_calls": 0}
+    USAGE.set(usage)
+    return usage
 
 
 def _llm(role: str):
@@ -35,6 +47,12 @@ async def call_json(role: str, system: str, human: str, default: Any = None) -> 
             return model.invoke([SystemMessage(content=SHARED + "\n\n" + system), HumanMessage(content=human)])
 
     msg = await loop.run_in_executor(None, call)
+    usage = USAGE.get()
+    if usage is not None:
+        usage["model_calls"] += 1
+        served = (getattr(msg, "response_metadata", None) or {}).get("model_name") or ""
+        if served and "nemotron-3-ultra" not in served:
+            usage["fallback_calls"] += 1
     data = safe_extract_json(strip_chain_of_thought(getattr(msg, "content", "") or ""), default=default)
     if isinstance(data, dict):
         # Which model actually answered (the fallback may have), so the record can say so.

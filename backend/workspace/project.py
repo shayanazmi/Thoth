@@ -12,6 +12,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+def _path(db_path: Optional[str]) -> str:
+    """The DB path at call time: a default bound at import time would point at whichever database was
+    configured when this module was first imported."""
+    from backend.memory import db as _db
+    return db_path or _db.DEFAULT_DB_PATH
+
+
 from backend.memory.db import (
     DEFAULT_DB_PATH,
     associate_artifact_to_project_db,
@@ -79,9 +86,10 @@ def create_project(
     session_id: str = "",
     metadata: Optional[Dict[str, Any]] = None,
     project_id: Optional[str] = None,
-    db_path: str = DEFAULT_DB_PATH,
+    db_path: Optional[str] = None,
 ) -> ResearchProject:
     """Create a new research project workspace."""
+    db_path = _path(db_path)
     pid = project_id or f"proj_{uuid.uuid4().hex[:12]}"
     res = save_project_db(
         project_id=pid,
@@ -104,8 +112,9 @@ def create_project(
     )
 
 
-def get_project(project_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[ResearchProject]:
+def get_project(project_id: str, db_path: Optional[str] = None) -> Optional[ResearchProject]:
     """Retrieve a project by its identifier."""
+    db_path = _path(db_path)
     res = get_project_db(project_id, db_path=db_path)
     if not res:
         return None
@@ -124,9 +133,10 @@ def get_project(project_id: str, db_path: str = DEFAULT_DB_PATH) -> Optional[Res
 def list_projects(
     session_id: Optional[str] = None,
     status: Optional[str] = None,
-    db_path: str = DEFAULT_DB_PATH,
+    db_path: Optional[str] = None,
 ) -> List[ResearchProject]:
     """List projects filtered by optional session_id or status."""
+    db_path = _path(db_path)
     rows = list_projects_db(session_id=session_id, status=status, db_path=db_path)
     return [
         ResearchProject(
@@ -143,8 +153,9 @@ def list_projects(
     ]
 
 
-def archive_project(project_id: str, db_path: str = DEFAULT_DB_PATH) -> bool:
+def archive_project(project_id: str, db_path: Optional[str] = None) -> bool:
     """Archive an existing project without deleting data."""
+    db_path = _path(db_path)
     proj = get_project(project_id, db_path=db_path)
     if not proj:
         return False
@@ -160,8 +171,9 @@ def archive_project(project_id: str, db_path: str = DEFAULT_DB_PATH) -> bool:
     return True
 
 
-def delete_project(project_id: str, db_path: str = DEFAULT_DB_PATH) -> bool:
+def delete_project(project_id: str, db_path: Optional[str] = None) -> bool:
     """Delete a project record."""
+    db_path = _path(db_path)
     return delete_project_db(project_id, db_path=db_path)
 
 
@@ -169,12 +181,13 @@ def associate_artifact(
     project_id: str,
     artifact_type: str,
     artifact_id: str,
-    db_path: str = DEFAULT_DB_PATH,
+    db_path: Optional[str] = None,
 ) -> bool:
     """
     Associate an existing research artifact with a project.
     Supported types: 'brief', 'idea', 'prisma_review', 'report'.
     """
+    db_path = _path(db_path)
     proj = get_project(project_id, db_path=db_path)
     if not proj:
         raise ValueError(f"Project '{project_id}' does not exist.")
@@ -189,12 +202,13 @@ def associate_artifact(
 def verify_project_access(
     project_id: str,
     session_id: Optional[str] = None,
-    db_path: str = DEFAULT_DB_PATH,
+    db_path: Optional[str] = None,
 ) -> bool:
     """
     Verify meaningful project boundaries and access constraints.
     If session_id is provided, ensures the project belongs to the caller's session scope.
     """
+    db_path = _path(db_path)
     proj = get_project(project_id, db_path=db_path)
     if not proj:
         return False
@@ -206,12 +220,13 @@ def verify_project_access(
 def load_project_workspace(
     project_id: str,
     session_id: Optional[str] = None,
-    db_path: str = DEFAULT_DB_PATH,
+    db_path: Optional[str] = None,
 ) -> ProjectWorkspace:
     """
     Load the consolidated intellectual workspace connecting ideas, briefs,
     reviews, reports, manuscripts, revisions, and exports.
     """
+    db_path = _path(db_path)
     proj = get_project(project_id, db_path=db_path)
     if not proj:
         raise ValueError(f"Project '{project_id}' not found.")

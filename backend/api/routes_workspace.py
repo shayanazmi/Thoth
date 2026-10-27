@@ -165,7 +165,9 @@ async def api_list_projects(
 ):
     try:
         projects = list_projects(session_id=session_id, status=status_filter)
-        return {"status": "success", "projects": [p.to_dict() for p in projects]}
+        # A chat is a thread until a hypothesis is accepted (docs/features/02).
+        from backend.conversation.projects import kind
+        return {"status": "success", "projects": [{**p.to_dict(), "kind": kind(p.project_id)} for p in projects]}
     except Exception as e:
         logger.error(f"Error listing projects: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -213,11 +215,15 @@ async def api_archive_project(project_id: str):
 
 
 @router.delete("/projects/{project_id}")
-async def api_delete_project(project_id: str):
-    ok = delete_project(project_id)
-    if not ok:
+async def api_delete_project(project_id: str, confirm: bool = Query(False)):
+    """Deletes the project and everything it holds (docs/features/02 § Retention). Without ?confirm=true it
+    deletes nothing and answers 409 with the counts the researcher must see first."""
+    from backend.conversation import projects as project_state
+    if not project_state.exists(project_id):
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found.")
-    return {"status": "success", "deleted": True}
+    if not confirm:
+        raise HTTPException(status_code=409, detail=project_state.footprint(project_id))
+    return {"status": "success", "deleted": True, "removed": project_state.delete(project_id)}
 
 
 # ==========================================

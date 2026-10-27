@@ -118,7 +118,8 @@ function outlineEditor(d) {
           <button class="icon-btn" data-act="olDrop" data-arg="${i}" title="Remove section" aria-label="Remove section">✕</button></div></li>`).join('')}</ol>
     <div class="chips"><button class="chip" data-act="olAdd">Add a section</button></div>
     <div class="effort">Writing: ${esc(e.sections)} sections · ${esc(e.minutes)} min · ${esc(e.model_calls)} model calls · ${esc(e.revision_rounds)} revision rounds · ${esc(e.cost)}</div>
-    <div class="chips"><button class="chip primary" data-act="proposalApprove">Approve and write</button>${p.approved ? '<button class="chip" data-act="olDone">Back to the proposal</button>' : ''}</div></div>`;
+    <div class="chips"><button class="chip primary" data-act="proposalApprove">${p.mode === 'autopilot' ? 'Approve and write all sections' : 'Approve and write the first section'}</button>${p.approved ? '<button class="chip" data-act="olDone">Back to the proposal</button>' : ''}</div>
+    <p class="faint">${p.mode === 'autopilot' ? 'Autopilot: every section is written and checked, then the peer Reviewer reads the whole proposal.' : 'Co-pilot: one section at a time; you approve each next one. The peer Reviewer reads it once every section is written.'}</p></div>`;
 }
 
 document.addEventListener('input', (e) => {
@@ -172,6 +173,7 @@ register('proposalApprove', async () => {
   addMessage({ role: 'thoth', kind: 'proposalProgress' });
   openPanel('draft', { fromUser: true });
   state.busy += 1; emit();
+  u.next = null;
   try {
     await streamSSE('/api/proposal/write', { project_id: state.projectId, approve: true, outline: d.proposal.outline }, live(d));
   } catch (err) { addMessage({ role: 'note', text: `Writing stopped: ${err.message}` }); }
@@ -179,8 +181,15 @@ register('proposalApprove', async () => {
     u.running = false; u.stage = ''; state.busy -= 1;
     await load(d, true);
     const st = d.proposal?.status;
-    if (st) addMessage({ role: 'thoth', text: `**The proposal is drafted: ${st.status}.** ${st.verifier?.checked || 0} claims checked, ${st.verifier?.removed || 0} removed, ${st.verifier?.softened || 0} softened.${d.proposal.review?.counts ? ` The Reviewer found ${d.proposal.review.counts.FATAL} FATAL, ${d.proposal.review.counts.MAJOR} MAJOR and ${d.proposal.review.counts.MINOR} MINOR problems.` : ''}`,
-      chips: [{ label: 'Read it', act: 'panel', arg: 'draft', primary: true }, { label: 'Ask thinkers to review it', act: 'proposalThinkers' }] });
+    if (u.next) {
+      // Co-pilot: one section per approval.
+      const written = Object.values(d.proposal.sections).filter((x) => x.draft).length;
+      addMessage({ role: 'thoth', text: `**Section ${written} of ${st?.sections_total ?? '?'} is written.** Read it, change it if you like, then approve the next one: “${u.next.title}”.`,
+        chips: [{ label: `Write “${u.next.title}”`, act: 'proposalApprove', primary: true }, { label: 'Read it', act: 'panel', arg: 'draft' }] });
+    } else if (st) {
+      addMessage({ role: 'thoth', text: `**The proposal is drafted: ${st.status}.** ${st.verifier?.checked || 0} claims checked, ${st.verifier?.removed || 0} removed, ${st.verifier?.softened || 0} softened.${d.proposal.review?.counts ? ` The Reviewer found ${d.proposal.review.counts.FATAL} FATAL, ${d.proposal.review.counts.MAJOR} MAJOR and ${d.proposal.review.counts.MINOR} MINOR problems.` : ''}`,
+        chips: [{ label: 'Read it', act: 'panel', arg: 'draft', primary: true }, { label: 'Ask thinkers to review it', act: 'proposalThinkers' }] });
+    }
     emit();
   }
 });
@@ -201,6 +210,7 @@ function live(d) {
         case 'review_failed': addMessage({ role: 'note', text: pl.message }); break;
         case 'section_revising': u.live[pl.key] = 'revising'; u.stage = `Revising “${titles[pl.key] || pl.key}” for a FATAL problem (round ${pl.round} of 2)`; break;
         case 'status': p.status = pl; break;
+        case 'awaiting_next': u.next = pl; break;
         case 'error': addMessage({ role: 'note', text: pl.error }); break;
         default: break;
       }
@@ -398,7 +408,7 @@ function statusHeader(p) {
       <span>Reviewer ${r.state === 'none' ? 'not run' : `<b>${r.open.FATAL}</b> FATAL · <b>${r.open.MAJOR}</b> MAJOR · <b>${r.open.MINOR}</b> MINOR open${r.state === 'stale' ? ' (out of date)' : ''}`}</span>
       <span>Thinkers ${t.reviewed ? `<b>${t.need_answer - t.open}</b> answered · <b>${t.open}</b> open` : 'not asked'}</span></div>
     ${st.gaps.length ? `<details><summary class="faint">${st.gaps.length} open item${st.gaps.length > 1 ? 's' : ''}</summary><ul class="list">${st.gaps.map((g) => `<li>${esc(g)}</li>`).join('')}</ul></details>` : ''}
-    <div class="chips"><button class="chip" data-act="pzExport">Export…</button><button class="chip" data-act="olEdit">Edit the outline</button></div></div>`;
+    <div class="chips">${st.sections_written < st.sections_total && !ui(p).running ? `<button class="chip primary" data-act="proposalApprove">${p.mode === 'autopilot' ? 'Write the remaining sections' : 'Write the next section'}</button>` : ''}<button class="chip" data-act="pzExport">Export…</button><button class="chip" data-act="olEdit">Edit the outline</button></div></div>`;
 }
 
 function proposalPanel(d) {

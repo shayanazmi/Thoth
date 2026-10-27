@@ -8,6 +8,8 @@ PATCH /api/trial/papers/{paper_id}       the researcher's own "I say" for a row
 POST  /api/trial/{id}/papers             add a paper by DOI (read + analysed immediately)
 POST  /api/trial/papers/{paper_id}/pdf   "Upload PDF to complete" (base64 body)
 POST  /api/trial/{id}/rejudge            weigh the witnesses again after edits or additions (Judge only)
+POST  /api/trial/{id}/stop               keep finished rows, mark the rest "not run" (trial becomes "stopped")
+POST  /api/trial/{id}/remap              a rival was swapped in: plan a trial of it on the same library (run needs approval)
 POST  /api/trial/{id}/subclaims          SSE; requires {"approve": true}: edited sub-claims → every row redone → re-judged
 """
 from __future__ import annotations
@@ -35,7 +37,47 @@ async def plan_trial(request: Request):
     hypothesis = (body.get("hypothesis") or "").strip()
     if not hypothesis:
         raise HTTPException(status_code=400, detail="hypothesis is required")
-    return await trial.plan(str(body.get("project_id") or "default"), hypothesis)
+    try:
+        return await trial.plan(str(body.get("project_id") or "default"), hypothesis)
+    except trial.NotTrialable as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+def _with_version(t: Dict[str, Any]) -> Dict[str, Any]:
+    """Is this verdict about the hypothesis as it stands? (docs/features/04: an old verdict is labelled stale.)"""
+    from backend.conversation import projects
+    now = projects.current_hypothesis(t["thread_id"])
+    version = t.get("hypothesis_version")
+    inferred = version is None
+    if inferred:  # trials from before versions were recorded: match the text to a version
+        version = projects.version_of(t["thread_id"], t["hypothesis"])
+    if not now:
+        stale = False
+    elif version is not None:
+        stale = version != now["version"]
+    else:
+        stale = t["hypothesis"].strip() != now["text"].strip()
+    return {**t, "hypothesis_version": version, "version_inferred": inferred and version is not None, "hypothesis_now": now, "stale": stale}
+
+
+@router.post("/{trial_id}/stop")
+async def stop(trial_id: str):
+    t = store.get_trial(trial_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="no such trial")
+    if t["status"] != "running":
+        raise HTTPException(status_code=409, detail=f"This trial is {t['status']}; only a running trial can be stopped.")
+    trial.request_stop(trial_id)
+    return {"stopping": True, "trial_id": trial_id}
+
+
+@router.post("/{trial_id}/remap")
+async def remap(trial_id: str, request: Request):
+    body = await request.json()
+    try:
+        return await trial.remap_plan(trial_id, body.get("hypothesis"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/latest")
@@ -44,7 +86,7 @@ async def latest_trial(project_id: str):
     _db.init_db(_db.DEFAULT_DB_PATH)
     row = conn.execute("SELECT trial_id FROM trials WHERE thread_id = ? AND status != 'planned' ORDER BY created_at DESC LIMIT 1",
                        (project_id,)).fetchone()
-    return store.get_trial(row[0]) if row else {"trial_id": None}
+    return _with_version(store.get_trial(row[0])) if row else {"trial_id": None}
 
 
 @router.get("/{trial_id}")
@@ -52,7 +94,7 @@ async def get_trial(trial_id: str):
     t = store.get_trial(trial_id)
     if not t:
         raise HTTPException(status_code=404, detail="no such trial")
-    return t
+    return _with_version(t)
 
 
 @router.post("/{trial_id}/run")

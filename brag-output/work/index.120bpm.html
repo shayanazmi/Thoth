@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Thoth Reel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Palette and type straight from frontend/styles/tokens.css */
+  :root {
+    --night: #0a0907; --night-2: #12100c; --surface: #17150f; --surface-2: #1e1b14;
+    --ink: #ede6d6; --ink-2: #bfb59f; --ink-3: #a1977f; --line: #2a261c; --line-strong: #3a3426;
+    --gold: #d4a64a; --gold-hi: #f3d58a; --gold-line: rgba(212,166,74,.5); --gold-soft: rgba(212,166,74,.14);
+    --rubric: #e0684b; --bad: #f08a72; --ok: #7cc49a;
+    --gold-grad: linear-gradient(135deg, #f3d58a 0%, #c99a3a 45%, #8a6420 100%);
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--night); }
+  body { font-family: var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #stage { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(120% 70% at 50% 45%, #1a160e 0%, var(--night) 62%); }
+  .scene { position: absolute; inset: 0; opacity: 0; will-change: transform, opacity; }
+  .gold-text { background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .mono-label { font-family: var(--mono); font-size: 26px; letter-spacing: .22em; text-transform: uppercase; }
+
+  /* Overlays */
+  #glow { position: absolute; left: 50%; top: 46%; width: 1400px; height: 1400px; margin: -700px 0 0 -700px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(212,166,74,.16) 0%, rgba(212,166,74,0) 60%); pointer-events: none; }
+  #vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(110% 80% at 50% 50%, transparent 55%, rgba(0,0,0,.75) 100%); }
+  #grain { position: absolute; inset: -50%; pointer-events: none; opacity: .07; mix-blend-mode: overlay;
+           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+  #flash { position: absolute; inset: 0; background: #f3d58a; opacity: 0; pointer-events: none; mix-blend-mode: screen; }
+  #wordmark { position: absolute; left: 60px; top: 232px; font-family: var(--serif); font-weight: 600; font-size: 30px; letter-spacing: .32em; color: var(--gold); opacity: 0; }
+
+  /* S1 hook */
+  #s1 .card { position: absolute; left: 60px; width: 880px; border-radius: 28px; padding: 44px 48px; }
+  #grey { top: 300px; background: #2a2a2c; border: 2px solid #3a3a3d; }
+  #grey .who { font-family: var(--mono); font-size: 24px; letter-spacing: .2em; color: #8d8d92; text-transform: uppercase; margin-bottom: 22px; display: flex; gap: 14px; align-items: center; }
+  #grey .dot { width: 18px; height: 18px; border-radius: 50%; background: #6a6a70; }
+  #grey .line { font-size: 92px; font-weight: 600; line-height: 1.04; color: #b9b9be; letter-spacing: -.02em; position: relative; }
+  #strike { position: absolute; left: -10px; top: 54%; height: 14px; width: 0; background: var(--gold); border-radius: 7px; box-shadow: 0 0 24px rgba(243,213,138,.7); }
+  #gold { top: 900px; background: linear-gradient(160deg, #1f1a10, #120f0a); border: 2px solid var(--gold-line); box-shadow: 0 0 80px rgba(212,166,74,.22); }
+  #gold .who { font-family: var(--mono); font-size: 24px; letter-spacing: .26em; color: var(--gold); margin-bottom: 18px; }
+  #gold .line { font-family: var(--serif); font-size: 112px; font-weight: 600; line-height: 1.0; letter-spacing: -.01em; }
+
+  /* S2 reveal */
+  #bust { position: absolute; left: 50%; top: 50%; width: 1500px; height: 1500px; margin: -750px 0 0 -750px; background: url(../../frontend/assets/thoth_bust.jpg) center/cover; }
+  #s2 .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,9,7,.55) 0%, rgba(10,9,7,.1) 40%, rgba(10,9,7,.85) 78%, var(--night) 100%); }
+  #s2 .title { position: absolute; left: 60px; right: 140px; top: 1240px; text-align: center; }
+  #s2 h1 { font-family: var(--serif); font-weight: 600; font-size: 168px; letter-spacing: .12em; margin-right: -.12em; line-height: 1; }
+  #s2 .sub { margin-top: 26px; color: var(--ink-2); }
+
+  /* S3 hunch */
+  #s3 .kicker { position: absolute; left: 60px; top: 330px; font-family: var(--serif); font-size: 104px; font-weight: 500; line-height: 1.02; width: 880px; }
+  #composer { position: absolute; left: 60px; top: 760px; width: 880px; background: var(--surface); border: 2px solid var(--line-strong); border-radius: 30px; padding: 40px 44px 110px; box-shadow: 0 30px 70px -20px rgba(0,0,0,.85); }
+  #composer .lbl { color: var(--gold); font-size: 22px; margin-bottom: 20px; }
+  #typed { font-family: var(--serif); font-size: 64px; line-height: 1.18; color: var(--ink); min-height: 300px; }
+  #caret { display: inline-block; width: 5px; height: 62px; background: var(--gold); vertical-align: -8px; margin-left: 4px; }
+  #send { position: absolute; right: 36px; bottom: 30px; width: 76px; height: 76px; border-radius: 50%; background: var(--gold); display: grid; place-items: center; color: #0e0d0b; font-size: 40px; font-weight: 700; }
+
+  /* S4 thinkers */
+  #s4 .kicker { position: absolute; left: 60px; top: 300px; font-family: var(--serif); font-size: 112px; font-weight: 600; line-height: 1; }
+  #chips { position: absolute; left: 60px; top: 460px; width: 880px; display: flex; flex-wrap: wrap; gap: 14px; }
+  .chip { font-family: var(--mono); font-size: 25px; padding: 12px 20px; border-radius: 999px; border: 1.5px solid var(--gold-line); color: var(--ink-2); background: rgba(23,21,15,.9); opacity: 0; }
+  .tcard { position: absolute; left: 60px; top: 760px; width: 880px; border-radius: 30px; padding: 46px 48px 50px; background: linear-gradient(165deg, #201b11, #14110b); border: 2px solid var(--gold-line); box-shadow: 0 40px 90px -30px rgba(0,0,0,.9), 0 0 60px rgba(212,166,74,.12); opacity: 0; }
+  .tcard .row { display: flex; align-items: center; gap: 24px; }
+  .tcard .seal { width: 104px; height: 104px; border-radius: 50%; display: grid; place-items: center; font-family: var(--serif); font-size: 50px; font-weight: 600; color: #0e0d0b; background: var(--gold-grad); }
+  .tcard .name { font-family: var(--serif); font-size: 58px; font-weight: 600; line-height: 1.05; }
+  .tcard .yrs { font-family: var(--mono); font-size: 24px; color: var(--ink-3); margin-top: 6px; }
+  .tcard .q { font-family: var(--serif); font-style: italic; font-size: 96px; line-height: 1.04; margin-top: 44px; color: var(--ink); }
+  .tcard .tag { position: absolute; right: 36px; top: 34px; font-family: var(--mono); font-size: 20px; letter-spacing: .16em; color: var(--ink-3); border: 1.5px solid var(--line-strong); border-radius: 8px; padding: 6px 10px; }
+
+  /* S5 papers */
+  #s5 .kicker { position: absolute; left: 60px; top: 300px; font-family: var(--serif); font-size: 96px; font-weight: 600; line-height: 1.02; width: 880px; }
+  #rain { position: absolute; left: 60px; top: 560px; width: 880px; height: 860px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent); }
+  .paper { position: absolute; left: 0; width: 880px; height: 104px; border-radius: 18px; background: var(--surface); border: 1.5px solid var(--line-strong); padding: 16px 22px; display: flex; flex-direction: column; justify-content: center; }
+  .paper .t { font-family: var(--serif); font-size: 30px; line-height: 1.15; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 230px; }
+  .paper .y { font-family: var(--mono); font-size: 20px; color: var(--ink-3); margin-top: 6px; }
+  .paper .acc { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 19px; font-weight: 600; letter-spacing: .1em; padding: 7px 12px; border-radius: 8px; }
+  .acc.full { color: #0e0d0b; background: var(--gold); }
+  .acc.abs { color: var(--bad); border: 1.5px solid var(--bad); }
+  #counter { position: absolute; right: 140px; top: 1430px; text-align: right; }
+  #counter .n { font-family: var(--serif); font-size: 150px; font-weight: 600; line-height: .9; }
+  #counter .l { font-family: var(--mono); font-size: 24px; letter-spacing: .2em; color: var(--ink-2); }
+
+  /* S6 drop */
+  #s6 .big1 { position: absolute; left: 60px; top: 380px; font-family: var(--serif); font-size: 200px; font-weight: 600; line-height: .95; }
+  #s6 .big2 { position: absolute; left: 60px; top: 620px; width: 880px; font-family: var(--serif); font-size: 152px; font-weight: 600; line-height: .98; color: var(--bad); }
+  #s6 .sub { position: absolute; left: 60px; top: 1040px; width: 820px; font-size: 54px; line-height: 1.2; color: var(--ink); font-weight: 500; }
+  #s6 .sub b { color: var(--gold-hi); font-weight: 600; }
+  #s6 .foot { position: absolute; left: 60px; top: 1400px; width: 860px; font-family: var(--mono); font-size: 21px; line-height: 1.55; color: var(--ink-3); letter-spacing: .04em; }
+  #stamp { position: absolute; left: 600px; top: 250px; font-family: var(--mono); font-weight: 600; font-size: 34px; letter-spacing: .2em; color: var(--rubric); border: 5px solid var(--rubric); border-radius: 12px; padding: 12px 20px; transform: rotate(-8deg); opacity: 0; }
+
+  /* S7 outro */
+  #s7 .bust2 { position: absolute; left: 50%; top: 40%; width: 1300px; height: 1300px; margin: -650px 0 0 -650px; background: url(../../frontend/assets/thoth_bust.jpg) center/cover; opacity: .38;
+               -webkit-mask-image: radial-gradient(circle, #000 30%, transparent 68%); }
+  #s7 .wm { position: absolute; left: 60px; width: 880px; top: 760px; text-align: center; font-family: var(--serif); font-weight: 600; font-size: 156px; letter-spacing: .14em; line-height: 1; }
+  #s7 .tag { position: absolute; left: 60px; width: 880px; top: 960px; text-align: center; font-family: var(--serif); font-style: italic; font-size: 68px; line-height: 1.1; color: var(--ink); }
+  #s7 .handles { position: absolute; left: 60px; width: 880px; top: 1180px; display: flex; flex-direction: column; gap: 22px; align-items: center; }
+  .handle { display: flex; align-items: baseline; gap: 22px; font-size: 44px; font-weight: 500; opacity: 0; }
+  .handle .k { font-family: var(--mono); font-size: 22px; letter-spacing: .2em; color: var(--gold); text-transform: uppercase; width: 150px; text-align: right; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="glow"></div>
+
+  <div class="scene" id="s1">
+    <div class="card" id="grey">
+      <div class="who"><span class="dot"></span>any AI chatbot</div>
+      <div class="line">Stop asking AI for <span style="position:relative">answers.<span id="strike"></span></span></div>
+    </div>
+    <div class="card" id="gold">
+      <div class="who">THOTH</div>
+      <div class="line gold-text">Start finding the questions worth asking.</div>
+    </div>
+  </div>
+
+  <div class="scene" id="s2">
+    <div id="bust"></div><div class="shade"></div>
+    <div class="title"><h1 class="gold-text" id="s2h">THOTH</h1><div class="sub mono-label" id="s2sub">a research companion</div></div>
+  </div>
+
+  <div class="scene" id="s3">
+    <div class="kicker">Start with a <span class="gold-text">hunch.</span></div>
+    <div id="composer"><div class="lbl mono-label">Your hunch</div><div id="typed"><span id="typedText"></span><span id="caret"></span></div><div id="send">↑</div></div>
+  </div>
+
+  <div class="scene" id="s4">
+    <div class="kicker">It argues <span class="gold-text">back.</span></div>
+    <div id="chips"></div>
+    <div class="tcard" id="hume"><span class="tag">AI PERSONA</span>
+      <div class="row"><div class="seal">H</div><div><div class="name">David Hume</div><div class="yrs">1711–1776</div></div></div>
+      <div class="q">“‘Feels like’ won’t do.”</div></div>
+    <div class="tcard" id="popper"><span class="tag">AI PERSONA</span>
+      <div class="row"><div class="seal">P</div><div><div class="name">Karl Popper</div><div class="yrs">1902–1994</div></div></div>
+      <div class="q">“What would refute this?”</div></div>
+  </div>
+
+  <div class="scene" id="s5">
+    <div class="kicker">Then it checks the <span class="gold-text">papers.</span></div>
+    <div id="rain"></div>
+    <div id="counter"><div class="n gold-text" id="cnt">0</div><div class="l">PAPERS FOUND</div></div>
+  </div>
+
+  <div class="scene" id="s6">
+    <div id="stamp">NOT ADDRESSED</div>
+    <div class="big1 gold-text">8 checked.</div>
+    <div class="big2" id="zero">0 test your idea.</div>
+    <div class="sub" id="s6sub">So it <b>tells you.</b><br>No fake “studies show…”</div>
+    <div class="foot" id="s6foot">REAL RUN · 15 PAPERS FOUND · 4 FULL TEXT · 11 ABSTRACT ONLY (LABELLED) · 8 ANALYSED · EVERY SUB-CLAIM: NOT ADDRESSED</div>
+  </div>
+
+  <div class="scene" id="s7">
+    <div class="bust2"></div>
+    <div class="wm gold-text">THOTH</div>
+    <div class="tag" id="s7tag">Find the questions worth asking.</div>
+    <div class="handles">
+      <div class="handle" id="h1"><span class="k">build</span><span>github.com/shayanazmi</span></div>
+      <div class="handle" id="h2"><span class="k">shoot</span><span>@letsclicksomephotos</span></div>
+    </div>
+  </div>
+
+  <div id="wordmark">THOTH</div>
+  <div id="vignette"></div>
+  <div id="grain"></div>
+  <div id="flash"></div>
+</div>
+
+<script>
+// Every frame is a pure function of t (seconds). 120 BPM: beat 0.5s, bar 2s.
+const HUNCH = 'Why do people trust a confident wrong answer over a hesitant right one?';
+const THINKERS = ['Aristotle','Ibn al-Haytham','Hume','Darwin','Nightingale','Weber','Popper','Kuhn','Simon','Ostrom'];
+// The 15 papers the recorded trial found (fixtures/trust/ch05.json), with access as Thoth labelled it.
+const PAPERS = [
+  ['Binaural masking level differences in actual and simulated bilateral cochlear implant listeners', 2010, 0],
+  ['The Effect of Public Media Service Delivery on Customer Satisfaction in Ethiopia…', 2022, 0],
+  ['AI Performer Bias: Listeners Like Music Less When They Think it was Performed by an AI', 2025, 0],
+  ["Factors predicting native and nonnative listeners' evaluative reactions to Japanese English", 2004, 0],
+  ['Modeling listeners’ perceptions of quality in consecutive interpreting…', 2024, 1],
+  ['Transparency, Reproducibility, and the Credibility of Economics Research', 2018, 0],
+  ['Talking the Talk: The Effect of Vocalics in an Interview', 2017, 0],
+  ['When Less Is More: Experimental Evidence on Information Delivery During India’s Demonetisation', 2023, 0],
+  ['Is there a Significant Relationship Between Teacher Credibility and Teacher Effectiveness', 1982, 0],
+  ['The Role of Digital Influencer Credibility on Purchase Intention…', 2023, 1],
+  ['Second language speech comprehensibility and acceptability in academic settings…', 2023, 1],
+  ['Credibility and Character: A Different Look at an Interminable Problem', 1975, 0],
+  ['A critical (re-)assessment of the effect of speaker ethnicity on speech processing and evaluation', 2020, 0],
+  ['Listener-level aesthetic appraisal in personalized music-listening interventions for older adults…', 2026, 1],
+  ['The Effect of Positive Communication on Leadership Development…', 2026, 0],
+];
+
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const p = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const easeIn = (x) => x * x * x;
+const spring = (x) => { const c = 1.70158 * 1.4; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, x) => a + (b - a) * x;
+const beatPulse = (t) => { const ph = (t % 0.5) / 0.5; return Math.exp(-ph * 6); };
+const shake = (t, at, dur = 0.18, amp = 14) => { const x = p(t, at, at + dur); if (x <= 0 || x >= 1) return [0, 0]; const k = amp * (1 - x); return [Math.sin(t * 190) * k, Math.cos(t * 160) * k]; };
+function show(el, on, extra = '') { el.style.opacity = on; if (extra !== null) el.style.transform = extra; }
+
+// Build chips and paper strips once.
+$('chips').innerHTML = THINKERS.map((n) => `<span class="chip">${n}</span>`).join('');
+$('rain').innerHTML = PAPERS.map(([t, y, full]) =>
+  `<div class="paper"><div class="t">${t}</div><div class="y">${y}</div><span class="acc ${full ? 'full' : 'abs'}">${full ? 'FULL TEXT' : 'ABSTRACT ONLY'}</span></div>`).join('');
+
+function sceneWindow(t, a, b) { return t >= a && t < b; }
+
+function seek(t) {
+  const scenes = ['s1','s2','s3','s4','s5','s6','s7'].map($);
+  scenes.forEach((s) => (s.style.opacity = 0));
+  let sx = 0, sy = 0, flash = 0;
+  $('glow').style.transform = `scale(${1 + 0.06 * beatPulse(t)})`;
+  $('wordmark').style.opacity = (t >= 4 && t < 15) ? 0.9 : 0;
+
+  // S1 hook: 0–3.0
+  if (sceneWindow(t, 0, 3.0)) {
+    const s = $('s1'); s.style.opacity = 1;
+    const g = easeOut(p(t, 0, 0.35));
+    $('grey').style.transform = `scale(${lerp(1.06, 1, g)})`;
+    const k = p(t, 1.0, 1.32);
+    $('gold').style.opacity = k > 0 ? 1 : 0;
+    $('gold').style.transform = `translateY(${lerp(120, 0, easeOut(k))}px) scale(${lerp(1.35, 1, spring(k))})`;
+    [sx, sy] = shake(t, 1.0, 0.22, 18);
+    flash = Math.max(0, 0.55 - (t - 1.0) * 4) * (t >= 1.0 ? 1 : 0);
+    $('strike').style.width = `${clamp(easeOut(p(t, 2.0, 2.3))) * 105}%`;
+    const out = p(t, 2.7, 3.0);
+    $('grey').style.opacity = 1 - out;
+    $('grey').style.filter = `grayscale(1) blur(${out * 10}px)`;
+    $('grey').style.transform += ` translateX(${-easeIn(out) * 400}px) rotate(${-easeIn(out) * 8}deg)`;
+  }
+
+  // S2 reveal: 3.0–4.0
+  if (sceneWindow(t, 3.0, 4.0)) {
+    const s = $('s2'); s.style.opacity = 1;
+    const z = easeOut(p(t, 3.0, 4.0));
+    $('bust').style.transform = `scale(${lerp(1.3, 1.05, z)})`;
+    const h = easeOut(p(t, 3.12, 3.45));
+    $('s2h').style.opacity = h; $('s2h').style.transform = `scale(${lerp(1.25, 1, h)})`; $('s2h').style.letterSpacing = `${lerp(.3, .12, h)}em`;
+    $('s2sub').style.opacity = easeOut(p(t, 3.35, 3.6));
+    flash = Math.max(0, 0.45 - (t - 3.0) * 3);
+    [sx, sy] = shake(t, 3.0, 0.15, 10);
+  }
+
+  // S3 hunch: 4.0–7.0
+  if (sceneWindow(t, 4.0, 7.0)) {
+    const s = $('s3'); s.style.opacity = 1;
+    const k = easeOut(p(t, 4.0, 4.3));
+    s.querySelector('.kicker').style.transform = `translateY(${lerp(40, 0, k)}px)`;
+    s.querySelector('.kicker').style.opacity = k;
+    $('composer').style.transform = `translateY(${lerp(80, 0, easeOut(p(t, 4.0, 4.35)))}px)`;
+    const n = Math.round(HUNCH.length * p(t, 4.15, 5.2));
+    $('typedText').textContent = HUNCH.slice(0, n);
+    $('caret').style.opacity = t < 5.3 ? 1 : ((t * 2) % 1 < .5 ? 1 : 0);
+    const send = p(t, 5.4, 5.6);
+    $('send').style.transform = `scale(${1 + 0.25 * Math.sin(send * Math.PI)})`;
+    $('composer').style.borderColor = send > 0 ? 'rgba(212,166,74,.7)' : '';
+    $('composer').style.boxShadow = send > 0 ? `0 0 ${80 * (1 - p(t, 5.6, 6.6))}px rgba(212,166,74,.35)` : '';
+  }
+
+  // S4 thinkers: 7.0–10.5
+  if (sceneWindow(t, 7.0, 10.5)) {
+    const s = $('s4'); s.style.opacity = 1;
+    const k = easeOut(p(t, 7.0, 7.25));
+    s.querySelector('.kicker').style.opacity = k;
+    s.querySelector('.kicker').style.transform = `scale(${lerp(1.2, 1, k)})`;
+    [...document.querySelectorAll('.chip')].forEach((c, i) => {
+      const x = easeOut(p(t, 7.05 + i * 0.045, 7.25 + i * 0.045));
+      c.style.opacity = x; c.style.transform = `translateY(${lerp(30, 0, x)}px) scale(${lerp(.7, 1, x)})`;
+      const hot = (i === 2 && t >= 7.5 && t < 9.0) || (i === 6 && t >= 9.0);
+      c.style.borderColor = hot ? 'var(--gold)' : ''; c.style.color = hot ? 'var(--gold-hi)' : ''; c.style.background = hot ? 'rgba(212,166,74,.18)' : '';
+    });
+    const card = (el, a, b) => {
+      const i = p(t, a, a + 0.28), o = p(t, b - 0.15, b);
+      el.style.opacity = t >= a && t < b ? 1 - o : 0;
+      el.style.transform = `translateY(${lerp(260, 0, easeOut(i)) - 120 * easeIn(o)}px) rotate(${lerp(-5, 0, spring(i))}deg) scale(${lerp(.85, 1, spring(i))})`;
+    };
+    card($('hume'), 7.5, 9.0); card($('popper'), 9.0, 10.5);
+    if (t >= 7.5 && t < 7.7) [sx, sy] = shake(t, 7.5, 0.18, 12);
+    if (t >= 9.0 && t < 9.2) [sx, sy] = shake(t, 9.0, 0.18, 12);
+  }
+
+  // S5 papers: 10.5–12.0 (11.5–12.0 is the held breath before the drop)
+  if (sceneWindow(t, 10.5, 12.0)) {
+    const s = $('s5'); s.style.opacity = 1;
+    const k = easeOut(p(t, 10.5, 10.75));
+    s.querySelector('.kicker').style.opacity = k;
+    s.querySelector('.kicker').style.transform = `translateY(${lerp(30, 0, k)}px)`;
+    const shown = PAPERS.filter((_, i) => t >= 10.55 + i * 0.062).length;
+    [...document.querySelectorAll('.paper')].forEach((el, i) => {
+      const a = 10.55 + i * 0.062;
+      const x = easeOut(p(t, a, a + 0.22));
+      // stack: newest on top, older ones pushed down
+      const slot = Math.max(0, shown - 1 - i);
+      el.style.opacity = x * (1 - clamp(slot / 9));
+      el.style.transform = `translateY(${lerp(-140, 0, x) + slot * 116}px)`;
+    });
+    $('cnt').textContent = shown;
+    const freeze = p(t, 11.5, 11.55);
+    s.style.filter = `brightness(${1 - 0.45 * freeze}) saturate(${1 - 0.6 * freeze})`;
+    $('counter').style.transform = `scale(${1 + 0.12 * Math.exp(-((t - 10.55) % 0.062) * 40) * (t < 11.5 ? 1 : 0)})`;
+  }
+
+  // S6 drop: 12.0–15.0
+  if (sceneWindow(t, 12.0, 15.0)) {
+    const s = $('s6'); s.style.opacity = 1;
+    const a = p(t, 12.0, 12.2);
+    s.querySelector('.big1').style.opacity = easeOut(a);
+    s.querySelector('.big1').style.transform = `scale(${lerp(1.6, 1, spring(a))})`;
+    const b = p(t, 12.5, 12.72);
+    $('zero').style.opacity = easeOut(b);
+    $('zero').style.transform = `translateY(${lerp(60, 0, easeOut(b))}px)`;
+    const st = p(t, 12.5, 12.62);
+    $('stamp').style.opacity = st;
+    $('stamp').style.transform = `rotate(-8deg) scale(${lerp(2.4, 1, easeOut(st))})`;
+    $('s6sub').style.opacity = easeOut(p(t, 13.0, 13.25));
+    $('s6foot').style.opacity = 0.9 * easeOut(p(t, 13.3, 13.6));
+    flash = Math.max(0, 0.7 - (t - 12.0) * 3.5);
+    [sx, sy] = t < 12.3 ? shake(t, 12.0, 0.3, 26) : shake(t, 12.5, 0.15, 12);
+  }
+
+  // S7 outro: 15.0–18.0, then a dip that loops back into the hook
+  if (t >= 15.0) {
+    const s = $('s7'); s.style.opacity = 1;
+    const w = easeOut(p(t, 15.0, 15.4));
+    s.querySelector('.wm').style.opacity = w;
+    s.querySelector('.wm').style.letterSpacing = `${lerp(.3, .14, w)}em`;
+    s.querySelector('.bust2').style.transform = `scale(${lerp(1.15, 1, easeOut(p(t, 15.0, 18.0)))})`;
+    $('s7tag').style.opacity = easeOut(p(t, 15.35, 15.65));
+    $('h1').style.opacity = easeOut(p(t, 15.9, 16.15)); $('h1').style.transform = `translateY(${lerp(24, 0, easeOut(p(t, 15.9, 16.15)))}px)`;
+    $('h2').style.opacity = easeOut(p(t, 16.15, 16.4)); $('h2').style.transform = `translateY(${lerp(24, 0, easeOut(p(t, 16.15, 16.4)))}px)`;
+    const dip = p(t, 17.6, 18.0);
+    s.style.opacity = 1 - easeIn(dip);
+    flash = t < 15.3 ? Math.max(0, 0.35 - (t - 15.0) * 1.5) : 0;
+  }
+
+  $('stage').style.transform = `translate(${sx}px, ${sy}px)`;
+  $('flash').style.opacity = flash;
+  $('grain').style.transform = `translate(${(Math.floor(t * 30) * 37) % 120 - 60}px, ${(Math.floor(t * 30) * 53) % 120 - 60}px)`;
+}
+window.seek = seek;
+seek(new URLSearchParams(location.search).has('t') ? parseFloat(new URLSearchParams(location.search).get('t')) : 2.6);
+</script>
+</body>
+</html>

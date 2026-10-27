@@ -92,3 +92,17 @@ content_json, status, author)`, `papers(project_id, …)` (see 05), `matrix_rows
 5. Delete the project: the confirmation shows counts; afterwards nothing remains in the DB for that id.
 
 Scenario test: `test_s11_thread_promotion_and_retention.py`.
+
+## Build note (27 Oct 2026, first slice)
+
+Built: thread vs project (derived from the first hypothesis version), project state on the server (question,
+hypothesis versions, rivals, conversation) with `hydrate()` in the browser, the researcher's own edits as notebook
+versions, and delete with a count confirmation across every table the project owns. Code:
+`backend/conversation/projects.py`, `backend/api/routes_projects.py`, the delete handler in `routes_workspace.py`.
+Walkthrough: `docs/archive/verify/projects_on_server.md`. Scenario: `test_s11_thread_promotion_and_retention.py`.
+
+Departures: no `threads`/`projects` tables yet, because every store already keys on the project id and "project"
+is derived from the notebook; the `projects(mode, step_overrides)` and `activity` tables come with Autopilot /
+Co-pilot and Stop. Promotion keeps the same id, so nothing is moved. Not yet: per-section status, Autopilot,
+the live-work header and Stop, chat cards on the server, and vault notes in the delete.
+

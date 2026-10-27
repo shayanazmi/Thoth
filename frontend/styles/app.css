@@ -612,3 +612,35 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 500; text-wrap: balance; ma
 .si-crit .crit-yes b { color: var(--ok); }
 .screen-item select { font: inherit; font-size: .82rem; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; background: var(--surface); color: var(--ink); }
 kbd { font: .7rem var(--mono); border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 4px; margin-left: 4px; color: var(--ink-3); }
+
+/* Threads and projects in the sidebar; delete with a count confirmation (docs/features/02) */
+.project-list .p-row { position: relative; }
+.project-list .p-row > button[data-act="selectProject"] { padding-right: 30px; }
+.project-list .p-delete { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; justify-content: center;
+  opacity: 0; color: var(--ink-3); background: none; box-shadow: none; font-size: 1rem; }
+.project-list .p-row:hover .p-delete, .project-list .p-delete:focus-visible { opacity: 1; }
+.project-list .p-delete:hover { color: var(--bad); background: var(--sunken); }
+.app.sb-collapsed .project-list .p-delete { display: none; }
+
+/* Hypothesis strength markers (docs/features/04) */
+.hyp-markers { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 6px; font-size: .78rem; }
+.hyp-markers .mk { font-family: var(--mono); color: var(--ok); cursor: help; }
+.hyp-markers .mk.missing { color: var(--rubric); }
+.rivals li { display: grid; gap: 4px; }
+.rivals .chips { margin-top: 0; }
+.status-banner.stale { border-left: 3px solid var(--rubric); margin-bottom: 10px; }
+
+/* Autopilot / Co-pilot, live work and Stop (docs/features/02) */
+.mode-btn { font: 500 .72rem/1 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); background: none;
+  border: 1px solid var(--line-strong); border-radius: 999px; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+.mode-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+.mode-dialog .mode-main { display: grid; gap: 8px; margin: 6px 0; }
+.mode-dialog .mode-main label { display: block; font-size: .9rem; }
+.mode-dialog details summary { cursor: pointer; color: var(--ink-2); font-size: .86rem; }
+.mode-dialog .mode-step { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: .86rem; }
+.mode-dialog select { font: inherit; font-size: .85rem; background: var(--sunken); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 6px; }
+.live-work { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: .86rem; color: var(--ink-2);
+  border: 1px solid var(--line-strong); border-left: 3px solid var(--rubric); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 10px; }
+.live-work b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.live-work .chip { margin-left: auto; }
+.mrow.not_run { opacity: .5; }

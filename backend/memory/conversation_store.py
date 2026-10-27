@@ -176,3 +176,13 @@ def set_thinker_memory(thread_id: str, thinker_id: str, stance: str, changed: bo
             "changes = thinker_memory.changes + ?, updated_at = excluded.updated_at",
             (thread_id, thinker_id, stance, int(changed), time.time(), int(changed)),
         )
+
+
+def section_history(thread_id: str, kind: str) -> List[Dict[str, Any]]:
+    """Every version of one notebook section, oldest first."""
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT content, version, author, created_at FROM notebook_sections WHERE thread_id = ? AND kind = ? ORDER BY version",
+        (thread_id, kind),
+    ).fetchall()
+    return [{"content": r[0], "version": r[1], "author": r[2], "created_at": r[3]} for r in rows]

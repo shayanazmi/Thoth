@@ -24,6 +24,20 @@
         "8001"
       ],
       "port": 8001
+    },
+    {
+      "name": "thoth-scratch",
+      "runtimeExecutable": "/usr/bin/env",
+      "runtimeArgs": [
+        "THOTH_DB_PATH=/private/tmp/claude-501/-Users-shayanazmi-college-project-based-learning--langchain-thoth/157c66e1-04e3-4681-9717-b3ab0fb458bb/scratchpad/mode-live.db",
+        "venv/bin/uvicorn",
+        "backend.main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8002"
+      ],
+      "port": 8002
     }
   ]
 }

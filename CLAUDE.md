@@ -2,7 +2,7 @@
 
 > Read this in full before touching anything. It is the single working context for any agent on
 > Thoth. If it conflicts with any other file, `THOTH/THOTH.docx` wins, then this file.
-> Last updated **25 Oct 2026**.
+> Last updated **27 Oct 2026**.
 
 ---
 
@@ -47,7 +47,7 @@ journey: **Explore → Thinkers → Hypothesis → Check → Review → Design �
 | Study design + feasibility (`07`) | Built | `verify/study_design.md` |
 | Writing: research proposal, verifier, reviewer, export gate (`08`) | Built | `verify/proposal.md` |
 | UI: Folio layout, Obsidian & Gold palette, motion, cinematic intro (`10`) | Built | `verify/demo_tour.md` |
-| Guided demo tour (optional, `frontend/scripted/`) | Built. One hunch recorded (nurses); "cities" and "trust" not recorded | `verify/demo_tour.md` |
+| Guided demo tour (optional, `frontend/scripted/`) | Built. "Nurses" recorded in full. "Trust" recorded 27 Oct, but its trial stopped before a verdict (the autopilot moved on), so that chapter replays without a ruling. "Cities" not recorded | `verify/demo_tour.md` |
 
 **Known gaps** (details are in each walkthrough):
 - free-tier speed (~1 paper/min);
@@ -60,7 +60,7 @@ journey: **Explore → Thinkers → Hypothesis → Check → Review → Design �
 The old plan-and-pipeline path, its six routers and the dead code were retired on 25 Oct 2026, to
 `docs/archive/legacy_code/pipeline_v1/` (see `verify/legacy_retirement.md`).
 
-**Test gate:** `make test-vision` → **57 passed, 1 skipped**. The skip is a live-model test; set `THOTH_LIVE_TESTS=1` to run it.
+**Test gate:** `make test-vision` → **72 passed, 1 skipped** (27 Oct 2026). The skip is a live-model test; set `THOTH_LIVE_TESTS=1` to run it.
 
 ---
 
@@ -70,7 +70,7 @@ The old plan-and-pipeline path, its six routers and the dead code were retired o
 thoth/
 ├── CLAUDE.md                 this file
 ├── THOTH/THOTH.docx          the spec (only trusted document) · thoth_visual_architecture_guide.png
-├── README.md                 short public overview (points here)
+├── README.md                 public overview: idea, journey, reel, quick start (points here for working rules)
 ├── Makefile                  setup · dev · test(-vision) · migrate · seed · health …
 ├── main.py                   ASGI entry → backend.main:app
 ├── conftest.py               blanks provider keys + hosted URLs so tests never call live services
@@ -98,7 +98,7 @@ thoth/
 │   ├── scholarly.py  ingestion.py  tools.py  dispatcher.py  telemetry.py
 │   ├── reports/  workspace/  collaboration/   sections/patch/validation · manuscripts/exports · membership + sync
 │   ├── repositories/base.py  supabase_provider (used by health)
-│   └── tests/scenarios/      THE test gate: S10 S12(×2) S15 S16 S17 S18 S19 (fixtures + SSE helpers in conftest.py)
+│   └── tests/scenarios/      THE test gate: S10 S11 S12(×2) S13 S15 S16 S17 S18 S19 (fixtures + SSE helpers in conftest.py)
 │
 ├── frontend/                 vanilla ES modules, no build step
 │   ├── index.html            shell: sidebar · journey · conversation · workspace · intro
@@ -199,6 +199,7 @@ make test-vision    # the gate (backend/tests/scenarios); `make test` is an alia
 | `docs/features/00–10` | The redesign specs, one per feature (architecture, agents, prompts, acceptance walkthrough) |
 | `docs/archive/verify/*.md` | User-seat walkthroughs: the evidence (current: `conversation_core`, `thinkers`, `trial`, `systematic_review`, `study_design`, `proposal`, `demo_tour`, `legacy_retirement`) |
 | `frontend/scripted/README.md` | Playing, recording and deleting the demo tour |
+| `docs/media/` | The 18s product reel used by the README (`thoth-reel.mp4`, GIF preview, poster), cut from the real "trust" recording |
 | `docs/setup.md` `env-vars.md` `deployment.md` `runbook.md` `database-schema.md` `caching.md` `auth-flow.md` `api-limits.md` | Ops reference, written before the redesign. Check against the code before relying on details. |
 | `docs/decisions/ADR-001…004` | Infrastructure decisions (monorepo, Supabase, Redis, decoupled client) |
 | `docs/archive/superseded/` | Retired material: the old 10-phase plan, handoff, demo script, UI v3 plan, roadmap ledger, alignment audit, architecture suite and diagrams, UI prototype, old agent pointers. **Historical only.** |

@@ -115,7 +115,8 @@ export function currentHypothesis(d = project()) {
   return v.length ? v[v.length - 1] : null;
 }
 
-export function setHypothesis(text, reason, source = 'you') {
+// `saved`: the server already has this version (an accepted Thoth proposal is written when it's accepted).
+export function setHypothesis(text, reason, source = 'you', { saved = false } = {}) {
   const d = project();
   const clean = String(text || '').trim();
   if (!clean) return;
@@ -123,7 +124,57 @@ export function setHypothesis(text, reason, source = 'you') {
   if (cur && cur.text === clean) return;
   d.hypothesis.versions.push({ text: clean, reason, source, at: Date.now() });
   d.hypothesis.view = d.hypothesis.versions.length - 1;
+  if (!saved) persistSection('hypothesis', clean);
   emit();
+}
+
+// ---------- The project on the server (docs/features/02) ----------
+// The server holds the question, every hypothesis version, the rivals and the conversation, so another
+// browser can rebuild the project. localStorage only caches the view (panels, cards).
+const isLocal = (id) => !id || String(id).startsWith('local_');
+
+export async function persistSection(section, value) {
+  if (isLocal(state.projectId)) return;
+  try {
+    const res = await fetch(`${window.THOTH_API_BASE || ''}/api/projects/${encodeURIComponent(state.projectId)}/notebook`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section, value }),
+    });
+    const out = await res.json();
+    const p = state.projects.find((x) => x.id === state.projectId);
+    if (p && out.kind) { p.kind = out.kind; emit(); }
+  } catch (_) { /* offline: the local copy still has it; the next hydrate re-sends it */ }
+}
+
+const SOURCE_REASON = { you: 'Written by you', thoth: 'Proposed by Thoth, accepted by you' };
+
+export async function hydrate(id) {
+  if (isLocal(id)) return;
+  let s;
+  try { s = await (await fetch(`${window.THOTH_API_BASE || ''}/api/projects/${encodeURIComponent(id)}/state`)).json(); } catch (_) { return; }
+  const d = state.data[id] || project();
+  if (!d || !s || s.project_id !== id) return;
+  const local = d.hypothesis.versions;
+  if (s.hypothesis.length) {
+    // The server's history wins; a local reason for the same text is kept.
+    d.hypothesis.versions = s.hypothesis.map((v) => ({ text: v.text, source: v.source, at: v.at,
+      reason: local.find((x) => x.text === v.text)?.reason || SOURCE_REASON[v.source] || '' }));
+    d.hypothesis.view = d.hypothesis.versions.length - 1;
+  } else if (local.length) {
+    persistSection('hypothesis', local[local.length - 1].text); // a project from before this change: send it up once
+  }
+  if (s.question) d.question = s.question;
+  else if (d.question) persistSection('question', d.question);
+  if (s.rivals?.length || !(d.rivals || []).length) d.rivals = s.rivals || [];
+  else d.rivals.forEach((r) => persistSection('rival_hypothesis', r)); // rivals from before this change: send them up once
+  if (!d.messages.length && s.messages.length) d.messages = s.messages.map((m, i) => ({ id: `srv_${i}`, ...m }));
+  const p = state.projects.find((x) => x.id === id);
+  if (p) p.kind = s.kind;
+  emit();
+}
+
+export function forgetProject(id) {
+  delete state.data[id];
+  try { localStorage.removeItem(`${KEY}.${id}`); } catch (_) {}
 }
 
 // ---------- Journey stages ----------

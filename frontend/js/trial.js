@@ -7,6 +7,7 @@ import { PANELS } from './workspace.js';
 import { esc, md, brandMark } from './util.js';
 import { fresh, letterbox } from './motion.js';
 import { askText } from './ui.js';
+import { modeOf } from './mode.js';
 
 const VERDICT = {
   already_established: 'Already established',
@@ -49,12 +50,16 @@ cardRenderers.trialPlan = (m, d) => {
   const p = (d.trialPlans || {})[m.trial];
   if (!p) return '';
   const open = p.status === 'planned';
+  const auto = (p.mode || modeOf('subclaims')) === 'autopilot';
   const e = p.estimate || {};
   return `<div class="card proposal heavy trial-plan" data-trial="${esc(p.trial_id)}">
     <div class="card-kicker">Trial plan · nothing runs until you approve</div>
     <div class="card-title">${esc(p.hypothesis)}</div>
-    <div class="muted">The hypothesis is split into the claims it is made of. Each paper will be read against each one. ${open ? 'Edit them if they misstate what you mean.' : ''}</div>
-    <ol class="subclaims">${p.subclaims.map((s, i) => `<li>${open ? `<textarea rows="2" data-sub="${i}" aria-label="Sub-claim ${i + 1}">${esc(s.claim)}</textarea>` : esc(s.claim)}</li>`).join('')}</ol>
+    <div class="muted">The hypothesis is split into the claims it is made of. ${p.remapped_from ? "Each paper's existing record will be matched against each one." : 'Each paper will be read against each one.'} ${open && !auto ? 'Edit them if they misstate what you mean.' : ''}</div>
+    <ol class="subclaims">${p.subclaims.map((s, i) => `<li>${open && !auto ? `<textarea rows="2" data-sub="${i}" aria-label="Sub-claim ${i + 1}">${esc(s.claim)}</textarea>` : esc(s.claim)}</li>`).join('')}</ol>
+    ${open && auto ? '<div class="faint">Autopilot set these sub-claims. You can change them after the run with “Edit sub-claims”; the run itself still waits for your approval.</div>' : ''}
+    ${p.weaknesses?.length ? `<div class="guard">Weaknesses the Judge will cite: ${esc(p.weaknesses.join('; '))}. You can still go ahead.</div>` : ''}
+    ${p.remapped_from ? `<div class="faint">Re-uses the ${esc(p.papers)} paper${p.papers === 1 ? '' : 's'} of the previous trial; nothing is searched or read again.</div>` : ''}
     ${p.ambiguities?.length ? `<details class="ambig"><summary>${p.ambiguities.length} thing${p.ambiguities.length > 1 ? 's' : ''} your hypothesis leaves open</summary><ul class="list">${p.ambiguities.map((a) => `<li>${esc(a)}</li>`).join('')}</ul></details>` : ''}
     <div class="effort">${esc(e.scope || '')} · ${esc(e.duration || '')} · ${esc(e.model_calls || '')} model calls (free tier)</div>
     <div class="chips">${open ? `<button class="chip primary" data-act="runTrial" data-arg="${esc(p.trial_id)}">Approve and run</button><button class="chip" data-act="dropTrial" data-arg="${esc(p.trial_id)}">Not yet</button>` : `<span class="faint">${p.status === 'dropped' ? 'Not run.' : 'Approved and started.'}</span>`}</div>
@@ -71,18 +76,20 @@ register('runTrial', async (id, el) => {
   const card = el.closest('.trial-plan');
   const subclaims = [...card.querySelectorAll('textarea[data-sub]')].map((t) => t.value.trim()).filter(Boolean);
   p.status = 'approved';
-  d.trial = { trial_id: id, hypothesis: p.hypothesis, subclaims: p.subclaims, papers: {}, order: [], verdict: null, status: 'running', stage: 'Searching', started: Date.now(), strategy: null };
+  d.trial = { trial_id: id, hypothesis: p.hypothesis, subclaims: p.subclaims, papers: {}, order: [], verdict: null, status: 'running', stage: 'Searching', started: Date.now(), strategy: null,
+    estimate: p.estimate?.duration || '', usage: null };
   addMessage({ role: 'thoth', kind: 'trialProgress', trial: id });
   openPanel('check', { fromUser: true });
   emit();
   state.busy += 1; emit();
   liveTrial = id;
+  const tick = setInterval(tickElapsed, 1000);
   try {
     await streamSSE(`/api/trial/${encodeURIComponent(id)}/run`, { approve: true, subclaims }, (type, pl) => onEvent(d, type, pl));
   } catch (err) {
     d.trial.status = 'failed';
     addMessage({ role: 'note', text: `The trial stopped: ${err.message}` });
-  } finally { liveTrial = null; state.busy -= 1; emit(); }
+  } finally { clearInterval(tick); d.trial.ended = Date.now(); liveTrial = null; state.busy -= 1; emit(); }
 });
 
 function onEvent(d, type, pl) {
@@ -90,9 +97,9 @@ function onEvent(d, type, pl) {
   if (!t) return;
   const paper = (id) => (t.papers[id] = t.papers[id] || { paper_id: id, status: 'found', access: 'pending' });
   switch (type) {
-    case 'trial_start': t.subclaims = pl.subclaims; break;
+    case 'trial_start': t.subclaims = pl.subclaims; t.remap = !!pl.remapped_from; break;
     case 'strategy': t.strategy = pl; t.stage = 'Searching OpenAlex and Europe PMC'; break;
-    case 'paper_found': Object.assign(paper(pl.paper_id), { meta: pl.meta }); t.order.push(pl.paper_id); t.stage = 'Fetching full texts and reading'; break;
+    case 'paper_found': Object.assign(paper(pl.paper_id), { meta: pl.meta }); t.order.push(pl.paper_id); t.stage = t.remap ? 'Matching the existing records to the new sub-claims' : 'Fetching full texts and reading'; break;
     case 'paper_access': Object.assign(paper(pl.paper_id), { access: pl.access, text_source: pl.text_source, status: 'reading' }); break;
     case 'paper_read': Object.assign(paper(pl.paper_id), { record: pl.record, status: 'analysing' }); break;
     case 'matrix_row': Object.assign(paper(pl.paper_id), { row: pl.row, weight: pl.weight, status: 'done' }); break;
@@ -111,6 +118,13 @@ function onEvent(d, type, pl) {
     case 'trial_complete':
       t.status = 'complete'; t.stage = 'Done';
       addMessage({ role: 'thoth', text: `**The trial is in.** ${verdictSentence(t)}`, chips: [{ label: 'Open the trial', act: 'panel', arg: 'check', primary: true }, { label: 'Design a study', act: 'openDesign' }, { label: 'Get reviews', act: 'reviewHyp' }] });
+      break;
+    case 'usage': t.usage = pl; break;
+    case 'stopped':
+      t.status = 'stopped'; t.stage = 'Stopped';
+      for (const p of Object.values(t.papers)) if (!['done', 'unreadable', 'failed'].includes(p.status)) p.status = 'not_run';
+      addMessage({ role: 'thoth', text: `**Stopped.** ${pl.analysed} of ${pl.found} papers were analysed and are kept; ${pl.not_run} were not run. No verdict was weighed.`,
+        chips: [{ label: "Weigh what's done", act: 'rejudgeTrial', primary: true }, { label: 'Open the trial', act: 'panel', arg: 'check' }] });
       break;
     case 'error': addMessage({ role: 'note', text: pl.error }); t.status = t.status === 'running' ? 'failed' : t.status; break;
     default: break;
@@ -135,29 +149,38 @@ cardRenderers.trialProgress = (m, d) => {
   return `<div class="card trial-progress${t.status === 'running' ? ' live' : ''}">
     <div class="card-kicker">The trial · ${esc(t.stage || '')}</div>
     <div class="progress-grid"><span><b>${ps.length}</b> found</span><span><b>${full}</b> full text</span><span><b>${n('done')}</b> analysed</span>${n('failed') + n('unreadable') ? `<span><b>${n('failed') + n('unreadable')}</b> couldn't be read</span>` : ''}<span class="faint">${secs}s</span></div>
-    <div class="chips"><button class="chip" data-act="panel" data-arg="check">Watch the matrix fill in</button></div></div>`;
+    <div class="chips"><button class="chip" data-act="panel" data-arg="check">Watch the matrix fill in</button>${t.status === 'running' && liveTrial === t.trial_id ? `<button class="chip" data-act="stopTrial" ${t.stopping ? 'disabled' : ''}>${t.stopping ? 'Stopping…' : 'Stop'}</button>` : ''}</div></div>`;
 };
 
 // ---------- The trial panel (workspace "Check") ----------
 // The trial streaming in this tab, if any. A saved trial that says "running" without a live stream is
 // stale (the page was reloaded or the server restarted), so it is refreshed from the server.
 let liveTrial = null;
+let loadingTrial = false;
+
+// The trial saved in localStorage is only a cache: the server's copy is fetched once per page load, so its
+// version and staleness (docs/features/04) are current.
+const fetchedThisPage = new Set();
 
 async function ensureLoaded(d) {
   const stale = d.trial && d.trial.status === 'running' && liveTrial !== d.trial.trial_id;
-  if ((d.trial && !stale) || d.trialLoading || !state.projectId) return;
-  d.trialLoading = true;
+  const fresh = fetchedThisPage.has(state.projectId) || liveTrial;
+  if ((d.trial && !stale && fresh) || loadingTrial || !state.projectId) return;
+  fetchedThisPage.add(state.projectId);
+  loadingTrial = true;
   try {
     const t = stale ? await getJSON(`/api/trial/${encodeURIComponent(d.trial.trial_id)}`)
       : await getJSON(`/api/trial/latest?project_id=${encodeURIComponent(state.projectId)}`);
-    if (t.trial_id) {
+    // A run that started while this was loading owns d.trial: don't overwrite it with an older snapshot.
+    if (t.trial_id && !(liveTrial && d.trial?.trial_id === liveTrial)) {
       d.trial = { trial_id: t.trial_id, hypothesis: t.hypothesis, subclaims: t.subclaims, verdict: Object.keys(t.verdict || {}).length ? t.verdict : null,
+        stale: t.stale, hypothesis_version: t.hypothesis_version, hypothesis_now: t.hypothesis_now, remapped_from: t.remapped_from,
         filtered: t.strategy?.europepmc_dropped_off_topic?.count ? { dropped: t.strategy.europepmc_dropped_off_topic.count, titles: t.strategy.europepmc_dropped_off_topic.titles } : null,
         status: t.status, stage: { complete: 'Done', stopped: 'Stopped before finishing' }[t.status] || t.status, started: Date.now(), papers: {}, order: [] };
       for (const p of t.papers) { d.trial.papers[p.paper_id] = p; d.trial.order.push(p.paper_id); }
       emit();
     }
-  } catch (_) { /* no trial yet */ } finally { d.trialLoading = false; }
+  } catch (_) { /* no trial yet */ } finally { loadingTrial = false; }
 }
 
 function witnessIds(t) {
@@ -201,6 +224,45 @@ function ruling(t, v) {
       <div class="fact${notAssessed ? ' warn' : ''}"><b>${esc(notAssessed ? 'Not assessed' : origNote)}</b>originality${v.originality?.reason ? `: ${esc(v.originality.reason).slice(0, 110)}` : ''}</div>
     </div></section>
     `;
+}
+
+// ---------- Live work (docs/features/02): elapsed against the estimate, papers, model calls, Stop ----------
+const fmt = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s >= 60 ? `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`; };
+
+function tickElapsed() {
+  const t = project()?.trial;
+  if (!t || t.status !== 'running') return;
+  for (const el of document.querySelectorAll('.lw-elapsed')) el.textContent = fmt(Date.now() - t.started);
+}
+
+function liveWork(t) {
+  if (t.status !== 'running' || liveTrial !== t.trial_id) return '';
+  const u = t.usage || {};
+  const found = u.found ?? Object.keys(t.papers).length;
+  const done = u.analysed ?? Object.values(t.papers).filter((p) => p.status === 'done').length;
+  return `<div class="live-work" role="status">
+    <span><b class="lw-elapsed">${fmt(Date.now() - t.started)}</b>${t.estimate ? ` <span class="faint">of ~${esc(t.estimate.replace(/ \(.*\)/, ''))}</span>` : ''}</span>
+    <span><b>${done}</b>/${found} papers analysed</span>
+    <span><b>${u.model_calls ?? 0}</b> model calls${u.fallback_calls ? ` <span class="faint">(${u.fallback_calls} by the fallback)</span>` : ''}</span>
+    <button class="chip" data-act="stopTrial" ${t.stopping ? 'disabled' : ''}>${t.stopping ? 'Stopping…' : 'Stop'}</button>
+  </div>`;
+}
+
+register('stopTrial', async () => {
+  const t = project()?.trial;
+  if (!t || t.status !== 'running') return;
+  t.stopping = true; t.stage = 'Stopping: finished rows are kept'; emit();
+  try { await postJSON(`/api/trial/${encodeURIComponent(t.trial_id)}/stop`, {}); }
+  catch (err) { t.stopping = false; addMessage({ role: 'note', text: `Couldn't stop it: ${err.message}` }); emit(); }
+});
+
+function stoppedBlock(t) {
+  if (t.status !== 'stopped' || t.verdict) return '';
+  const ps = Object.values(t.papers);
+  const done = ps.filter((p) => p.status === 'done').length;
+  const notRun = ps.filter((p) => p.status === 'not_run').length;
+  return `<div class="status-banner"><b>Stopped before finishing.</b> ${done} paper${done === 1 ? '' : 's'} analysed and kept${notRun ? `; ${notRun} not run` : ''}. No verdict yet.
+    ${done ? '<div class="chips"><button class="chip primary" data-act="rejudgeTrial">Weigh what\'s done</button></div><span class="faint">The verdict will say which papers weren\'t run.</span>' : ''}</div>`;
 }
 
 function verdictBlock(t) {
@@ -257,7 +319,7 @@ function matrix(t) {
       <span class="wid">${esc(ids[p.paper_id] || '')}</span>
       <span class="mtitle">${esc(m.title || '…')}<span class="faint"> · ${esc(m.year ?? '')}${rec.design?.value ? ` · ${esc(String(rec.design.value).replace(/_/g, ' '))}` : ''}${rec.sample_size?.value ? ` · n ${esc(String(rec.sample_size.value).slice(0, 40))}` : ''}</span></span>
       <span class="badge acc-${esc(p.access)}">${esc(ACCESS[p.access] || p.access)}</span>
-      <span class="dirs">${done ? subs.map((s) => { const x = (p.row.per_subclaim || []).find((y) => y.id === s.id) || {}; const [g, l] = DIR[x.direction] || DIR.not_addressed; return `<span class="dir d-${esc(x.direction || 'not_addressed')}" title="${s.id}. ${esc(l)}${x.locator ? ` · ${esc(x.locator)}` : ''}">${g}</span>`; }).join('') : `<span class="faint">${esc({ found: 'queued', reading: 'reading…', analysing: 'analysing…', failed: "couldn't read", unreadable: 'title only' }[p.status] || p.status)}</span>`}</span>
+      <span class="dirs">${done ? subs.map((s) => { const x = (p.row.per_subclaim || []).find((y) => y.id === s.id) || {}; const [g, l] = DIR[x.direction] || DIR.not_addressed; return `<span class="dir d-${esc(x.direction || 'not_addressed')}" title="${s.id}. ${esc(l)}${x.locator ? ` · ${esc(x.locator)}` : ''}">${g}</span>`; }).join('') : `<span class="faint">${esc({ found: 'queued', reading: 'reading…', analysing: 'analysing…', failed: "couldn't read", unreadable: 'title only', not_run: 'not run', read: 'record reused' }[p.status] || p.status)}</span>`}</span>
       ${done ? `<span class="weight" title="Witness weight">${p.weight}</span>` : ''}
     </summary>
     ${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener" class="faint">${esc(m.venue || 'Source')} ↗</a>` : ''}
@@ -279,8 +341,14 @@ function trialPanel(d) {
   ensureLoaded(d);
   const t = d.trial;
   if (!t) return null;
+  const now = t.hypothesis_now;
+  const stale = t.stale && now ? `<div class="status-banner stale"><b>This verdict is for v${esc(t.hypothesis_version)} of your hypothesis.</b> It is now v${esc(now.version)}: “${esc(now.text)}”
+      <div class="chips"><button class="chip primary" data-act="remapTrial" data-arg="${esc(t.trial_id)}">Re-map these papers to v${esc(now.version)}</button></div>
+      <span class="faint">The papers and their records are reused; only the sub-claims, the matrix and the verdict are redone.</span></div>` : '';
   return `<h2>The trial</h2>
-    <p class="muted">${esc(t.hypothesis)}</p>
+    <p class="muted">${esc(t.hypothesis)}${t.hypothesis_version ? ` <span class="badge">v${esc(t.hypothesis_version)}</span>` : ''}${t.remapped_from ? ' <span class="faint">· same library as the previous trial</span>' : ''}</p>
+    ${stale}
+    ${liveWork(t)}${stoppedBlock(t)}
     ${verdictBlock(t)}
     ${matrix(t)}`;
 }

@@ -603,7 +603,9 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                 verdict_json TEXT NOT NULL DEFAULT '{}',
                 adjacent_json TEXT NOT NULL DEFAULT '[]',
                 created_at REAL NOT NULL,
-                updated_at REAL NOT NULL
+                updated_at REAL NOT NULL,
+                hypothesis_version INTEGER,
+                remapped_from TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_trials_thread ON trials(thread_id, created_at);
 
@@ -653,6 +655,14 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             );
             CREATE INDEX IF NOT EXISTS idx_sys_records_review ON sys_review_records(review_id, created_at);
         """)
+        # Feature 04 (migration 011): a trial is tied to the hypothesis version it tested; a re-mapped trial
+        # (a rival swapped in) names the trial whose library it reused. Older databases get the columns here.
+        for col, typ in (("hypothesis_version", "INTEGER"), ("remapped_from", "TEXT")):
+            try:
+                conn.execute(f"ALTER TABLE trials ADD COLUMN {col} {typ};")
+            except sqlite3.OperationalError:
+                pass
+
 
     return conn
 

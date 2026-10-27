@@ -14,7 +14,12 @@ export async function postJSON(path, body) {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body || {}),
   });
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+  if (!res.ok) {
+    // Keep the server's reason (e.g. "Name what varies first…") so the researcher sees why.
+    let detail = '';
+    try { const j = await res.json(); detail = typeof j.detail === 'string' ? j.detail : ''; } catch (_) {}
+    throw new Error(detail || `${path} → ${res.status}`);
+  }
   return res.json();
 }
 
