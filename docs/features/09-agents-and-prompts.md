@@ -708,3 +708,14 @@ Live-model tests run behind `-m live`; the default gate stays fast and stubbed.
 - **v1.4 (25 Oct 2026):** the valid blind-attribution run scored 24/30 with Darwin and Ibn al-Haytham at 1/3; both opened
   with the same generic confounder checklist. Persona rule added against leading with that checklist; both dossiers
   gained a written first instinct and a "misreading to avoid" for the checklist opening.
+
+## Appraiser (added 29 Oct 2026)
+
+Role `appraiser` (Ultra, temperature 0, 2500 tokens, hidden reasoning off): one call per readable paper, right after
+the Reader, hypothesis-blind. The prompt is in `backend/research/appraisal.py`.
+- The checklist (RoB 2, JBI ×6, MMAT, SANRA, or core questions only) is chosen in code from the Reader's design.
+- Item answers need a quote and a locator; code enforces that, plus the abstract-only limits.
+- The overall judgement and the weight factor are computed from the items.
+
+The Screener prompt now asks for single quotes inside evidence strings (a double quote broke the JSON live), and a
+retry carries a format note.

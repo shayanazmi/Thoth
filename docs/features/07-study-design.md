@@ -61,3 +61,11 @@ the same guardrails. Designs record the trial their witness ids come from (`tria
 flags appeals to unnamed studies and effect sizes with neither a witness id nor "assumed". Walkthrough:
 `docs/archive/verify/design_revision.md`. Scenario: `test_s21_design_revision_loop.py`.
 
+
+## Build note (29 Oct 2026): the loop closed
+
+- Choosing a revision stores why: the change, the Reviewer findings it answers (with their problems), and what is still open.
+- Findings raised against an older design can't drive a revision of the current one (409: run the Reviewer again).
+- Witness appraisals and the verdict's coverage reach the Designer, which prefers low-risk witnesses' measures.
+
+Tests: S26. Walkthrough: `docs/archive/verify/revision_history_and_design_loop.md`.

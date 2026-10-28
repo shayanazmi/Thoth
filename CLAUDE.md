@@ -2,7 +2,7 @@
 
 > Read this in full before touching anything. It is the single working context for any agent on
 > Thoth. If it conflicts with any other file, `THOTH/THOTH.docx` wins, then this file.
-> Last updated **27 Oct 2026**.
+> Last updated **29 Oct 2026**.
 
 ---
 
@@ -31,7 +31,7 @@ a real run in the browser.
 
 ---
 
-## 2. Current state (25 Oct 2026)
+## 2. Current state (29 Oct 2026)
 
 The product is the 24 Oct redesign in `docs/features/`. One conversation, a living research file, and a
 journey: **Explore → Thinkers → Hypothesis → Check → Review → Design → Draft**.
@@ -41,11 +41,11 @@ journey: **Explore → Thinkers → Hypothesis → Check → Review → Design �
 | Conversation core: the conductor (`01`) | Built | `verify/conversation_core.md` |
 | Threads, projects, research file (`02`) | Mostly. Project state on the server (a second browser rebuilds it), thread → project on an accepted hypothesis, delete with counts; Autopilot / Co-pilot with per-step overrides; live-work header and Stop for the trial | `verify/projects_on_server.md`, `verify/modes_live_work_stop.md` |
 | Thinkers as co-authors: roster, council, debate, reviews (`03`) | Built | `verify/thinkers.md` |
-| Hypothesis: versions, strength markers, rivals, version-tied trials, re-map (`04`) | Built | `verify/hypothesis.md` |
-| Literature + the trial / neutral court (`05`, `06`) | Built | `verify/trial.md` |
-| Systematic review, PRISMA (`05` tier 3) | Built | `verify/systematic_review.md` |
+| Hypothesis: versions, strength markers, rivals, version-tied trials, re-map (`04`) | Built; every version keeps why it changed (reason, trigger, evidence, what was known then) | `verify/hypothesis.md`, `verify/revision_history_and_design_loop.md` |
+| Literature + the trial / neutral court (`05`, `06`) | Built; each paper appraised with a checklist for its design (weight = design × access × appraisal); citation neighbours checked for prior work | `verify/trial.md`, `verify/evidence_depth.md` |
+| Systematic review, PRISMA (`05` tier 3) | Built; budgeted, paged, logged search over OpenAlex / Europe PMC / Semantic Scholar, recorded stopping rules, citation rounds, Stop/Continue | `verify/systematic_review.md`, `verify/evidence_depth.md` |
 | Study design + feasibility (`07`) | Built; revises itself from the peer Reviewer's design-level FATALs; unsourced claims flagged | `verify/study_design.md`, `verify/design_revision.md` |
-| Writing: research proposal, verifier, reviewer, export gate (`08`) | Built | `verify/proposal.md` |
+| Writing: research proposal, verifier, reviewer, export gate (`08`) | Built; a design FATAL goes round the loop (revise → choose → bring the proposal up to date → review), resolved findings recorded | `verify/proposal.md`, `verify/revision_history_and_design_loop.md` |
 | UI: Folio layout, Obsidian & Gold palette, motion, cinematic intro (`10`) | Built | `verify/demo_tour.md` |
 | Guided demo tour (optional, `frontend/scripted/`) | Built. "Nurses" recorded in full. "Trust" recorded 27 Oct, but its trial stopped before a verdict (the autopilot moved on), so that chapter replays without a ruling. "Cities" not recorded | `verify/demo_tour.md` |
 
@@ -61,7 +61,7 @@ journey: **Explore → Thinkers → Hypothesis → Check → Review → Design �
 The old plan-and-pipeline path, its six routers and the dead code were retired on 25 Oct 2026, to
 `docs/archive/legacy_code/pipeline_v1/` (see `verify/legacy_retirement.md`).
 
-**Test gate:** `make test-vision` → **83 passed, 1 skipped** (28 Oct 2026). The skip is a live-model test; set `THOTH_LIVE_TESTS=1` to run it.
+**Test gate:** `make test-vision` → **124 passed, 1 skipped** (29 Oct 2026). The skip is a live-model test; set `THOTH_LIVE_TESTS=1` to run it.
 
 ---
 
@@ -89,17 +89,18 @@ thoth/
 │   │                         brief.py (task lifecycle + orphan reconciliation at startup) · mandate · escalation
 │   │                         · clarification · resolver
 │   ├── thinkers/             roster.py · persona.py · modes.py · dossiers/ (one per thinker)
-│   ├── research/             the trial: librarian · reader · analyst · judge · trial · store
+│   ├── research/             the trial: librarian · reader · appraisal (checklists) · analyst · judge · trial · store
+│   │                         citations (references / citing works: OpenAlex, Semantic Scholar)
 │   │                         review · review_store (systematic review) · designer (study design)
 │   │                         writer · verifier · reviewer · proposal (writing) · llm.py
-│   ├── memory/               db.py (SQLite schema, init_db) · conversation_store · vault · graph · index · session
+│   ├── memory/               db.py (SQLite schema, init_db) · conversation_store · rationale (why a version changed) · vault · graph · index · session
 │   ├── intellectual_rigour/  integrity_gate (Truth Guard) · attack_surface · counter_evidence · sparring · synthesis
 │   │                         · matcher · registry + frameworks/ + thinkers.yaml (older thinker engine)
 │   ├── core/                 config · cache (Redis → memory) · errors · logging
 │   ├── scholarly.py  ingestion.py  tools.py  dispatcher.py  telemetry.py
 │   ├── reports/  workspace/  collaboration/   sections/patch/validation · manuscripts/exports · membership + sync
 │   ├── repositories/base.py  supabase_provider (used by health)
-│   └── tests/scenarios/      THE test gate: S10 S11 S12(×2) S13 S14 S15 S16 S17 S18 S19 S20 S21 (fixtures + SSE helpers in conftest.py)
+│   └── tests/scenarios/      THE test gate: S10–S26 (fixtures + SSE helpers in conftest.py)
 │
 ├── frontend/                 vanilla ES modules, no build step
 │   ├── index.html            shell: sidebar · journey · conversation · workspace · intro
@@ -112,7 +113,7 @@ thoth/
 │   ├── assets/               bust, scales, logo, favicon, social preview
 │   └── Dockerfile  nginx.conf  railway.toml
 │
-├── db/migrations/            Postgres 001–008, 010 (must match backend/memory/db.py) · db/seed · db/store.db (local)
+├── db/migrations/            Postgres 001–008, 010–013 (must match backend/memory/db.py) · db/seed · db/store.db (local)
 ├── docs/                     see §7
 ├── scripts/                  db/ (migrate, seed) · ops/ (health, cache flush)
 ├── vault/                    Obsidian-style notes (global; not yet project-scoped)
@@ -170,7 +171,7 @@ make test-vision    # the gate (backend/tests/scenarios); `make test` is an alia
 - Keep this file current in the same change that alters state, the folder map or rules.
 - Preserve history: move superseded code and docs to `docs/archive/` (`git mv`), don't delete them.
 - **Never commit or push.** The owner handles git.
-- Secrets stay in `.env`. `.env.example` lists keys only. Route provider errors through `sanitize_log_message`.
+- Secrets stay in `.env`. `.env.example` lists keys only. Literature APIs: `OPENALEX_API_KEY` (cursor paging and its own daily budget), `SEMANTIC_SCHOLAR_API_KEY` (falls back to the anonymous pool on a 429). Route provider errors through `sanitize_log_message`.
 
 **Code**
 - Use Pydantic v2 for domain and transport objects.

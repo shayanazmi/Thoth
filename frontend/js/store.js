@@ -116,15 +116,19 @@ export function currentHypothesis(d = project()) {
 }
 
 // `saved`: the server already has this version (an accepted Thoth proposal is written when it's accepted).
-export function setHypothesis(text, reason, source = 'you', { saved = false } = {}) {
+// Why a version changed is kept on the server with the version (vision §3.2, §8.1): a reason, what triggered it,
+// and any evidence (a trial verdict, a thinker's reply). The server adds what was known at the time.
+const SOURCE_TRIGGER = { you: 'user_edit', thoth: 'thoth_proposal', idea: 'idea', thinker: 'thinker_critique' };
+
+export function setHypothesis(text, reason, source = 'you', { saved = false, trigger, evidence } = {}) {
   const d = project();
   const clean = String(text || '').trim();
   if (!clean) return;
   const cur = currentHypothesis(d);
   if (cur && cur.text === clean) return;
-  d.hypothesis.versions.push({ text: clean, reason, source, at: Date.now() });
+  d.hypothesis.versions.push({ text: clean, reason, source, at: Date.now(), evidence: evidence || [] });
   d.hypothesis.view = d.hypothesis.versions.length - 1;
-  if (!saved) persistSection('hypothesis', clean);
+  if (!saved) persistSection('hypothesis', clean, { reason, source, trigger: trigger || SOURCE_TRIGGER[source] || 'user_edit', evidence: evidence || [] });
   emit();
 }
 
@@ -133,11 +137,11 @@ export function setHypothesis(text, reason, source = 'you', { saved = false } = 
 // browser can rebuild the project. localStorage only caches the view (panels, cards).
 const isLocal = (id) => !id || String(id).startsWith('local_');
 
-export async function persistSection(section, value) {
+export async function persistSection(section, value, rationale) {
   if (isLocal(state.projectId)) return;
   try {
     const res = await fetch(`${window.THOTH_API_BASE || ''}/api/projects/${encodeURIComponent(state.projectId)}/notebook`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section, value }),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section, value, ...(rationale ? { rationale } : {}) }),
     });
     const out = await res.json();
     const p = state.projects.find((x) => x.id === state.projectId);
@@ -155,9 +159,10 @@ export async function hydrate(id) {
   if (!d || !s || s.project_id !== id) return;
   const local = d.hypothesis.versions;
   if (s.hypothesis.length) {
-    // The server's history wins; a local reason for the same text is kept.
-    d.hypothesis.versions = s.hypothesis.map((v) => ({ text: v.text, source: v.source, at: v.at,
-      reason: local.find((x) => x.text === v.text)?.reason || SOURCE_REASON[v.source] || '' }));
+    // The server's history wins, reasons included (older versions without one keep a local reason, if any).
+    d.hypothesis.versions = s.hypothesis.map((v) => ({ text: v.text, source: v.source, at: v.at, version: v.version,
+      trigger: v.trigger, evidence: v.evidence || [], context: v.context || [],
+      reason: v.reason || local.find((x) => x.text === v.text)?.reason || SOURCE_REASON[v.source] || '' }));
     d.hypothesis.view = d.hypothesis.versions.length - 1;
   } else if (local.length) {
     persistSection('hypothesis', local[local.length - 1].text); // a project from before this change: send it up once

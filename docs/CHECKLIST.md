@@ -95,12 +95,16 @@ Thoth plays three roles at once: a **conversational companion**, a **rigorous in
 - [x] Scenario `test_s13_hypothesis_versions_and_rivals.py` + walkthrough
 - [ ] The Judge is given the computed markers (today it names missing ones from its own reading)
 - [ ] Writer and Designer check that the trial they use is for the current version
+- [x] Every version keeps why it changed: reason, trigger, evidence, what was known then; the original motivation with its question (29 Oct, S25, `verify/revision_history_and_design_loop.md`)
 
 ### 05 · Literature and systematic review — built (`verify/trial.md`, `verify/systematic_review.md`)
 - [x] Librarian strategy, OpenAlex + Europe PMC, open-access full text, honest access badges
 - [x] Hypothesis-blind Reader with provenance on every field; "Upload PDF to complete"; add by DOI
 - [x] Systematic review: protocol → approval → search → screening; PRISMA counts only from recorded decisions
 - [x] Europe PMC tightened to titles and abstracts, off-topic records dropped and counted (25 Oct)
+- [x] Review at scale: budget on the protocol card, paged OpenAlex / Europe PMC / Semantic Scholar, every request logged with its cost (29 Oct, S23, `verify/evidence_depth.md`)
+- [x] Recorded stopping rules (exhausted, budget, K irrelevant in a row, citation saturation, full-text budget, errors, Stop); limitations stated (29 Oct)
+- [x] Citation searching in rounds, counted apart in the PRISMA flow; Stop and Continue (29 Oct)
 - [ ] A review can be revised and re-screened
 - [ ] A not-retrieved review record can take an uploaded PDF
 - [ ] Borderline off-topic papers still get in (e.g. intimate-partner violence among night-shift nurses)
@@ -110,6 +114,8 @@ Thoth plays three roles at once: a **conversational companion**, a **rigorous in
 - [x] Live matrix, witness weights, "I say", case for and against, GRADE-style verdict, originality guardrails
 - [x] Papers the fallback model read are re-read by the primary model (25 Oct; tested, not yet seen live)
 - [x] Thinker reviews of the verdict (25 Oct)
+- [x] Each paper appraised with the checklist for its design (RoB 2, JBI, MMAT, SANRA, core); weight = design × access × appraisal; the Judge rates down for risk of bias (29 Oct, S24)
+- [x] Citation neighbours of the strongest witnesses checked for prior work; closest prior work named by id; coverage stated on every verdict (29 Oct)
 - [ ] Older trials keep fallback-read papers flagged (the fetched text isn't stored, so they can't be re-read)
 - [ ] Speed: ~1 analysed paper per minute on the free tier (15 papers ≈ 8-10 min)
 
@@ -121,7 +127,7 @@ Thoth plays three roles at once: a **conversational companion**, a **rigorous in
 - [x] A design-level FATAL from the peer Reviewer goes back to the Design tab: one revised design, changes per finding, what's still open (28 Oct)
 - [x] Designs keep the trial their witness ids come from; proposal sections are marked stale when the design changes (28 Oct)
 - [ ] Revise the design from thinker critiques (today: only from the peer Reviewer's findings)
-- [ ] Regenerate all stale sections in one step after choosing a new design
+- [x] Regenerate all stale sections in one step after choosing a new design, then re-review; a finding no longer raised is recorded as resolved by that design version (29 Oct, S26)
 
 ### 08 · Research proposal — built (`verify/proposal.md`)
 - [x] Editable outline → approval with an estimate → sections from the research file only
@@ -130,7 +136,8 @@ Thoth plays three roles at once: a **conversational companion**, a **rigorous in
 - [ ] Fallback-checked claims labelled but not treated as weaker in the status
 - [ ] The uncited-claim check is a word-matching heuristic
 - [ ] PDF / Word export (with approval)
-- [ ] The live run ended provisional: 1 FATAL about the design's recall windows, 4 critical thinker concerns open
+- [x] The recall-windows FATAL went round the loop and is recorded as resolved by design v2 (29 Oct); the new design drew 3 new design FATALs, so the proposal stays provisional, honestly
+- [x] An advisory (not a gap) when the literature review rests on a scan rather than a systematic review
 
 ### 09 · Agents and prompts — built
 - [x] One prompt shape and shared preamble; model map in `ROLE_MODELS`; `_served_by` recorded on every record

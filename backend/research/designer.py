@@ -60,7 +60,9 @@ OUTPUT (JSON)
 RULES
 - Never invent effect sizes, reliability coefficients or instrument properties.
 - Never describe a cross-sectional or other non-causal design as able to show causation.
-- Use only witness ids that appear in the trial lessons."""
+- Use only witness ids that appear in the trial lessons.
+- Prefer measures and procedures from witnesses whose appraisal is low risk; when you borrow from a high-risk witness,
+  say what its weakness means for your design."""
 
 
 def latest_trial(thread_id: str) -> Optional[Dict[str, Any]]:
@@ -107,11 +109,17 @@ def trial_lessons(trial: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             "measures": [{"construct": m.get("construct"), "instrument": m.get("instrument")} for m in rec.get("measures") or []][:6],
             "boundary_conditions": row.get("boundary_conditions"), "blind_spots": row.get("blind_spots"),
             "risks_of_bias": (row.get("appraisal") or {}).get("risks_of_bias"), "access": p.get("access"),
+            "appraisal": appraisal_summary(p.get("appraisal") or {}),
         })
     v = trial.get("verdict") or {}
     return {"available": True, "trial_id": trial["trial_id"], "subclaims": trial["subclaims"], "witnesses": witnesses,
             "verdict": {"overall": v.get("overall"), "per_subclaim": [{"id": s.get("id"), "verdict": s.get("verdict")} for s in v.get("per_subclaim") or []],
-                        "gaps": v.get("gaps"), "hypothesis_weaknesses": v.get("hypothesis_weaknesses")}}
+                        "gaps": v.get("gaps"), "hypothesis_weaknesses": v.get("hypothesis_weaknesses"), "coverage": v.get("coverage")}}
+
+
+def appraisal_summary(a: Dict[str, Any]) -> Dict[str, Any]:
+    from backend.research.judge import appraisal_summary as summary
+    return summary(a)
 
 
 _TOKEN = re.compile(r"[A-Za-z]{3,}|[A-Z]{2,}")

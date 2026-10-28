@@ -2,7 +2,7 @@
 // choose one (with your notes) → it becomes the Design section; thinkers can critique it.
 import { getJSON, postJSON } from './api.js';
 import { state, project, emit, addMessage, currentHypothesis } from './store.js';
-import { register, openPanel } from './chat.js';
+import { register, openPanel, actions } from './chat.js';
 import { PANELS } from './workspace.js';
 import { esc } from './util.js';
 import { askText } from './ui.js';
@@ -62,11 +62,20 @@ function designCard(dz, i, rec, chosenName) {
   </details>`;
 }
 
+// Why this design version exists (vision §8.1): the reason, the peer Reviewer's findings it answers, what is still open.
+function whyThisVersion(r) {
+  if (!r || !r.reason) return '';
+  return `<div class="rev-box"><b>Why this version</b> ${esc(r.reason)}
+    ${(r.evidence || []).length ? `<ul class="list">${r.evidence.map((e) => `<li><span class="rk">${esc(e.ref?.finding_id || e.kind.replace(/_/g, ' '))}</span>${esc(e.label || '')}</li>`).join('')}</ul>` : ''}
+    ${(r.context || []).length ? `<div class="guard">${r.context.map((c) => esc(c.label)).join(' · ')}</div>` : ''}</div>`;
+}
+
 function chosenBlock(c) {
   if (!c) return '';
   return `<div class="status-banner full"><b>Your design (v${c.version}): ${esc(c.name)}</b><br>
     <span class="faint">${c.author === 'user' ? 'Chosen with your notes' : 'Chosen as proposed'} · ${esc(c.can_conclude)}</span>
     ${c.researcher_notes ? `<p>${esc(c.researcher_notes)}</p>` : ''}
+    ${whyThisVersion(c.rationale)}
     ${unsourcedList(c.unsourced)}
     <div class="chips"><button class="chip" data-act="critiqueDesign">Ask thinkers to critique it</button><button class="chip" data-act="startProposal">Write the proposal</button></div></div>`;
 }
@@ -119,6 +128,7 @@ register('chooseDesign', async (i) => {
   if (notes === null) return;
   try {
     d.design.chosen = await postJSON('/api/design/choose', { project_id: state.projectId, index: +i, notes });
+    actions.proposalStale?.();
     addMessage({ role: 'thoth', text: `Design chosen: **${dz.name}** (v${d.design.chosen.version}). It's now the Design section of your research file.`, chips: [{ label: 'Ask thinkers to critique it', act: 'critiqueDesign', primary: true }, { label: 'Write the proposal', act: 'startProposal' }] });
   } catch (err) { addMessage({ role: 'note', text: `Couldn't save the choice: ${err.message}` }); }
   emit();

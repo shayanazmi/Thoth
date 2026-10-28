@@ -18,7 +18,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from backend.intellectual_rigour.integrity_gate import generate_deterministic_bibliography
 from backend.memory import conversation_store as notebook
-from backend.research import reviewer, verifier, writer
+from backend.research import designer, reviewer, verifier, writer
 
 META = "proposal"
 SECTION = "proposal_section:"
@@ -228,6 +228,15 @@ def status(thread: str) -> Dict[str, Any]:
             gaps.append("Sections changed after the peer review; run the Reviewer again.")
     else:
         gaps.append("The peer Reviewer has not reviewed this proposal." if not rv else "The peer Reviewer could not be reached; no review is on record.")
+    advisories: List[str] = []
+    if any(s["key"] == "literature" for s in outline):
+        # A literature review written from a 15-paper scan is honest only if it says so (vision §5.4). It is advice,
+        # not a gap: a scan is not an unresolved check, and the Writer is told to state the coverage as it is.
+        t = designer.trial_for_design(thread, writer._section(thread, "design"))
+        cov = ((t or {}).get("verdict") or {}).get("coverage") or {}
+        if t and cov.get("kind") != "systematic_review":
+            advisories.append("The literature review rests on a lightweight scan, not a systematic review; a systematic review "
+                              "would make it more defensible.")
     th = meta.get("thinkers") or {}
     concerns = th.get("concerns") or []
     open_c = [c for c in concerns if c["severity"] in NEEDS_ANSWER and not c.get("answer")]
@@ -237,7 +246,7 @@ def status(thread: str) -> Dict[str, Any]:
         claim = c["claim"] if len(c["claim"]) <= 90 else c["claim"][:88].rstrip() + "…"
         gaps.append(f"{c['thinker_name']}'s {'critical' if c['severity'] == 'critical' else 'unstructured'} concern is unanswered: “{claim}”")
     return {
-        "status": "provisional" if gaps else "reviewed", "gaps": gaps,
+        "status": "provisional" if gaps else "reviewed", "gaps": gaps, "advisories": advisories,
         "verifier": verifier_totals(list(secs.values())),
         "reviewer": {"state": review_state, "open": open_counts, "loops": (rv or {}).get("loops", 0)},
         "thinkers": {"reviewed": len([r for r in th.get("reviews") or [] if not r.get("degraded")]),
@@ -342,6 +351,28 @@ async def write_all(thread: str, outline: List[Dict[str, str]], only_missing: bo
     yield "status", status(thread)
 
 
+def _similar(a: str, b: str) -> bool:
+    from backend.research.librarian import _stems
+    x, y = _stems(a), _stems(b)
+    return bool(x and y) and len(x & y) / min(len(x), len(y)) >= 0.4
+
+
+def resolved_since(thread: str, held_now: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """A design or evidence finding held by the previous review that this review no longer raises was resolved, by the
+    design version current now. Recorded (append-only, at most 20) so the correction loop stays auditable; a finding
+    is never silently dropped."""
+    prev = get_meta(thread).get("review") or {}
+    out = list(prev.get("resolved_held") or [])
+    now = design_version(thread)
+    for h in prev.get("held") or []:
+        if h.get("fix_in") not in ("design", "evidence"):
+            continue
+        if any(n.get("fix_in") == h.get("fix_in") and _similar(n.get("problem", ""), h.get("problem", "")) for n in held_now):
+            continue
+        out.append({**h, "resolved_at": time.time(), "resolved_by_design_version": now})
+    return out[-20:]
+
+
 async def review_loop(thread: str, rf: Optional[Dict[str, Any]] = None) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
     """Reviewer; FATAL → revise the section → Verifier → Reviewer again, at most MAX_LOOPS revision rounds.
     FATALs still open after that stay open (and keep the proposal provisional); they are never dropped."""
@@ -366,7 +397,8 @@ async def review_loop(thread: str, rf: Optional[Dict[str, Any]] = None) -> Async
         for w in fatal:
             # Rewording cannot fix a design or evidence problem: those go back to the researcher (Design tab, or
             # more evidence), never to the Writer's revision rounds (docs/features/08; seen live 25 Oct).
-            base = {"id": w["id"], "fix_in": w.get("fix_in", "writing"), "problem": w["problem"], "fix": w["fix"], "section": w["section"]}
+            base = {"id": w["id"], "fix_in": w.get("fix_in", "writing"), "problem": w["problem"], "fix": w["fix"], "section": w["section"],
+                    "design_version": design_version(thread)}
             if w.get("fix_in", "writing") == "design":
                 held.append({**base, "why": "needs a change to the study design"})
             elif w.get("fix_in") == "evidence":
@@ -375,7 +407,8 @@ async def review_loop(thread: str, rf: Optional[Dict[str, Any]] = None) -> Async
                 revisable.setdefault(w["section"], []).append(w)
             else:
                 held.append({**base, "why": "the section has your edits" if w["section"] in by_key else "the passage could not be placed in a section"})
-        rv.update(seen={s["key"]: s["version"] for s in secs}, loops=len(rounds), rounds=rounds, held=held, at=time.time())
+        rv.update(seen={s["key"]: s["version"] for s in secs}, loops=len(rounds), rounds=rounds, held=held, at=time.time(),
+                  resolved_held=resolved_since(thread, held))
         update_meta(thread, review=rv)
         yield "review_done", {"review": rv, "round": rnd}
         if not revisable or rnd == MAX_LOOPS:

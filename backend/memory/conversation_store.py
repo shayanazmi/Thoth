@@ -131,7 +131,9 @@ def resolve_proposal(proposal_id: str, status: str) -> None:
 
 # ---------------------------------------------------------------- notebook
 
-def write_section(thread_id: str, kind: str, content: str, author: str) -> int:
+def write_section(thread_id: str, kind: str, content: str, author: str, rationale: Optional[Dict[str, Any]] = None) -> int:
+    """Append a version. `rationale` (backend/memory/rationale.py) says why; it is stored with the version, write-once."""
+    from backend.memory.rationale import clean
     conn = _conn()
     with conn:
         row = conn.execute(
@@ -139,9 +141,12 @@ def write_section(thread_id: str, kind: str, content: str, author: str) -> int:
             (thread_id, kind),
         ).fetchone()
         version = (row[0] or 0) + 1
+        why = clean(rationale)
+        why["previous_version"] = version - 1 if version > 1 else None
         conn.execute(
-            "INSERT INTO notebook_sections (section_id, thread_id, kind, version, content, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (_id("sec"), thread_id, kind, version, content, author, time.time()),
+            "INSERT INTO notebook_sections (section_id, thread_id, kind, version, content, author, created_at, rationale_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (_id("sec"), thread_id, kind, version, content, author, time.time(), json.dumps(why)),
         )
     return version
 
@@ -149,11 +154,18 @@ def write_section(thread_id: str, kind: str, content: str, author: str) -> int:
 def notebook_snapshot(thread_id: str) -> Dict[str, Dict[str, Any]]:
     conn = _conn()
     rows = conn.execute(
-        "SELECT kind, content, version, author FROM notebook_sections s WHERE thread_id = ? AND version = "
+        "SELECT kind, content, version, author, rationale_json FROM notebook_sections s WHERE thread_id = ? AND version = "
         "(SELECT MAX(version) FROM notebook_sections WHERE thread_id = s.thread_id AND kind = s.kind)",
         (thread_id,),
     ).fetchall()
-    return {r[0]: {"content": r[1], "version": r[2], "author": r[3]} for r in rows}
+    return {r[0]: {"content": r[1], "version": r[2], "author": r[3], "rationale": _why(r[4])} for r in rows}
+
+
+def _why(raw: Optional[str]) -> Dict[str, Any]:
+    try:
+        return json.loads(raw or "{}") or {}
+    except ValueError:
+        return {}
 
 
 # ---------------------------------------------------------------- thinker memory
@@ -182,10 +194,10 @@ def section_history(thread_id: str, kind: str) -> List[Dict[str, Any]]:
     """Every version of one notebook section, oldest first."""
     conn = _conn()
     rows = conn.execute(
-        "SELECT content, version, author, created_at FROM notebook_sections WHERE thread_id = ? AND kind = ? ORDER BY version",
+        "SELECT content, version, author, created_at, rationale_json FROM notebook_sections WHERE thread_id = ? AND kind = ? ORDER BY version",
         (thread_id, kind),
     ).fetchall()
-    return [{"content": r[0], "version": r[1], "author": r[2], "created_at": r[3]} for r in rows]
+    return [{"content": r[0], "version": r[1], "author": r[2], "created_at": r[3], "rationale": _why(r[4])} for r in rows]
 
 
 # ---------------------------------------------------------------- what the thinkers said (for the conductor)

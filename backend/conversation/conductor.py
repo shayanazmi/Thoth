@@ -31,15 +31,17 @@ THINKER_SUGGESTION_GAP = 4  # user turns between thinker suggestions
 STEP_ESTIMATES: Dict[str, Dict[str, str]] = {
     "trial": {
         "label": "Put the hypothesis on trial",
-        "scope": "about 15 papers; open-access full text where it exists, each read and weighed against your sub-claims",
-        "duration": "5-10 minutes",
-        "model_calls": "~33",
+        "scope": "about 15 papers; open-access full text where it exists, each read, appraised for its design and weighed "
+                 "against your sub-claims; papers citing or cited by the strongest checked for prior work",
+        "duration": "6-12 minutes",
+        "model_calls": "~48",
     },
     "systematic_review": {
         "label": "Systematic review (PRISMA)",
-        "scope": "protocol, screening log, full texts where legally available",
-        "duration": "10-30 minutes",
-        "model_calls": "~40-120",
+        "scope": "a protocol and a budget you set; databases and citations searched until recorded stopping rules end it; "
+                 "full texts where legally available, appraised and weighed",
+        "duration": "about 20-90 minutes, depending on the budget",
+        "model_calls": "up to ~250 at the default budget",
     },
 }
 
@@ -524,6 +526,13 @@ def resolve(proposal_id: str, action: str, value: Optional[str] = None) -> Dict[
             raise ValueError("empty value")
         out["section"] = p["payload"]["section"]
         out["value"] = content
-        out["version"] = store.write_section(p["thread_id"], out["section"], content, "user" if action == "edit" else "thoth_accepted")
+        why = {"trigger": "user_edit" if action == "edit" else "thoth_proposal", "source": "you" if action == "edit" else "thoth",
+               "reason": (p["payload"].get("why") or "Proposed by Thoth") + (" (you edited it before accepting)" if action == "edit" else ""),
+               "decision_ref": {"kind": "conductor_proposal", "id": proposal_id}}
+        if out["section"] in ("question", "hypothesis", "rival_hypothesis"):
+            from backend.conversation import projects
+            why = projects.with_context(p["thread_id"], out["section"], why)
+        out["version"] = store.write_section(p["thread_id"], out["section"], content, "user" if action == "edit" else "thoth_accepted",
+                                             rationale=why)
     store.resolve_proposal(proposal_id, out["status"])
     return out

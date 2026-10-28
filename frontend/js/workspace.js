@@ -76,8 +76,15 @@ function hypothesisPanel(d) {
     ${d.firstObservation ? `<div class="ws-section"><h3>Original motivation (kept unchanged)</h3><p>${esc(d.firstObservation)}</p></div>` : ''}
     ${b.context_and_assumptions?.length ? `<div class="ws-section"><h3>Assumptions</h3><ul class="list">${b.context_and_assumptions.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
     ${cleanCriteria(b.falsification_criteria).length ? `<div class="ws-section"><h3>What would prove it wrong</h3><ul class="list">${cleanCriteria(b.falsification_criteria).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
-    <div class="ws-section"><h3>Versions</h3><ol class="list">${v.map((x, i) => `<li><span class="badge">v${i + 1}</span> ${esc(x.text)}<br><span class="faint">${esc(x.reason || '')} · ${esc(x.source || '')} · ${clock(x.at)}</span></li>`).reverse().join('')}</ol></div>`;
+    ${v.length && v[0].reason ? `<div class="ws-section"><h3>Where it started</h3><p>${esc(v[0].text)}</p><p class="faint">${esc(v[0].reason)}${(v[0].context || []).filter((c) => c.kind === 'question').map((c) => ` · asked: “${esc(c.label)}”`).join('')}</p></div>` : ''}
+    <div class="ws-section"><h3>Versions, and why each changed</h3><ol class="list">${v.map((x, i) => `<li><span class="badge">v${i + 1}</span> ${esc(x.text)}
+      <br><span class="faint">${esc(x.reason || '')} · ${esc(TRIGGER[x.trigger] || x.source || '')} · ${clock(x.at)}</span>
+      ${(x.evidence || []).length ? `<div class="chips">${x.evidence.map((e) => `<span class="badge" title="${esc(e.kind.replace(/_/g, ' '))}">${esc(e.label || e.kind)}</span>`).join('')}</div>` : ''}
+      ${(x.context || []).filter((c) => c.kind !== 'question').length ? `<div class="faint">What was known then: ${x.context.filter((c) => c.kind !== 'question').map((c) => esc(c.label)).join('; ')}</div>` : ''}</li>`).reverse().join('')}</ol></div>`;
 }
+
+const TRIGGER = { initial: 'first version', user_edit: 'your edit', thoth_proposal: 'proposed by Thoth, accepted by you', trial_verdict: 'after a trial',
+  review_finding: 'after a review finding', thinker_critique: 'from a thinker conversation', rival_swap: 'a rival swapped in', idea: 'from an idea' };
 
 function checkPanel(d) {
   const running = d.runs.some((r) => !r.done && r.mode !== 'formal');

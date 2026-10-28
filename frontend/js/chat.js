@@ -161,7 +161,8 @@ register('useAsHypothesis', (arg) => {
   const d = project();
   const idea = d.ideas.find((i) => i.key === arg);
   if (idea) setHypothesis(idea.hypothesis || idea.title, 'From an idea Thoth noticed in the conversation', 'idea');
-  else setHypothesis(arg, 'Proposed in a thinker conversation', d.escalation?.source || 'thinker');
+  else setHypothesis(arg, 'Proposed in a thinker conversation', d.escalation?.source || 'thinker',
+    { trigger: 'thinker_critique', evidence: d.escalation?.thinker_id ? [{ kind: 'thinker_reply', ref: { thinker_id: d.escalation.thinker_id }, label: 'the thinker conversation it came from' }] : [] });
   addMessage({ role: 'thoth', text: 'Pinned as your working hypothesis. You can edit it, refine it with a thinker, or check it against the literature.', chips: [{ label: 'Check the evidence', act: 'check', primary: true }, { label: 'Hear the council', act: 'council' }] });
   openPanel('hypothesis');
 });
@@ -474,9 +475,15 @@ register('hypEdit', () => {
   el.textContent = currentHypothesis().text;
   el.contentEditable = 'true';
   el.focus();
-  const finish = () => {
+  const before = currentHypothesis().text;
+  const finish = async () => {
     el.contentEditable = 'false';
-    setHypothesis(el.textContent, 'Edited by you', 'you');
+    const text = el.textContent.trim();
+    if (!text || text === before) { emit(); return; }
+    // Why it changed is kept with the version (vision §3.2): optional, and never invented for the researcher.
+    const why = await askText({ title: 'Why are you changing it?', body: 'Optional. Kept with this version, so the history of your hypothesis can be followed later.',
+      placeholder: 'e.g. the trial found the effect only in rotating shifts', confirm: 'Save the reason', cancel: 'Skip' });
+    setHypothesis(text, (why || '').trim() || 'Edited by you', 'you', { trigger: 'user_edit' });
     emit();
   };
   el.addEventListener('blur', finish, { once: true });

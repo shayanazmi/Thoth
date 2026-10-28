@@ -31,8 +31,10 @@ Evidence for each step is in `docs/archive/verify/`: `conversation_core`, `think
 | Hypothesis (27 Oct: strength markers, rivals on the server, version-tied trials and re-map built: `verify/hypothesis.md`): the Judge isn't given the computed markers; Writer and Designer don't check the trial is for the current version | Proposal / design after a swap | `features/04` |
 | Free-tier speed: ~1 analysed paper per minute; designer and writer slow down under 429s | A 15-paper trial takes 8–10 min | `features/06` |
 | Fallback-model output is labelled (`written_by`, `checked_by`) but not treated as weaker | Proposal status | `features/08` |
-| Reviews can't be revised and re-screened; a not-retrieved review record can't take an uploaded PDF | Systematic review | `features/05` |
-| ~~The design guardrail checks only that assumptions are stated~~ (28 Oct: unsourced claims flagged; design-level FATALs go back to the Design tab; stale proposal sections marked: `verify/design_revision.md`). Stale sections are regenerated one by one | Study design, proposal | `features/07`, `08` |
+| ~~A review is capped at 50 records with no stopping rule~~ (29 Oct: budgeted, paged, logged search; recorded stopping rules; citation rounds; Stop/Continue: `verify/evidence_depth.md`). Reviews can't be revised and re-screened; a not-retrieved review record can't take an uploaded PDF; Semantic Scholar's relevance search stops at 1000 | Systematic review | `features/05` |
+| ~~Appraisal is free text; no citation following~~ (29 Oct: design-specific checklists, weight × appraisal, citation neighbours for originality: `verify/evidence_depth.md`) | Trial | `features/06` |
+| ~~A version doesn't record why it changed~~ (29 Oct: reason, trigger, evidence and context on every version: `verify/revision_history_and_design_loop.md`). The Reviewer renumbers findings in every review | Hypothesis, design | `features/04`, `07`, `08` |
+| ~~The design guardrail checks only that assumptions are stated~~ (28 Oct: unsourced claims flagged; design-level FATALs go back to the Design tab; stale proposal sections marked: `verify/design_revision.md`). Stale sections are brought up to the new design in one step, then re-reviewed; resolved findings are recorded (29 Oct) | Study design, proposal | `features/07`, `08` |
 | Vault notes are global, not project-scoped | `vault/` | vision §9 |
 | Demo tour: "nurses" is recorded in full; "trust" is recorded but its trial has no verdict; "cities" is not recorded. There are no frontend tests | `frontend/scripted/` | — |
 

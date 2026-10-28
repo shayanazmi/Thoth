@@ -1,7 +1,8 @@
 """Project state on the server (docs/features/02-threads-projects-notebook.md).
 
 GET  /api/projects/{id}/state       thread or project, question, hypothesis versions, rivals, the conversation
-PUT  /api/projects/{id}/notebook    the researcher's own question / hypothesis / rival (a new version)
+PUT  /api/projects/{id}/notebook    the researcher's own question / hypothesis / rival (a new version), with an optional rationale
+GET  /api/projects/{id}/history?kind=   every version of question / hypothesis / rival / design with why it changed
 GET  /api/projects/{id}/footprint   what the project holds, with counts (shown before deleting)
 GET  /api/projects/{id}/markers     strength markers of the current hypothesis (once per version)
 POST /api/projects/{id}/rivals/retire   {text}: a parked rival is retired
@@ -27,7 +28,16 @@ async def get_state(project_id: str):
 async def write_notebook(project_id: str, request: Request):
     body = await request.json()
     try:
-        return projects.write(project_id, str(body.get("section") or ""), str(body.get("value") or ""))
+        return projects.write(project_id, str(body.get("section") or ""), str(body.get("value") or ""),
+                              body.get("rationale") if isinstance(body.get("rationale"), dict) else None)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/{project_id}/history")
+async def get_history(project_id: str, kind: str = "hypothesis"):
+    try:
+        return projects.history(project_id, kind)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
