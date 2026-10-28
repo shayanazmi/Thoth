@@ -93,6 +93,9 @@ def _neutralize_scholarly(request, monkeypatch):
         "get_paper_recommendations",
         "get_paper_citations",
         "get_paper_references",
+        # Called directly by backend/research/citations.py so that rate limits are recorded as errors.
+        "_fetch_s2_citations_raw",
+        "_fetch_s2_references_raw",
         "snowball_literature_graph",
     ):
         fn = getattr(sch, name, None)

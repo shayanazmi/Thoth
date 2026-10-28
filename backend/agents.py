@@ -210,6 +210,8 @@ ROLE_MODELS: Dict[str, Dict[str, Any]] = {
     "librarian": {"model": NIM_ULTRA, "temperature": 0.2, "max_tokens": 1200, "timeout": 60, "thinking": False},
     "reader": {"model": NIM_ULTRA, "temperature": 0.0, "max_tokens": 3000, "timeout": 120, "thinking": False},
     "analyst": {"model": NIM_ULTRA, "temperature": 0.2, "max_tokens": 2000, "timeout": 120, "thinking": False},
+    # Study-quality appraisal (vision §5.6): hypothesis-blind, one checklist per paper, item answers with locators.
+    "appraiser": {"model": NIM_ULTRA, "temperature": 0.0, "max_tokens": 2500, "timeout": 120, "thinking": False},
     "judge": {"model": NIM_ULTRA, "temperature": 0.2, "max_tokens": 4000, "timeout": 180},
     # Systematic-review screening: extraction-style judgement on records, many calls, so no hidden reasoning.
     "screener": {"model": NIM_ULTRA, "temperature": 0.0, "max_tokens": 6000, "timeout": 120, "thinking": False},
