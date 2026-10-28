@@ -4,6 +4,8 @@ GET  /api/design?project_id=     resources, latest candidates, chosen design (ve
 POST /api/design/resources       remember the researcher's resources for this project
 POST /api/design/propose         Designer: 2-3 candidates from the hypothesis, trial lessons and resources
 POST /api/design/choose          the researcher picks (and may edit) one; saved as the Design section
+POST /api/design/revise          a design-level FATAL from the peer Reviewer: one revised design answering it,
+                                 offered first among the candidates (choosing it is still the researcher's call)
 """
 from __future__ import annotations
 
@@ -83,3 +85,38 @@ async def choose(request: Request):
     author = "user" if edits else "thoth_accepted"
     version = notebook.write_section(thread, "design", json.dumps(chosen), author)
     return {**chosen, "version": version, "author": author}
+
+
+@router.post("/revise")
+async def revise(request: Request):
+    """Findings default to the proposal review's held design-level FATALs (docs/features/08 → 07)."""
+    body = await request.json()
+    thread = str(body.get("project_id") or "default")
+    chosen = _section(thread, "design")
+    findings = body.get("findings")
+    if not findings:
+        from backend.research import proposal
+        held = (proposal.get_meta(thread).get("review") or {}).get("held") or []
+        findings = [h for h in held if h.get("fix_in") == "design"]
+    if not chosen or not findings:
+        raise HTTPException(status_code=400, detail="needs a chosen design and at least one design-level finding to answer")
+    resources = {k: str((_section(thread, "resources") or {}).get(k) or "") for k in designer.RESOURCE_FIELDS}
+    trial = designer.trial_for_design(thread, chosen)
+    lessons = designer.trial_lessons(trial)
+    hypothesis = notebook.notebook_snapshot(thread).get("hypothesis", {}).get("content") or (trial or {}).get("hypothesis", "")
+    subclaims = (trial or {}).get("subclaims") or [{"id": 1, "claim": hypothesis}]
+    try:
+        out = await designer.revise(chosen, findings, hypothesis, subclaims, resources, lessons)
+    except Exception:
+        out = {"designs": [], "guardrail_notes": []}
+    if not out["designs"]:
+        return {**out, "degraded": True, "message": "The Designer couldn't be reached; no revision was made up in its place."}
+    prev = _section(thread, "design_candidates") or {}
+    others = [d for d in prev.get("designs") or [] if d.get("name") != out["designs"][0]["name"]][:3]
+    merged = {**prev, "designs": out["designs"] + others, "recommended": out["designs"][0]["name"],
+              "why": f"Revised to answer the peer Reviewer: {'; '.join(f.get('problem', '')[:100] for f in findings)}",
+              "guardrail_notes": out["guardrail_notes"], "lessons_used": lessons["available"]}
+    merged.pop("version", None); merged.pop("author", None)
+    merged["version"] = notebook.write_section(thread, "design_candidates", json.dumps(merged), "thoth")
+    return merged
+

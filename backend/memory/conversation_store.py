@@ -186,3 +186,54 @@ def section_history(thread_id: str, kind: str) -> List[Dict[str, Any]]:
         (thread_id, kind),
     ).fetchall()
     return [{"content": r[0], "version": r[1], "author": r[2], "created_at": r[3]} for r in rows]
+
+
+# ---------------------------------------------------------------- what the thinkers said (for the conductor)
+
+def _room_prefix(thread_id: str) -> str:
+    return f"{thread_id}::room::"
+
+
+def thinker_memories(thread_id: str) -> List[Dict[str, Any]]:
+    """Every thinker's remembered stance on this project (thinker_memory), most recently updated first."""
+    rows = _conn().execute(
+        "SELECT thinker_id, stance, changes FROM thinker_memory WHERE thread_id = ? AND stance != '' ORDER BY updated_at DESC",
+        (thread_id,),
+    ).fetchall()
+    return [{"thinker_id": r[0], "stance": r[1], "changes": r[2]} for r in rows]
+
+
+def room_threads(thread_id: str) -> List[str]:
+    """The project's one-to-one thinker rooms (thread ids "<project>::room::<thinker>") that have turns."""
+    p = _room_prefix(thread_id)
+    rows = _conn().execute(
+        "SELECT thread_id, MAX(created_at) FROM conversation_turns WHERE substr(thread_id, 1, ?) = ? GROUP BY thread_id ORDER BY 2 DESC",
+        (len(p), p),
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
+def search_project_turns(thread_id: str, query: str, limit: int = 6) -> List[Dict[str, Any]]:
+    """Like search_turns, across the main conversation AND the thinker rooms, saying who spoke and where."""
+    words = [w for w in query.lower().split() if len(w) > 3][:5] or [query.lower()]
+    p = _room_prefix(thread_id)
+    clause = " OR ".join("LOWER(content) LIKE ?" for _ in words)
+    rows = _conn().execute(
+        f"SELECT thread_id, role, content, meta_json FROM conversation_turns WHERE (thread_id = ? OR substr(thread_id, 1, ?) = ?) "
+        f"AND ({clause}) ORDER BY created_at DESC LIMIT ?",
+        (thread_id, len(p), p, *[f"%{w}%" for w in words], limit),
+    ).fetchall()
+    out = []
+    for tid, role, content, meta_json in rows:
+        meta = json.loads(meta_json or "{}")
+        who = meta.get("thinker_name") if role == "thinker" else ("the researcher" if role == "user" else "Thoth")
+        room = tid[len(p):] if tid.startswith(p) else ""
+        where = "the main conversation"
+        if room:
+            name = meta.get("thinker_name") or room
+            if role != "thinker":
+                name = next((t["meta"].get("thinker_name") for t in recent_turns(tid, 20) if t["meta"].get("thinker_name")), room)
+            where = f"one-to-one with {name}"
+        # A thinker's words come back whole (up to 1500 characters) so they can be quoted exactly.
+        out.append({"who": who or "a thinker", "where": where, "content": content[:1500 if role == "thinker" else 400]})
+    return out

@@ -65,6 +65,30 @@ def save_section(thread: str, sec: Dict[str, Any], author: str) -> Dict[str, Any
     return {**body, "version": version}
 
 
+# Sections that restate the chosen design: written for one design version, stale when it changes.
+DESIGN_DEPENDENT = {"title_abstract", "methods", "expected_outcomes", "limitations_ethics", "timeline"}
+
+
+def design_version(thread: str) -> int:
+    sec = notebook.notebook_snapshot(thread).get("design")
+    return sec["version"] if sec else 0
+
+
+def design_stale(thread: str, sec: Dict[str, Any]) -> str:
+    """Why a design-dependent section no longer matches the chosen design ("" if it does). Sections record the design
+    version they were written from; older ones are compared by time with the current design version."""
+    if sec.get("key") not in DESIGN_DEPENDENT:
+        return ""
+    hist = notebook.section_history(thread, "design")
+    if not hist:
+        return ""
+    now = hist[-1]
+    if sec.get("design_version") is not None:
+        return f"written for design v{sec['design_version']}; the design is now v{now['version']}" if sec["design_version"] != now["version"] else ""
+    written = sec.get("edited_at") or sec.get("written_at") or 0
+    return f"written before design v{now['version']} was chosen" if now["version"] > 1 and written and written < now["created_at"] else ""
+
+
 def outline_of(thread: str) -> List[Dict[str, str]]:
     return get_meta(thread).get("outline") or writer.default_outline()
 
@@ -183,6 +207,9 @@ def status(thread: str) -> Dict[str, Any]:
                 gaps.append(f"“{s['title']}”: {sm['unchecked']} sentence(s) the Verifier could not check.")
             if sm.get("gaps"):
                 gaps.append(f"“{s['title']}”: {sm['gaps']} [GAP] marker(s) — the research file lacks something this section needs.")
+            why = design_stale(thread, sec)
+            if why:
+                gaps.append(f"“{s['title']}” was {why}. Regenerate it.")
     rv = meta.get("review")
     open_counts = {"FATAL": 0, "MAJOR": 0, "MINOR": 0}
     review_state = "none"
@@ -193,6 +220,10 @@ def status(thread: str) -> Dict[str, Any]:
         open_counts = rv.get("counts") or open_counts
         if open_counts.get("FATAL"):
             gaps.append(f"The Reviewer's {open_counts['FATAL']} FATAL problem(s) are unresolved after {rv.get('loops', 0)} revision round(s).")
+        for h in rv.get("held") or []:
+            if h.get("fix_in") in ("design", "evidence"):
+                where = "a change to the study design (Design tab: Revise the design)" if h["fix_in"] == "design" else "evidence the research file doesn't have"
+                gaps.append(f"FATAL {h['id']} needs {where}: {h.get('problem', '')[:140]}")
         if stale:
             gaps.append("Sections changed after the peer review; run the Reviewer again.")
     else:
@@ -249,6 +280,7 @@ async def write_and_verify(thread: str, s: Dict[str, str], outline: List[Dict[st
     ver = await verifier.verify_section(out["markdown"], rf["witnesses"], writer.file_keys(rf))
     prev = get_section(thread, s["key"]) or {}
     return save_section(thread, {"key": s["key"], "title": s["title"], "draft": out["markdown"], "author": "thoth",
+                                 "design_version": design_version(thread),
                                  "user_edited": False, "verification": ver, "writer_notes": out["notes"],
                                  "written_by": out["written_by"], "revisions": prev.get("revisions", 0) + (1 if revision else 0),
                                  "written_at": time.time()}, "thoth")
@@ -332,10 +364,17 @@ async def review_loop(thread: str, rf: Optional[Dict[str, Any]] = None) -> Async
         revisable: Dict[str, List[Dict[str, Any]]] = {}
         held = []
         for w in fatal:
-            if w["section"] in by_key and not by_key[w["section"]].get("user_edited"):
+            # Rewording cannot fix a design or evidence problem: those go back to the researcher (Design tab, or
+            # more evidence), never to the Writer's revision rounds (docs/features/08; seen live 25 Oct).
+            base = {"id": w["id"], "fix_in": w.get("fix_in", "writing"), "problem": w["problem"], "fix": w["fix"], "section": w["section"]}
+            if w.get("fix_in", "writing") == "design":
+                held.append({**base, "why": "needs a change to the study design"})
+            elif w.get("fix_in") == "evidence":
+                held.append({**base, "why": "needs evidence the research file doesn't have"})
+            elif w["section"] in by_key and not by_key[w["section"]].get("user_edited"):
                 revisable.setdefault(w["section"], []).append(w)
             else:
-                held.append({"id": w["id"], "why": "the section has your edits" if w["section"] in by_key else "the passage could not be placed in a section"})
+                held.append({**base, "why": "the section has your edits" if w["section"] in by_key else "the passage could not be placed in a section"})
         rv.update(seen={s["key"]: s["version"] for s in secs}, loops=len(rounds), rounds=rounds, held=held, at=time.time())
         update_meta(thread, review=rv)
         yield "review_done", {"review": rv, "round": rnd}

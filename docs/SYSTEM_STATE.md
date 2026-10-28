@@ -19,19 +19,20 @@ Evidence for each step is in `docs/archive/verify/`: `conversation_core`, `think
 
 ## Gate
 
-`make test-vision`: 72 passed, 1 skipped (the live-model test), 27 Oct 2026.
+`make test-vision`: 83 passed, 1 skipped (the live-model test), 27 Oct 2026.
 
 ## Open gaps (from the walkthroughs)
 
 | Gap | Where it shows | Spec |
 |---|---|---|
 | ~~Project state lives in browser localStorage~~ (27 Oct: question, hypothesis versions, rivals and the conversation are on the server; chats are threads until a hypothesis is accepted; delete removes everything after a count confirmation: `verify/projects_on_server.md`). Chat cards are still only in the browser | A second browser gets the conversation text, not the cards | `features/02` |
-| Thinker replies are not written to the conductor's server-side memory | The conductor can't refer to what a thinker said on a new thread | `features/01`, `03` |
+| ~~Thinker replies are not in the conductor's memory~~ (28 Oct: rooms and stances reach Thoth, recall covers rooms, quotations are checked against the record: `verify/thinkers_heard.md`). Paraphrase is not checked | A thinker's view can still be misstated without quotation marks | `features/01`, `03` |
+| Modes and Stop (27 Oct: Autopilot / Co-pilot with per-step overrides, live-work header, Stop for the trial: `verify/modes_live_work_stop.md`): Stop only for the trial; the screening override is not applied in the review panel; no `activity` table | Long proposal / review runs can't be stopped | `features/02` |
 | Hypothesis (27 Oct: strength markers, rivals on the server, version-tied trials and re-map built: `verify/hypothesis.md`): the Judge isn't given the computed markers; Writer and Designer don't check the trial is for the current version | Proposal / design after a swap | `features/04` |
 | Free-tier speed: ~1 analysed paper per minute; designer and writer slow down under 429s | A 15-paper trial takes 8–10 min | `features/06` |
 | Fallback-model output is labelled (`written_by`, `checked_by`) but not treated as weaker | Proposal status | `features/08` |
 | Reviews can't be revised and re-screened; a not-retrieved review record can't take an uploaded PDF | Systematic review | `features/05` |
-| The design guardrail checks that assumptions are stated, not that they are sourced | Study design | `features/07` |
+| ~~The design guardrail checks only that assumptions are stated~~ (28 Oct: unsourced claims flagged; design-level FATALs go back to the Design tab; stale proposal sections marked: `verify/design_revision.md`). Stale sections are regenerated one by one | Study design, proposal | `features/07`, `08` |
 | Vault notes are global, not project-scoped | `vault/` | vision §9 |
 | Demo tour: "nurses" is recorded in full; "trust" is recorded but its trial has no verdict; "cities" is not recorded. There are no frontend tests | `frontend/scripted/` | — |
 

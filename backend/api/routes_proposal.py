@@ -50,9 +50,9 @@ def _state(thread: str) -> Dict[str, Any]:
     outline = proposal.outline_of(thread)
     from backend.conversation import projects
     return {"outline": outline, "has_outline": bool(meta.get("outline")), "approved": meta.get("approved"),
-            "mode": projects.step_mode(thread, "proposal"),
+            "mode": projects.step_mode(thread, "proposal"), "design_version": proposal.design_version(thread),
             "estimate": proposal.estimate(outline, thread),
-            "sections": {s["key"]: s for s in proposal.sections(thread, outline)},
+            "sections": {s["key"]: {**s, "design_stale": proposal.design_stale(thread, s)} for s in proposal.sections(thread, outline)},
             "review": meta.get("review"), "thinkers": meta.get("thinkers"), "status": proposal.status(thread),
             "references": proposal.references(thread, rf),
             "witnesses": {w["id"]: {"title": w.get("title"), "year": w.get("year"), "access": w.get("access"),

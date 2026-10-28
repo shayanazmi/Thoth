@@ -39,12 +39,12 @@ journey: **Explore → Thinkers → Hypothesis → Check → Review → Design �
 | Feature (spec) | Status | Evidence |
 |---|---|---|
 | Conversation core: the conductor (`01`) | Built | `verify/conversation_core.md` |
-| Threads, projects, research file (`02`) | Partly. Notebook proposals are built; project state is still browser localStorage, and the project is created on the first message | `verify/conversation_core.md` |
+| Threads, projects, research file (`02`) | Mostly. Project state on the server (a second browser rebuilds it), thread → project on an accepted hypothesis, delete with counts; Autopilot / Co-pilot with per-step overrides; live-work header and Stop for the trial | `verify/projects_on_server.md`, `verify/modes_live_work_stop.md` |
 | Thinkers as co-authors: roster, council, debate, reviews (`03`) | Built | `verify/thinkers.md` |
-| Hypothesis, with versions (`04`) | Built in the UI (client-side versions) | UI |
+| Hypothesis: versions, strength markers, rivals, version-tied trials, re-map (`04`) | Built | `verify/hypothesis.md` |
 | Literature + the trial / neutral court (`05`, `06`) | Built | `verify/trial.md` |
 | Systematic review, PRISMA (`05` tier 3) | Built | `verify/systematic_review.md` |
-| Study design + feasibility (`07`) | Built | `verify/study_design.md` |
+| Study design + feasibility (`07`) | Built; revises itself from the peer Reviewer's design-level FATALs; unsourced claims flagged | `verify/study_design.md`, `verify/design_revision.md` |
 | Writing: research proposal, verifier, reviewer, export gate (`08`) | Built | `verify/proposal.md` |
 | UI: Folio layout, Obsidian & Gold palette, motion, cinematic intro (`10`) | Built | `verify/demo_tour.md` |
 | Guided demo tour (optional, `frontend/scripted/`) | Built. "Nurses" recorded in full. "Trust" recorded 27 Oct, but its trial stopped before a verdict (the autopilot moved on), so that chapter replays without a ruling. "Cities" not recorded | `verify/demo_tour.md` |
@@ -52,15 +52,16 @@ journey: **Explore → Thinkers → Hypothesis → Check → Review → Design �
 **Known gaps** (details are in each walkthrough):
 - free-tier speed (~1 paper/min);
 - fallback-model output is labelled but not weighted lower;
-- thinker replies are not in the conductor's server memory;
-- project state lives in the browser;
+- Thoth's quotations of thinkers are checked against the record, but its paraphrases are not;
+- chat cards still live in the browser (the conversation text and project state are on the server);
+- Stop exists for the trial only;
 - no "revise and re-screen" for reviews;
 - no frontend tests.
 
 The old plan-and-pipeline path, its six routers and the dead code were retired on 25 Oct 2026, to
 `docs/archive/legacy_code/pipeline_v1/` (see `verify/legacy_retirement.md`).
 
-**Test gate:** `make test-vision` → **72 passed, 1 skipped** (27 Oct 2026). The skip is a live-model test; set `THOTH_LIVE_TESTS=1` to run it.
+**Test gate:** `make test-vision` → **83 passed, 1 skipped** (28 Oct 2026). The skip is a live-model test; set `THOTH_LIVE_TESTS=1` to run it.
 
 ---
 
@@ -98,7 +99,7 @@ thoth/
 │   ├── scholarly.py  ingestion.py  tools.py  dispatcher.py  telemetry.py
 │   ├── reports/  workspace/  collaboration/   sections/patch/validation · manuscripts/exports · membership + sync
 │   ├── repositories/base.py  supabase_provider (used by health)
-│   └── tests/scenarios/      THE test gate: S10 S11 S12(×2) S13 S15 S16 S17 S18 S19 (fixtures + SSE helpers in conftest.py)
+│   └── tests/scenarios/      THE test gate: S10 S11 S12(×2) S13 S14 S15 S16 S17 S18 S19 S20 S21 (fixtures + SSE helpers in conftest.py)
 │
 ├── frontend/                 vanilla ES modules, no build step
 │   ├── index.html            shell: sidebar · journey · conversation · workspace · intro
@@ -197,7 +198,7 @@ make test-vision    # the gate (backend/tests/scenarios); `make test` is an alia
 | `CLAUDE.md` | This file: state, map, rules |
 | `docs/SYSTEM_STATE.md` | Short status page: what's built, what's next |
 | `docs/features/00–10` | The redesign specs, one per feature (architecture, agents, prompts, acceptance walkthrough) |
-| `docs/archive/verify/*.md` | User-seat walkthroughs: the evidence (current: `conversation_core`, `thinkers`, `trial`, `systematic_review`, `study_design`, `proposal`, `demo_tour`, `legacy_retirement`) |
+| `docs/archive/verify/*.md` | User-seat walkthroughs: the evidence (current: `conversation_core`, `thinkers`, `thinkers_heard`, `trial`, `systematic_review`, `study_design`, `design_revision`, `proposal`, `projects_on_server`, `hypothesis`, `modes_live_work_stop`, `demo_tour`, `legacy_retirement`) |
 | `frontend/scripted/README.md` | Playing, recording and deleting the demo tour |
 | `docs/media/` | The 18s product reel used by the README (`thoth-reel.mp4`, GIF preview, poster), cut from the real "trust" recording |
 | `docs/setup.md` `env-vars.md` `deployment.md` `runbook.md` `database-schema.md` `caching.md` `auth-flow.md` `api-limits.md` | Ops reference, written before the redesign. Check against the code before relying on details. |

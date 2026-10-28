@@ -102,7 +102,9 @@ def _text(thread: str, kind: str) -> str:
 
 def research_file(thread: str) -> Dict[str, Any]:
     """Everything the Writer may draw on, and nothing else. Witness ids match designer.trial_lessons."""
-    trial = designer.latest_trial(thread)
+    # The design's witness ids belong to the trial it was built from; read that trial so W3 means the same paper
+    # in the Methods as in the design (a newer trial would renumber them).
+    trial = designer.trial_for_design(thread, _section(thread, "design"))
     witnesses: List[Dict[str, Any]] = []
     verdict: Dict[str, Any] = {}
     subclaims: List[Dict[str, Any]] = []

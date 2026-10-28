@@ -8,6 +8,7 @@ import { PANELS } from './workspace.js';
 import { esc, md } from './util.js';
 
 const legacyDraft = PANELS.draft;
+const FIX_IN = { design: 'fix in the study design', evidence: 'needs more evidence' };
 const SEV = { FATAL: 'contradicted', MAJOR: 'contested', MINOR: 'insufficient_evidence' };
 const PROBLEM = { causal_leap: 'causal leap', overgeneralization: 'overgeneralization', direction_inversion: 'direction inverted',
   predicate_drift: 'different outcome or measure', number_mismatch: 'number not in the source', none: '' };
@@ -248,7 +249,8 @@ function liveLabel(d, key, sec) {
   if (sec.user_edited && !sec.verification) return '<span class="badge acc-abstract_only">your edits · not verified</span>';
   if (!sec.verification) return '<span class="badge acc-abstract_only">not verified</span>';
   const fallback = sec.written_by && !/ultra/i.test(sec.written_by) ? ` <span class="badge" title="Ultra was rate-limited; this section was written by ${esc(sec.written_by)}">fallback model</span>` : '';
-  return `<span class="badge acc-full_text">${sec.user_edited ? 'your edits · ' : ''}verified${sec.revisions ? ` · revised ×${sec.revisions}` : ''}</span>${fallback}`;
+  const staleDesign = sec.design_stale ? ` <span class="badge bad" title="Regenerate it to follow the current design">${esc(sec.design_stale)}</span>` : '';
+  return `<span class="badge acc-full_text">${sec.user_edited ? 'your edits · ' : ''}verified${sec.revisions ? ` · revised ×${sec.revisions}` : ''}</span>${fallback}${staleDesign}`;
 }
 
 function sectionCard(d, s, i) {
@@ -320,8 +322,10 @@ function reviewerBlock(p) {
     <p>${esc(r.summary)}</p>
     ${(r.weaknesses || []).map((x) => `<div class="finding sev-${x.severity}"><span class="verdict v-${SEV[x.severity]}">${x.severity}</span> <span class="faint">${esc(title(x.section) || 'unplaced')}</span>
       ${x.passage ? `<blockquote>${esc(x.passage)}</blockquote>${x.quoted ? '' : '<span class="faint">(passage not found verbatim in the proposal)</span>'}` : ''}
-      <p>${esc(x.problem)}</p>${x.fix ? `<p class="faint">Fix: ${esc(x.fix)}</p>` : ''}</div>`).join('')}
+      <p>${esc(x.problem)}</p>${x.fix ? `<p class="faint">Fix: ${esc(x.fix)}</p>` : ''}
+      ${FIX_IN[x.fix_in] ? `<div><span class="badge">${FIX_IN[x.fix_in]}</span>${x.severity === 'FATAL' && x.fix_in === 'design' ? ' <span class="faint">Rewording the proposal can\'t fix this, so it wasn\'t sent to the Writer.</span>' : ''}</div>` : ''}</div>`).join('')}
     ${r.held?.length ? `<p class="faint">Not revised automatically: ${r.held.map((h) => `${esc(h.id)} (${esc(h.why)})`).join('; ')}.</p>` : ''}
+    ${r.held?.some((h) => h.fix_in === 'design') ? '<div class="chips"><button class="chip primary" data-act="reviseDesign">Revise the design for this</button></div>' : ''}
     ${r.questions?.length ? `<h4>Questions</h4><ul class="list">${r.questions.map((q) => `<li>${esc(q)}</li>`).join('')}</ul>` : ''}
     <div class="chips"><button class="chip" data-act="pzReview">Run the Reviewer again</button></div></details>`;
 }

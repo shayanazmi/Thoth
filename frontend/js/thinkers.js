@@ -184,6 +184,7 @@ function renderRoom() {
   const el = $('#room');
   if (!room) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false;
+  const draft = $('#roomInput')?.value || ''; // a reply landing re-renders the room; keep what's being typed
   el.innerHTML = `<div class="room-head"><button class="bust-btn" data-act="profile" data-arg="${room.t.id}" aria-label="About ${esc(room.t.name)}">${bustSVG(room.t.name)}</button><div><h2>${esc(room.t.name)}</h2><div class="faint">${esc(room.t.years || '')} · one-on-one · remembers this project</div></div>
       <button class="btn-ghost" data-act="leaveRoom" style="margin-left:auto">Return to Thoth</button></div>
     <div class="messages" id="roomMessages">${room.msgs.map((m) => m.role === 'user'
@@ -194,6 +195,7 @@ function renderRoom() {
     <form class="composer" id="roomForm"><textarea id="roomInput" rows="1" placeholder="Talk with ${esc(room.t.name)}…" aria-label="Message ${esc(room.t.name)}"></textarea><button class="send-btn" aria-label="Send">↑</button></form>`;
   const box = $('#roomMessages'); box.scrollTop = box.scrollHeight;
   const form = $('#roomForm'); const input = $('#roomInput');
+  input.value = draft;
   input.focus();
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
   form.addEventListener('submit', async (e) => {

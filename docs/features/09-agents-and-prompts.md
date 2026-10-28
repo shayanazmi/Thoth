@@ -132,6 +132,7 @@ CONTEXT
 <research_file>{research_file_snapshot}</research_file>
 <pending>{open_proposals_and_offers}</pending>
 <thinker_territories>{roster_id: one-line territory, …}</thinker_territories>
+<thinkers_heard>{each thinker's stance on the project; the latest exchange of each one-to-one room}</thinkers_heard>
 <recent_turns>{recent_turns}</recent_turns>
 ```
 
@@ -555,7 +556,7 @@ OUTPUT (JSON)
 {"summary": str,
  "strengths": [{"point": str, "passage": str}],
  "weaknesses": [{"id": "W1", "severity": "FATAL"|"MAJOR"|"MINOR", "passage": str, "problem": str,
-                 "fix": str}],
+                 "fix": str, "fix_in": "writing"|"design"|"evidence"}],
  "questions": [str], "revision_plan": [str]}
 
 RULES

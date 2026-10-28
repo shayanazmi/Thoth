@@ -22,6 +22,7 @@ from backend.memory import conversation_store as store
 logger = logging.getLogger("ThothConductor")
 
 RECENT_TURNS = 12
+THINKERS_HEARD_MAX = 2400  # characters: thinker stances and room exchanges shown to the conductor
 SUMMARY_EVERY = 10
 NOTEBOOK_SECTIONS = ("question", "hypothesis", "rival_hypothesis", "thinker_note")
 OFFERABLE_STEPS = ("trial", "systematic_review")  # the old "scan" pipeline is retired; the trial is the lightweight check
@@ -102,7 +103,8 @@ TOOLS (use them sparingly; most replies need none)
   or systematic_review. Before there is a hypothesis, help them state one instead. Offer research only when ALL hold: (a) there is
   a statable question or claim; (b) it names at least one concrete construct; (c) their last two messages
   were not open musing. Never offer a step listed as pending below.
-- recall(query): search this project's earlier conversation when the context below is not enough.
+- recall(query): search this project's earlier conversation, including the one-to-one rooms with thinkers,
+  when the context below is not enough.
 
 EXAMPLE OF THE RHYTHM YOU WANT
 User: why do night-shift nurses burn out more?
@@ -121,7 +123,14 @@ CONTEXT
 <project_summary>{summary}</project_summary>
 <research_file>{research_file}</research_file>
 <pending>{pending}</pending>
-<thinker_territories>{territories}</thinker_territories>"""
+<thinker_territories>{territories}</thinker_territories>
+<thinkers_heard>
+What the thinkers have said in this project: their opinion, not evidence. When the researcher asks what a
+thinker said, answer from this (or recall), attribute it by name, and never present it as a finding.
+Put a thinker's words in quotation marks only if they appear here or in a recall result exactly; where an
+excerpt is cut (…), call recall or paraphrase without quotation marks.
+{thinkers_heard}
+</thinkers_heard>"""
 
 
 def _tool_schemas(thinker_ids: List[str]) -> List[Dict[str, Any]]:
@@ -320,10 +329,81 @@ async def _run_tool(name: str, args: Dict[str, Any], thread_id: str, ctx: Dict[s
         return f"Offered a {step} with its estimate. Nothing has started.", events
 
     if name == "recall":
-        hits = store.search_turns(thread_id, str(args.get("query") or ""))
+        hits = store.search_project_turns(thread_id, str(args.get("query") or ""))
         return json.dumps(hits) if hits else "Nothing relevant found in earlier conversation.", events
 
     return f"Unknown tool {name}.", events
+
+
+def _short(text: str, n: int) -> str:
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+def thinkers_heard(thread_id: str) -> str:
+    """Where each thinker stands on this project (their memory) and the latest exchange in each one-to-one room,
+    so Thoth can say what a thinker said (docs/features/03 § Room: "the same, in a separate panel")."""
+    roster = _roster()
+    name = lambda tid: (roster.get(tid) or {}).get("name") or tid
+    lines = []
+    for m in store.thinker_memories(thread_id):
+        moved = f" (changed their mind {m['changes']}x)" if m["changes"] else ""
+        lines.append(f"- {name(m['thinker_id'])}{moved} now stands: {_short(m['stance'], 300)}")
+    for room in store.room_threads(thread_id):
+        tid = room.rsplit("::", 1)[-1]
+        turns = store.recent_turns(room, 4)
+        said = [t for t in turns if t["role"] == "thinker"]
+        asked = [t for t in turns if t["role"] == "user"]
+        if not said:
+            continue
+        who = said[-1]["meta"].get("thinker_name") or name(tid)
+        lines.append(f"- One-to-one with {who} ({store.count_turns(room)} messages). Last: researcher asked "
+                     f"\"{_short(asked[-1]['content'], 200) if asked else '…'}\"; {who} said \"{_short(said[-1]['content'], 1200)}\"")
+    text, used = [], 0
+    for line in lines:
+        if used + len(line) > THINKERS_HEARD_MAX:
+            text.append(f"- …and {len(lines) - len(text)} more (use recall).")
+            break
+        text.append(line)
+        used += len(line) + 1
+    return "\n".join(text) or "(none yet)"
+
+
+_QUOTED = re.compile(r"“([^”]{40,})”|\"([^\"]{40,})\"")
+
+
+def _plain(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[*_`>#\[\]]", "", text or "")).strip().lower()
+
+
+def unsourced_quotes(reply: str, thread_id: str, extra_sources: List[str]) -> List[str]:
+    """Quoted passages (40+ characters, in quotation marks or a blockquote) that appear nowhere in the record:
+    the project's conversation, its thinker rooms, its research file, or what a tool returned this turn.
+    Seen live: asked what Hume said, Thoth quoted two real sentences and then words Hume never wrote."""
+    quotes = [a or b for a, b in _QUOTED.findall(reply or "")]
+    block, blocks = [], []
+    for line in (reply or "").splitlines() + [""]:
+        if line.lstrip().startswith(">"):
+            block.append(line.lstrip()[1:].strip())
+        elif block:
+            blocks.append(" ".join(block)); block = []
+    quotes += [b.strip(" \"“”") for b in blocks if len(b) >= 40]
+    if not quotes:
+        return []
+    # Thoth's own earlier replies are not a source (a misquote repeated would otherwise "find itself").
+    sources = [t["content"] for th in [thread_id, *store.room_threads(thread_id)] for t in store.recent_turns(th, 300) if t["role"] != "assistant"]
+    sources += [v["content"] for v in store.notebook_snapshot(thread_id).values()] + list(extra_sources)
+    record = _plain(" \n ".join(sources))
+    out = []
+    for q in dict.fromkeys(quotes):
+        pieces = [p for p in re.split(r"…|\.\.\.", _plain(q)) if len(p.strip()) >= 20]
+        if pieces and not all(p.strip() in record for p in pieces):
+            out.append(q[:200])
+    return out
+
+
+def _speaker(t: Dict[str, Any]) -> str:
+    return f"{t['meta'].get('thinker_name')} (thinker)" if t["role"] == "thinker" and t["meta"].get("thinker_name") else t["role"]
 
 
 async def _maybe_summarise(thread_id: str, loop: asyncio.AbstractEventLoop) -> None:
@@ -335,7 +415,7 @@ async def _maybe_summarise(thread_id: str, loop: asyncio.AbstractEventLoop) -> N
     from backend.agents import conversation_summarizer_chain
     turns = store.recent_turns(thread_id, total)[: older]
     new_turns = turns[current["turns_covered"]:]
-    text = "\n".join(f"{t['role']}: {t['content'][:600]}" for t in new_turns)
+    text = "\n".join(f"{_speaker(t)}: {t['content'][:600]}" for t in new_turns)
     try:
         summary = await loop.run_in_executor(None, lambda: conversation_summarizer_chain.invoke(
             {"existing_summary": current["summary"] or "(none)", "recent_turns": text}))
@@ -363,6 +443,7 @@ async def run_conductor_turn(body: Dict[str, Any]) -> AsyncIterator[Tuple[str, D
         research_file=_research_file_text(thread_id, body.get("research_file")),
         pending=_pending_text(thread_id),
         territories="\n".join(f"{tid}: {d['name']}. Cares about: {d['territory']}" for tid, d in roster.items()),
+        thinkers_heard=thinkers_heard(thread_id),
     )
     messages: List[Any] = [SystemMessage(content=system), *history, HumanMessage(content=user_text)]
     tools_used: List[str] = []
@@ -411,8 +492,13 @@ async def run_conductor_turn(body: Dict[str, Any]) -> AsyncIterator[Tuple[str, D
         )
 
     spans = unchecked_spans(reply)
-    store.add_turn(thread_id, "assistant", reply, {"tools": tools_used, "unchecked": spans, "degraded": degraded})
-    yield "direct_answer", {"answer": reply, "unchecked": spans, "tools": tools_used, "fallback": degraded, "degraded": degraded}
+    misquotes = [] if degraded else unsourced_quotes(reply, thread_id, [m.content for m in messages if isinstance(m, ToolMessage)])
+    if misquotes:
+        reply += ("\n\n*Note: a passage in quotation marks above is not in the record word for word. "
+                  "Read it as a paraphrase, not as the speaker's own words.*")
+    store.add_turn(thread_id, "assistant", reply, {"tools": tools_used, "unchecked": spans, "degraded": degraded, "misquotes": misquotes})
+    yield "direct_answer", {"answer": reply, "unchecked": spans, "tools": tools_used, "fallback": degraded, "degraded": degraded,
+                            "misquotes": misquotes}
 
     await _maybe_summarise(thread_id, loop)
     yield "complete", {"kind": "conversation"}

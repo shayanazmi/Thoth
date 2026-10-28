@@ -106,3 +106,15 @@ is derived from the notebook; the `projects(mode, step_overrides)` and `activity
 Co-pilot and Stop. Promotion keeps the same id, so nothing is moved. Not yet: per-section status, Autopilot,
 the live-work header and Stop, chat cards on the server, and vault notes in the delete.
 
+## Build note (27 Oct 2026, second slice: modes, live work, Stop)
+
+Built: mode per project (`copilot` default / `autopilot`) with overrides for `subclaims`, `screening`, `proposal`
+(stored as a versioned notebook entry, `/api/projects/{id}/mode`); a per-run model-call counter
+(`research/llm.py`); the trial's live-work header (elapsed vs estimate, papers analysed of found, model calls,
+fallback calls) and Stop (`POST /api/trial/{id}/stop`: finished rows kept, the rest `not_run`, no verdict unless
+asked; a later verdict says what wasn't run). Proposal writing steps one section per approval in Co-pilot.
+Walkthrough: `docs/archive/verify/modes_live_work_stop.md`. Scenario: `test_s14_modes_live_work_and_stop.py`.
+
+Departures: no `projects` or `activity` tables (the mode is a notebook entry; live work is streamed, not stored).
+Not yet: Stop for proposal writing, systematic review and re-analysis; the screening override in the review panel.
+

@@ -101,3 +101,10 @@ Departures from the design above, and why:
 - Thinker reviews: an unstructured review (no envelope) counts as a concern that must be answered.
 - Export is Markdown only for now (approval required; provisional is watermarked).
 
+## Build note (28 Oct 2026): where a problem is fixed
+
+The Reviewer tags each finding `fix_in: writing | design | evidence`. Only writing FATALs enter the revision rounds;
+design FATALs are held and sent back to the Design tab ("Revise the design"); evidence FATALs are held and listed.
+Sections that restate the design record its version and are marked stale when it changes. Walkthrough:
+`docs/archive/verify/design_revision.md`.
+

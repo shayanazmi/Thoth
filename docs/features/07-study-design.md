@@ -52,3 +52,12 @@ Replaces the planned `workspace/feasibility.py` probe (`CLAUDE.md` Phase 8).
 4. Pick one, edit it → the Design section is saved as v1.
 
 Scenario test: `test_s17_design_feasibility.py`.
+
+## Build note (28 Oct 2026): revision from the peer Reviewer; sourcing
+
+`designer.revise` and `POST /api/design/revise`: the proposal Reviewer's design-level FATALs (`fix_in: design`) go
+back to the Designer, which returns one revised design with changes per finding and what stays unresolved, under
+the same guardrails. Designs record the trial their witness ids come from (`trial_for_design`). A sourcing check
+flags appeals to unnamed studies and effect sizes with neither a witness id nor "assumed". Walkthrough:
+`docs/archive/verify/design_revision.md`. Scenario: `test_s21_design_revision_loop.py`.
+
