@@ -206,6 +206,7 @@ async def search_openalex(client: httpx.AsyncClient, query: str, limit: int, cur
         if page_info is not None:
             meta = data.get("meta") or {}
             page_info["total"] = meta.get("count")
+            page_info["cost_usd"] = meta.get("cost_usd")
             if page is None:
                 page_info["next_cursor"] = meta.get("next_cursor")
             else:
@@ -228,12 +229,83 @@ def _stems(text: str) -> set:
             if w.lower() not in _STOP and w.lower() not in _BOOL}
 
 
-def on_topic(paper: Dict[str, Any], query: str) -> bool:
-    """Title + abstract share at least two of the query's content words (one if the query has only one).
-    Europe PMC matches words anywhere in the full text, which let in e.g. workplace-violence papers."""
+def on_topic(paper: Dict[str, Any], query: str, need: int = 2) -> bool:
+    """Title + abstract share at least `need` of the query's content words (fewer if the query has fewer).
+    Europe PMC matches words anywhere in the full text, which let in e.g. workplace-violence papers. Citation
+    following uses need=1: a seed's references are already linked to the topic, so the Screener decides the rest."""
     want = _stems(query)
     have = _stems(f"{paper.get('title', '')} {paper.get('abstract', '')}")
-    return len(want & have) >= min(2, len(want))
+    return len(want & have) >= min(need, len(want))
+
+
+# ---------------------------------------------------------------- Semantic Scholar
+
+S2_GRAPH = "https://api.semanticscholar.org/graph/v1"
+S2_FIELDS = "title,authors,abstract,url,venue,year,citationCount,externalIds,publicationDate,paperId"
+
+
+async def _s2_raw(path: str, params: Dict[str, Any], keyed: bool = True) -> Dict[str, Any]:
+    import os
+    headers = {"User-Agent": UA["User-Agent"]}
+    if keyed and os.getenv("SEMANTIC_SCHOLAR_API_KEY"):
+        headers["x-api-key"] = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(f"{S2_GRAPH}{path}", params=params, headers=headers)
+        r.raise_for_status()
+        return r.json()
+
+
+async def s2_get(path: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """One Semantic Scholar Graph call through its rate limiter (a key allows 1 request a second). A key whose
+    quota is spent answers 429 while the shared anonymous pool still answers (seen 29 Oct 2026), so a keyed 429 is
+    retried once without the key. Raises on failure, so callers can record the error instead of "no papers"."""
+    import os
+    from backend import scholarly
+
+    async def call():
+        try:
+            return await _s2_raw(path, params, keyed=True)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429 and os.getenv("SEMANTIC_SCHOLAR_API_KEY"):
+                await asyncio.sleep(1.5)
+                return await _s2_raw(path, params, keyed=False)
+            raise
+    return await scholarly.s2_dispatcher.call(call)
+
+
+async def search_s2(query: str, limit: int, offset: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Semantic Scholar relevance search, paged by offset (up to 100 a call). Not the bulk endpoint its docs suggest for
+    heavy use: bulk search ANDs every term and returns results sorted by id, date or citations, not relevance (seen
+    29 Oct 2026: 2 matches for a 6-word query). A review takes the first N by relevance within its budget and stops
+    screening after K irrelevant records in a row, so it needs relevance order. Returns (records, {total, next_cursor, error})."""
+    start = int(offset or 0)
+    params = {"query": keywords(query, 10), "fields": S2_FIELDS, "limit": max(1, min(100, limit)), "offset": start}
+    try:
+        data = await s2_get("/paper/search", params)
+    except Exception as exc:
+        return [], {"error": f"Semantic Scholar: {sanitize_log_message(str(exc))[:180]}", "next_cursor": offset}
+    if not isinstance(data, dict):
+        return [], {"error": "Semantic Scholar returned no data", "next_cursor": offset}
+    rows = [x for x in data.get("data") or [] if isinstance(x, dict) and x.get("title")]
+    nxt = data.get("next")
+    # The relevance endpoint serves at most the first 1000 results.
+    return ([s2_meta(x, "Semantic Scholar") for x in rows],
+            {"total": data.get("total"), "next_cursor": str(nxt) if nxt is not None and int(nxt) < 1000 else None, "error": None})
+
+
+def _pmc(v: Any) -> Optional[str]:
+    v = str(v or "").strip().upper()
+    return (v if v.startswith("PMC") else f"PMC{v}") if v else None
+
+
+def s2_meta(p: Dict[str, Any], found_via: str) -> Dict[str, Any]:
+    ext = p.get("externalIds") or {}
+    year = p.get("year")
+    return {"title": p.get("title") or "", "year": year if isinstance(year, int) else None, "venue": p.get("venue") or None,
+            "authors": [a.get("name") for a in (p.get("authors") or [])[:6] if isinstance(a, dict) and a.get("name")],
+            "doi": norm_doi(ext.get("DOI")) or None, "abstract": p.get("abstract") or "", "pmcid": _pmc(ext.get("PubMedCentral")),
+            "oa_pdf": None, "is_oa": False, "url": p.get("url") or "", "citations": p.get("citationCount"),
+            "found_via": found_via, "s2_id": p.get("paperId") or None, "pmid": ext.get("PubMed") or None, "openalex_id": ""}
 
 
 async def search_europepmc(client: httpx.AsyncClient, query: str, limit: int, dropped: Optional[List[str]] = None,

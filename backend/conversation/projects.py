@@ -185,7 +185,8 @@ def _args(pid: str):
 
 
 LABELS = [("papers", "paper", "papers"), ("trials", "trial", "trials"), ("systematic_reviews", "systematic review", "systematic reviews"),
-          ("review_records", "screening record", "screening records"), ("messages", "message", "messages"),
+          ("review_records", "screening record", "screening records"),
+          ("review_searches", "logged search", "logged searches"), ("messages", "message", "messages"),
           ("notebook_entries", "notebook entry", "notebook entries"), ("thinker_memories", "thinker memory", "thinker memories")]
 
 
@@ -202,6 +203,7 @@ def footprint(pid: str) -> Dict[str, Any]:
         "papers": one(f"SELECT COUNT(*) FROM trial_papers WHERE trial_id IN (SELECT trial_id FROM trials WHERE {w})", a),
         "systematic_reviews": one(f"SELECT COUNT(*) FROM sys_reviews WHERE {w}", a),
         "review_records": one(f"SELECT COUNT(*) FROM sys_review_records WHERE review_id IN (SELECT review_id FROM sys_reviews WHERE {w})", a),
+        "review_searches": one(f"SELECT COUNT(*) FROM sys_review_searches WHERE review_id IN (SELECT review_id FROM sys_reviews WHERE {w})", a),
     }
     parts = [f"{counts[k]} {one_ if counts[k] == 1 else many}" for k, one_, many in LABELS if counts[k]]
     return {"project_id": pid, "counts": counts, "summary": ", ".join(parts) or "nothing stored yet"}
@@ -215,6 +217,7 @@ def delete(pid: str) -> Dict[str, Any]:
     with c:
         c.execute(f"DELETE FROM trial_papers WHERE trial_id IN (SELECT trial_id FROM trials WHERE {w})", a)
         c.execute(f"DELETE FROM sys_review_records WHERE review_id IN (SELECT review_id FROM sys_reviews WHERE {w})", a)
+        c.execute(f"DELETE FROM sys_review_searches WHERE review_id IN (SELECT review_id FROM sys_reviews WHERE {w})", a)
         for table in ("conversation_turns", "thread_summaries", "conductor_proposals", "notebook_sections", "thinker_memory", "trials", "sys_reviews"):
             c.execute(f"DELETE FROM {table} WHERE {w}", a)
         c.execute("DELETE FROM research_projects WHERE project_id = ?", (pid,))

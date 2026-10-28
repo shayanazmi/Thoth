@@ -91,6 +91,29 @@ hypothesis vN + sub-claims
 The Judge must write **the case for and the case against**, each from the strongest witnesses, before it
 gives a verdict. That's what makes the court neutral.
 
+### As built (29 Oct 2026): appraisal and citation neighbours
+
+- **Appraiser** (role `appraiser`, `backend/research/appraisal.py`): hypothesis-blind, one call per readable paper,
+  right after the Reader. The checklist is chosen in code from the Reader's design:
+  - Cochrane RoB 2 domains for RCTs;
+  - JBI for quasi-experimental, cohort, case-control, cross-sectional, qualitative and systematic reviews;
+  - MMAT for mixed methods; SANRA for narrative reviews;
+  - core questions only for anything else, which the paper says.
+
+  Code turns an answer without a locator into "unclear", and makes items that need the full text "not assessable"
+  when only the abstract was read. The overall judgement is computed from the items: critical "no" → high;
+  critical unclear → some concerns.
+- **Weight v2** = design tier × access factor × appraisal factor (low 1.0, some concerns 0.85, high 0.6, not assessable
+  0.8 only when read in full, core only 0.9). The basis is stored in `appraisal.weight_basis` and shown on hover.
+  Papers from older runs keep their weight.
+- **Judge**: each witness carries its appraisal summary. Code lowers certainty when every supporting witness is high
+  risk or not assessable.
+- **Citation neighbours**: papers citing, or cited by, the 3 strongest witnesses (OpenAlex, then Semantic Scholar;
+  abstracts only; never witnesses), stored in `adjacent_json.citation`. The Judge names the closest prior work by
+  W#/C# id. `likely_novel` is refused when this run's citation search did not run; older trials are only noted.
+- **Coverage**, set in code on every verdict: a lightweight scan, or the systematic review's counts and limitations.
+- Cost: about 3 calls per paper plus 3 (about 48 for 15 papers). Evidence: `docs/archive/verify/evidence_depth.md`; tests S22, S24.
+
 ## Output (what the user sees)
 
 1. **Verdict strip**: overall verdict, originality, and a one-sentence reason.

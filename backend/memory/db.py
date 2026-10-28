@@ -693,7 +693,9 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                                 ("sys_review_records", "origin_json", "TEXT DEFAULT '{}'"),
                                 ("sys_review_records", "rank", "INTEGER"),
                                 ("trial_papers", "appraisal_json", "TEXT DEFAULT '{}'"),
-                                ("notebook_sections", "rationale_json", "TEXT DEFAULT '{}'")):
+                                ("notebook_sections", "rationale_json", "TEXT DEFAULT '{}'"),
+                                # migration 013: what each search request cost (OpenAlex reports meta.cost_usd)
+                                ("sys_review_searches", "cost_usd", "REAL")):
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ};")
             except sqlite3.OperationalError:

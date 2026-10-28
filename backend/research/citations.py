@@ -61,10 +61,10 @@ def _s2_id(meta: Dict[str, Any]) -> str:
     return librarian.norm_doi(meta.get("doi")) or str(meta.get("s2_id") or "")
 
 
-def _filter(papers: List[Dict[str, Any]], query: str, info: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _filter(papers: List[Dict[str, Any]], query: str, info: Dict[str, Any], need: int = 2) -> List[Dict[str, Any]]:
     if not query:
         return papers
-    kept = [p for p in papers if librarian.on_topic(p, query)]
+    kept = [p for p in papers if librarian.on_topic(p, query, need)]
     info["removed_offtopic"] += len(papers) - len(kept)
     return kept
 
@@ -75,32 +75,16 @@ def _tag(papers: List[Dict[str, Any]], kind: str, provider: str) -> List[Dict[st
     return [p for p in papers if p.get("title")]
 
 
-def _pmc(v: Any) -> Optional[str]:
-    v = str(v or "").strip().upper()
-    return (v if v.startswith("PMC") else f"PMC{v}") if v else None
-
-
-def _s2_meta(p: Dict[str, Any], found_via: str) -> Dict[str, Any]:
-    ext = p.get("externalIds") or {}
-    year = p.get("year")
-    return {"title": p.get("title") or "", "year": year if isinstance(year, int) else None, "venue": p.get("venue") or None,
-            "authors": [a.get("name") for a in (p.get("authors") or [])[:6] if isinstance(a, dict) and a.get("name")],
-            "doi": librarian.norm_doi(ext.get("DOI")) or None, "abstract": p.get("abstract") or "",
-            "pmcid": _pmc(ext.get("PubMedCentral")),
-            "oa_pdf": None, "is_oa": False, "url": p.get("url") or "", "citations": p.get("citationCount"),
-            "found_via": found_via, "s2_id": p.get("paperId") or None, "pmid": ext.get("PubMed") or None, "openalex_id": ""}
-
-
 async def _s2(kind: str, meta: Dict[str, Any], limit: int, info: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Calls Semantic Scholar's raw endpoints through its rate-limited dispatcher (not the public helpers, which
-    swallow errors) so that a rate limit is recorded as an error rather than as "no papers"."""
+    """Semantic Scholar references or citations (librarian.s2_get: rate-limited; a spent key falls back to the
+    anonymous pool). Errors are recorded, so a rate limit is never mistaken for "no papers"."""
     sid = _s2_id(meta)
     if not sid:
         return []
-    from backend import scholarly
-    raw = scholarly._fetch_s2_references_raw if kind == "backward" else scholarly._fetch_s2_citations_raw
+    from backend.scholarly import _normalize_s2_id
+    path = f"/paper/{_normalize_s2_id(sid)}/{'references' if kind == 'backward' else 'citations'}"
     try:
-        data = await scholarly.s2_dispatcher.call(raw, sid, limit)
+        data = await librarian.s2_get(path, {"fields": librarian.S2_FIELDS, "limit": limit})
     except Exception as exc:
         info["error"] = "; ".join(x for x in (info.get("error") and f"OpenAlex: {info['error']}", f"Semantic Scholar: {_err(exc)}") if x)
         return []
@@ -110,7 +94,7 @@ async def _s2(kind: str, meta: Dict[str, Any], limit: int, info: Dict[str, Any])
         info["error"] = info.get("error") or "Semantic Scholar returned no data"
         return []
     info["provider"] = "Semantic Scholar"
-    return [_s2_meta(x.get(key) or {}, FOUND_VIA[(kind, "Semantic Scholar")]) for x in items if isinstance(x, dict)]
+    return [librarian.s2_meta(x.get(key) or {}, FOUND_VIA[(kind, "Semantic Scholar")]) for x in items if isinstance(x, dict)]
 
 
 async def backward(client: httpx.AsyncClient, meta: Dict[str, Any], limit: int, query: str = "") -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
@@ -139,7 +123,8 @@ async def backward(client: httpx.AsyncClient, meta: Dict[str, Any], limit: int, 
     if not papers and not wid and not _s2_id(meta):
         info["error"] = info["error"] or "no identifier"
     papers = _tag(papers, "backward", info["provider"] or "OpenAlex")
-    papers = _filter(papers, query, info)
+    # One shared word is enough for a seed's own references; the Screener judges relevance (and is logged).
+    papers = _filter(papers, query, info, need=1)
     info["returned"] = len(papers)
     return papers, info
 

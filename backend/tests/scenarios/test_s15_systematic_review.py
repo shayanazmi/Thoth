@@ -83,10 +83,15 @@ def _stub(monkeypatch, with_model=True):
     if with_model:
         monkeypatch.setattr(rl, "_llm", lambda role: model)
 
-    async def oa(client, q, limit):
+    # Identification pages now (plan Phase 2 B): these stubs answer the first page and report no next page.
+    async def oa(client, q, limit, cursor=None, page_info=None):
+        if cursor not in (None, "*"):
+            return []
         return [{"title": t, "year": 2020, "doi": f"10.1/{i}", "abstract": f"abstract {t}", "found_via": "OpenAlex"} for i, t in enumerate(TITLES)]
 
-    async def ep(client, q, limit):
+    async def ep(client, q, limit, dropped=None, cursor=None, page_info=None):
+        if cursor not in (None, "*"):
+            return []
         # one duplicate of the first OpenAlex record, by DOI
         return [{"title": TITLES[0], "year": 2020, "doi": "10.1/0", "abstract": "dup", "found_via": "Europe PMC"},
                 {"title": "Another Europe paper E", "year": 2021, "doi": "10.2/9", "abstract": "abs", "found_via": "Europe PMC"},
@@ -106,7 +111,9 @@ def _protocol(client):
 
 
 def _run(client, rid, mode="copilot", approve=True, edits=None):
-    with client.stream("POST", f"/api/review/{rid}/run", json={"approve": approve, "mode": mode, "protocol": edits or {}}) as r:
+    # S15 keeps the original single-pass review: citation rounds and the early-stopping rule are covered in S23.
+    body = {"approve": approve, "mode": mode, "protocol": edits or {}, "budget": {"citation_rounds": 0, "stop_after_irrelevant": 0}}
+    with client.stream("POST", f"/api/review/{rid}/run", json=body) as r:
         if r.status_code != 200:
             return r.status_code, []
         return 200, _read_sse(r, max_events=300, max_seconds=20)
@@ -120,7 +127,8 @@ def _continue(client, rid):
 def _counts_match_log(client, rid):
     st = client.get(f"/api/review/{rid}").json()
     c, recs = st["counts"], st["records"]
-    assert c["identified"] == len(recs)
+    assert c["identified"] == len(recs) == c["identified_databases"] + c["identified_citations"]
+    assert c["screened_by_screener"] == c["screened"] - c["unscreened"] - c["not_screened_stopped"]
     assert c["duplicates_removed"] == sum(1 for r in recs if r["dup_of"])
     assert c["screened"] == c["identified"] - c["duplicates_removed"]
     assert c["excluded_title_abstract"] == sum(1 for r in recs if not r["dup_of"] and (r["ta"] or {}).get("decision") == "exclude")

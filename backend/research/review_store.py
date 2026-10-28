@@ -79,7 +79,7 @@ def records(review_id: str) -> List[Dict[str, Any]]:
 
 
 SEARCH_COLS = ("search_id", "review_id", "round", "kind", "source", "query", "seed_record_id", "page", "requested", "returned",
-               "new_unique", "duplicates", "removed_offtopic", "total_available", "next_cursor", "error", "searched_at")
+               "new_unique", "duplicates", "removed_offtopic", "total_available", "next_cursor", "error", "searched_at", "cost_usd")
 
 
 def add_search(review_id: str, **fields: Any) -> str:

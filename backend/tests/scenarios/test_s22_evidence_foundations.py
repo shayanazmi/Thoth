@@ -19,6 +19,8 @@ import asyncio
 import json
 import sqlite3
 
+import pytest
+
 from backend.research import appraisal, citations, librarian
 
 
@@ -80,14 +82,14 @@ def test_one_paper_is_one_record_whatever_id_it_arrives_with():
 
 def test_paging_reports_cursor_and_total_and_default_is_unchanged(monkeypatch):
     def works(url, params):
-        return Resp({"meta": {"count": 412, "next_cursor": "abc"}, "results": [work(1, doi="10.1/a")]})
+        return Resp({"meta": {"count": 412, "next_cursor": "abc", "cost_usd": 0.001}, "results": [work(1, doi="10.1/a")]})
     client = Client({"api.openalex.org/works": works})
 
     # Without an API key OpenAlex refuses cursor paging past page 1, so basic page numbers are used.
     monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
     info = {}
     out = run(librarian.search_openalex(client, "nurses night shift", 50, cursor="*", page_info=info))
-    assert info == {"next_cursor": "2", "total": 412} and client.calls[-1][1]["page"] == 1
+    assert info == {"next_cursor": "2", "total": 412, "cost_usd": 0.001} and client.calls[-1][1]["page"] == 1
     run(librarian.search_openalex(client, "nurses night shift", 50, cursor="9", page_info=info))
     assert info["next_cursor"] is None, "page 9 × 50 covers all 412 matches"
     assert out[0]["openalex_id"] == "W1" and out[0]["pmid"] == "1" and out[0]["doi"] == "10.1/a"
@@ -95,7 +97,7 @@ def test_paging_reports_cursor_and_total_and_default_is_unchanged(monkeypatch):
     monkeypatch.setenv("OPENALEX_API_KEY", "k")
     info = {}
     run(librarian.search_openalex(client, "nurses night shift", 50, cursor="*", page_info=info))
-    assert info == {"next_cursor": "abc", "total": 412}
+    assert info == {"next_cursor": "abc", "total": 412, "cost_usd": 0.001}
     assert client.calls[-1][1]["cursor"] == "*" and client.calls[-1][1]["api_key"] == "k"
 
     monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
@@ -128,6 +130,7 @@ def test_europepmc_paging_and_pmid():
 
 # ---------------------------------------------------------------- citations
 
+@pytest.mark.citations_unstubbed
 def test_backward_and_forward_from_openalex():
     seed = {"title": "Seed", "openalex_id": "W1", "doi": "10.1/seed"}
 
@@ -152,29 +155,67 @@ def test_backward_and_forward_from_openalex():
     assert any("cites:W1" in (c[1].get("filter") or "") and c[1].get("search") for c in client.calls)
 
 
+@pytest.mark.citations_unstubbed
 def test_semantic_scholar_fallback_and_fail_open(monkeypatch):
     from backend import scholarly
+    monkeypatch.setattr(scholarly.s2_dispatcher, "min_interval_seconds", 0.0)
+    monkeypatch.setattr(scholarly.s2_dispatcher, "max_attempts", 1)
+    calls = []
 
-    async def refs(pid, limit=5):
-        assert pid == "10.9/seed"
-        return {"data": [{"citedPaper": {"title": "Nurses night shift sleep", "abstract": "nurses night shift", "paperId": "s2a",
-                                         "externalIds": {"DOI": "10.9/R1", "PubMed": "55"}, "year": 2019}}]}
+    async def raw(path, params, keyed=True):
+        calls.append((path, keyed))
+        if path.endswith("/references"):
+            assert "DOI:10.9/seed" in path
+            return {"data": [{"citedPaper": {"title": "Nurses night shift sleep", "abstract": "nurses night shift", "paperId": "s2a",
+                                             "externalIds": {"DOI": "10.9/R1", "PubMed": "55"}, "year": 2019}}]}
+        raise RuntimeError("429 Too Many Requests")
 
-    monkeypatch.setattr(scholarly, "_fetch_s2_references_raw", refs)
+    monkeypatch.setattr(librarian, "_s2_raw", raw)
     down = Client({"api.openalex.org": lambda u, p: Resp({}, 500)})
     out, info = run(citations.backward(down, {"title": "Seed", "doi": "10.9/seed"}, 10, query="nurses night shift"))
     assert info["provider"] == "Semantic Scholar" and out[0]["s2_id"] == "s2a" and out[0]["doi"] == "10.9/r1" and out[0]["pmid"] == "55"
 
-    async def limited(pid, limit=5):
-        raise RuntimeError("429 Too Many Requests")
-
-    monkeypatch.setattr(scholarly, "_fetch_s2_citations_raw", limited)
-    monkeypatch.setattr(scholarly.s2_dispatcher, "max_attempts", 1)
     out, info = run(citations.forward(down, {"title": "Seed", "doi": "10.9/seed"}, 10))
     assert out == [] and "429" in info["error"], "a rate limit is recorded as an error, not as 'no citing papers'"
 
     out, info = run(citations.forward(down, {"title": "No ids at all"}, 10))
     assert out == [] and info["error"], "no identifier: reported, never raised"
+
+
+@pytest.mark.citations_unstubbed
+def test_spent_key_falls_back_to_the_anonymous_pool_and_search_pages_by_relevance(monkeypatch):
+    import httpx
+    from backend import scholarly
+    monkeypatch.setattr(scholarly.s2_dispatcher, "min_interval_seconds", 0.0)
+    monkeypatch.setattr(scholarly.s2_dispatcher, "max_attempts", 1)
+    monkeypatch.setenv("SEMANTIC_SCHOLAR_API_KEY", "spent")
+    calls = []
+
+    async def raw(path, params, keyed=True):
+        calls.append((path, keyed, params.get("offset")))
+        if keyed:
+            req = httpx.Request("GET", "https://api.semanticscholar.org" + path)
+            raise httpx.HTTPStatusError("429", request=req, response=httpx.Response(429, request=req))
+        start = params["offset"]
+        nxt = start + params["limit"]
+        return {"total": 1200, "offset": start, "next": nxt,
+                "data": [{"title": f"Night shift nurses paper {start + i}", "paperId": f"p{start + i}"} for i in range(params["limit"])]}
+
+    async def no_sleep(_s):
+        return None
+
+    monkeypatch.setattr(librarian, "_s2_raw", raw)
+    monkeypatch.setattr(librarian.asyncio, "sleep", no_sleep)
+    out, info = run(librarian.search_s2("night shift nurses", 5))
+    assert [(p, k) for p, k, _ in calls] == [("/paper/search", True), ("/paper/search", False)], "a keyed 429 is retried once without the key"
+    assert len(out) == 5 and info == {"total": 1200, "next_cursor": "5", "error": None}
+    out, info = run(librarian.search_s2("night shift nurses", 100, "900"))
+    assert info["next_cursor"] is None, "the relevance endpoint stops at 1000 results"
+
+
+def test_reference_lists_need_only_one_shared_word():
+    assert librarian.on_topic({"title": "Burnout among ICU physicians"}, "night shift nurses burnout", need=1)
+    assert not librarian.on_topic({"title": "Burnout among ICU physicians"}, "night shift nurses burnout")
 
 
 # ---------------------------------------------------------------- appraisal
@@ -227,6 +268,8 @@ def test_enforcement_and_overall_follow_the_items():
 def test_weight_factor_and_empty_or_failed_appraisal(monkeypatch):
     assert appraisal.factor({}) == 1.0 and appraisal.factor(None) == 1.0
     assert appraisal.factor({"overall": "high"}) == 0.6 and appraisal.factor({"overall": "not_appraised"}) == 1.0
+    assert appraisal.factor({"overall": "not_assessable", "access": "abstract_only"}) == 1.0, "access already discounts it"
+    assert appraisal.factor({"overall": "not_assessable", "access": "full_text"}) == 0.8, "read in full, still unreported"
 
     import backend.research.llm as rl
     from langchain_core.messages import AIMessage

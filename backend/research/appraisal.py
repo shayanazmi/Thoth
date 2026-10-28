@@ -192,8 +192,14 @@ def overall(items: List[Dict[str, Any]], checklist_id: Optional[str]) -> Tuple[s
 
 
 def factor(appraisal: Optional[Dict[str, Any]]) -> float:
-    """Weight factor. A paper with no appraisal (an older run, or the Appraiser unavailable) keeps factor 1.0."""
-    return FACTOR.get((appraisal or {}).get("overall") or "", 1.0)
+    """Weight factor. A paper with no appraisal (an older run, or the Appraiser unavailable) keeps factor 1.0.
+    "Couldn't be assessed" because only the abstract was readable is already priced in by the access factor, so it
+    is not discounted twice (seen 29 Oct 2026: 0.45 × 0.55 × 0.8); it lowers the weight only when the full text was
+    read and the paper still didn't report what the checklist asks."""
+    a = appraisal or {}
+    if a.get("overall") == "not_assessable" and a.get("access") and a.get("access") != "full_text":
+        return 1.0
+    return FACTOR.get(a.get("overall") or "", 1.0)
 
 
 def _core_item(v: Any) -> Dict[str, Any]:

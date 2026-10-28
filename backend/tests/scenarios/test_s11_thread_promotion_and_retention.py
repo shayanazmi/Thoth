@@ -87,6 +87,8 @@ def _fill(pid):
                      "VALUES (?, ?, 'H', '{}', 'planned', 0, 0)", (f"rv_{pid}", pid))
         conn.execute("INSERT INTO sys_review_records (record_id, review_id, meta_json, source, created_at) VALUES (?, ?, '{}', 'x', 0)",
                      (f"rr_{pid}", f"rv_{pid}"))
+        conn.execute("INSERT INTO sys_review_searches (search_id, review_id, kind, source, searched_at) VALUES (?, ?, 'keyword', 'OpenAlex', 0)",
+                     (f"rs_{pid}", f"rv_{pid}"))
     return tid
 
 
@@ -114,6 +116,7 @@ def test_delete_needs_a_confirmation_with_counts_and_leaves_nothing(client):
     assert not any(leftovers.values()), leftovers
     assert conn.execute("SELECT COUNT(*) FROM trial_papers").fetchone()[0] == 2, "the other project's papers stay"
     assert conn.execute("SELECT COUNT(*) FROM sys_review_records").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM sys_review_searches").fetchone()[0] == 1, "the search log goes with its review"
     assert gone not in _kinds(client) and keep in _kinds(client)
     assert client.get(f"/api/projects/{keep}/footprint").json()["counts"]["messages"] == 2
     assert client.delete(f"/api/projects/{gone}?confirm=true").status_code == 404

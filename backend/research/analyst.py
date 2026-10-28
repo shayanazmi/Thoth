@@ -7,7 +7,7 @@ in this paper; abstract-only rows are flagged. Witness weight is computed, not a
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from backend.research.llm import call_json
 
@@ -72,6 +72,17 @@ def weight(record: Dict[str, Any]) -> float:
     """Witness weight = design tier × access factor (docs/features/06). Unknown design counts as weak."""
     design = str((record.get("design") or {}).get("value") or "")
     return round(DESIGN_TIER.get(design, 0.3) * ACCESS_FACTOR.get(record.get("access", ""), 0.2), 2)
+
+
+def weight_v2(record: Dict[str, Any], appraisal: Dict[str, Any]) -> Tuple[float, Dict[str, Any]]:
+    """Witness weight = design tier × access factor × appraisal factor (docs/features/06), with its basis so the UI
+    can show how it was reached. No appraisal (an older run, or the Appraiser unavailable) leaves the factor at 1."""
+    from backend.research.appraisal import factor
+    tier = DESIGN_TIER.get(str((record.get("design") or {}).get("value") or ""), 0.3)
+    acc = ACCESS_FACTOR.get(record.get("access", ""), 0.2)
+    f = factor(appraisal)
+    return round(tier * acc * f, 2), {"method": "v2", "design_tier": tier, "access_factor": acc, "appraisal_factor": f,
+                                      "appraisal": (appraisal or {}).get("overall")}
 
 
 async def subclaims(hypothesis: str) -> Dict[str, Any]:
