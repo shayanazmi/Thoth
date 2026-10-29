@@ -93,6 +93,10 @@ def _neutralize_scholarly(request, monkeypatch):
         "get_paper_recommendations",
         "get_paper_citations",
         "get_paper_references",
+        # Called directly by backend/research/citations.py so that rate limits are recorded as errors.
+        "_fetch_s2_citations_raw",
+        "_fetch_s2_references_raw",
+        "_fetch_semantic_scholar_raw",  # the systematic review's third database (backend/research/review.py)
         "snowball_literature_graph",
     ):
         fn = getattr(sch, name, None)
@@ -101,6 +105,36 @@ def _neutralize_scholarly(request, monkeypatch):
         import inspect
         stub = _async_empty if inspect.iscoroutinefunction(fn) else _sync_empty
         monkeypatch.setattr(sch, name, stub, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_citations(request, monkeypatch):
+    """Citation following (backend/research/citations.py) never reaches OpenAlex or Semantic Scholar in the
+    scenario suite: by default it answers "looked, found nothing". Tests that drive it with a fake client opt out
+    with ``@pytest.mark.citations_unstubbed``; tests that need neighbours monkeypatch backward/forward."""
+    if request.node.get_closest_marker("citations_unstubbed"):
+        return
+    from backend.research import citations
+
+    async def _none(client, meta, limit, query=""):
+        return [], {"provider": "OpenAlex", "requested": limit, "returned": 0, "removed_offtopic": 0, "total_available": 0, "error": None}
+
+    monkeypatch.setattr(citations, "backward", _none)
+    monkeypatch.setattr(citations, "forward", _none)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_semantic_scholar(request, monkeypatch):
+    """Semantic Scholar calls made through backend/research/librarian.py (bulk search, references, citations) answer
+    "no data" in the scenario suite. Tests that drive them stub librarian._s2_raw themselves."""
+    if request.node.get_closest_marker("citations_unstubbed"):
+        return
+    from backend.research import librarian
+
+    async def _empty(path, params, keyed=True):
+        return {"total": 0, "data": []}
+
+    monkeypatch.setattr(librarian, "_s2_raw", _empty)
 
 
 @pytest.fixture(autouse=True)

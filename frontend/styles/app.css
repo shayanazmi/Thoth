@@ -644,3 +644,6 @@ kbd { font: .7rem var(--mono); border: 1px solid var(--line-strong); border-radi
 .live-work b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .live-work .chip { margin-left: auto; }
 .mrow.not_run { opacity: .5; }
+
+/* Design revision from the peer Reviewer (docs/features/07, 08) */
+.design-card .rev-box { border-left: 3px solid var(--accent); background: var(--sunken); border-radius: var(--radius-sm); padding: 8px 10px; margin: 6px 0; font-size: .88rem; }

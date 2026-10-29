@@ -101,3 +101,18 @@ Departures from the design above, and why:
 - Thinker reviews: an unstructured review (no envelope) counts as a concern that must be answered.
 - Export is Markdown only for now (approval required; provisional is watermarked).
 
+## Build note (28 Oct 2026): where a problem is fixed
+
+The Reviewer tags each finding `fix_in: writing | design | evidence`. Only writing FATALs enter the revision rounds;
+design FATALs are held and sent back to the Design tab ("Revise the design"); evidence FATALs are held and listed.
+Sections that restate the design record its version and are marked stale when it changes. Walkthrough:
+`docs/archive/verify/design_revision.md`.
+
+
+## Build note (29 Oct 2026): bringing the proposal up to the new design
+
+- **"Bring the proposal up to the new design"** regenerates every stale section except the ones you edited, then runs the Reviewer again, after showing the cost.
+- **Held findings** remember the design version they were raised against. A held design or evidence finding the next review no longer raises is recorded under `review.resolved_held` with the design version that resolved it.
+- **Scan advisory:** a literature review resting on a lightweight scan gets an advisory, not a gap. The Writer states coverage as the verdict gives it, and sees each witness's appraisal.
+
+Tests: S26. Walkthrough: `docs/archive/verify/revision_history_and_design_loop.md`.

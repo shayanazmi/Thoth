@@ -77,6 +77,28 @@ Existing code reused: `scholarly.py` (arXiv, S2, OpenAlex, Europe PMC, PubMed, s
 5. **Included studies** → Reader records → the trial matrix (06).
 6. **PRISMA flow diagram** generated from real counts only (never estimated).
 
+### As built (29 Oct 2026): scale, stopping rules, citation searching
+
+- **Budget**, set on the protocol card before approval: 300 database records, 200 citation records, 2 citation
+  rounds, stop after 50 irrelevant in a row, 30 full texts. The estimate follows it (`POST /api/review/estimate`).
+  `POST /api/review/{id}/budget` raises it later.
+- **Identification**: OpenAlex (100 a page; cursor paging needs `OPENALEX_API_KEY`), Europe PMC (cursorMark) and
+  Semantic Scholar relevance search (offset paging; a spent key falls back to the anonymous pool). Every request is a
+  row in `sys_review_searches`: query, page, returned, new, total, cost and error.
+- **Stopping rules**, recorded in `sys_reviews.stopping_json` and shown as "Why the search stopped":
+  - `source_exhausted`, `budget_reached`, `source_error`;
+  - `consecutive_irrelevant` (keyword records only, in relevance order; overriding a decision inside the run supersedes it);
+  - `citation_saturation`, `citation_rounds_max`, `citation_budget_reached`, `citation_off`;
+  - `ft_budget`, `user_stop`.
+  An entry is never deleted, only superseded.
+- **Citation searching**: references and citing works of the records that passed title/abstract screening
+  (`backend/research/citations.py`), screened like any record and counted apart ("identified by citation searching").
+- **Stop and Continue**: re-entrant by stage and stored cursors. A review left running by a crash is `stopped` and can
+  be continued.
+- **Synthesis**: the trial is tied to the hypothesis version, carries the review's coverage and limitations to the
+  Judge, and is never rewritten. A raised budget makes a new trial.
+- Evidence: `docs/archive/verify/evidence_depth.md`; tests S22, S23.
+
 ## Live view
 
 Papers stream into the library with their access badges; the Reader's progress shows per row. See 02 "Live work".

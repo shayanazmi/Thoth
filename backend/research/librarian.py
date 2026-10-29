@@ -84,30 +84,139 @@ def _norm_title(t: str) -> str:
     return re.sub(r"\W+", "", (t or "").lower())[:90]
 
 
-async def search_openalex(client: httpx.AsyncClient, query: str, limit: int) -> List[Dict[str, Any]]:
+# ---------------------------------------------------------------- identity (one record, many ids)
+
+_DOI_PREFIX = re.compile(r"^(https?://(dx\.)?doi\.org/|doi:)", re.I)
+
+
+def norm_doi(doi: Optional[str]) -> str:
+    """"https://doi.org/10.1/ABC." and "doi:10.1/abc" are the same paper."""
+    d = _DOI_PREFIX.sub("", str(doi or "").strip()).strip().lower()
+    return d.rstrip(".,;")
+
+
+def norm_openalex(oid: Optional[str]) -> str:
+    w = str(oid or "").strip().rstrip("/").rsplit("/", 1)[-1].upper()
+    return w if re.fullmatch(r"W\d+", w) else ""
+
+
+def ids_of(meta: Dict[str, Any]) -> Dict[str, str]:
+    return {"doi": norm_doi(meta.get("doi")), "openalex": norm_openalex(meta.get("openalex_id")),
+            "pmid": str(meta.get("pmid") or ""), "pmcid": str(meta.get("pmcid") or "").upper(),
+            "s2": str(meta.get("s2_id") or ""), "title": _norm_title(meta.get("title") or "")}
+
+
+class Deduper:
+    """Matches a record against everything seen so far on any shared id (DOI, OpenAlex, PubMed, PMC, Semantic
+    Scholar, normalised title). The first record seen stays the canonical one."""
+    ORDER = ("doi", "openalex", "pmid", "pmcid", "s2", "title")
+
+    def __init__(self) -> None:
+        self.index: Dict[Tuple[str, str], Any] = {}
+
+    def match(self, meta: Dict[str, Any]) -> Any:
+        ids = ids_of(meta)
+        for k in self.ORDER:
+            if ids[k] and (k, ids[k]) in self.index:
+                return self.index[(k, ids[k])]
+        return None
+
+    def add(self, meta: Dict[str, Any], ref: Any) -> None:
+        for k, v in ids_of(meta).items():
+            if v:
+                self.index.setdefault((k, v), ref)
+
+
+OPENALEX_SELECT = ("id,doi,title,publication_year,authorships,primary_location,abstract_inverted_index,open_access,"
+                   "best_oa_location,ids,cited_by_count,type")
+RETRY_AFTER_CAP = 30.0
+
+
+async def openalex_get(client: httpx.AsyncClient, url: str, params: Dict[str, Any]) -> httpx.Response:
+    """GET with an optional OPENALEX_API_KEY and one bounded retry on a 429. Anonymous search is rate-limited
+    under load (seen 28 Oct 2026: "retry in 37s"); a key gives its own daily budget."""
+    import os
+    params = dict(params)
+    if os.getenv("OPENALEX_API_KEY"):
+        params["api_key"] = os.getenv("OPENALEX_API_KEY")
+    r = await client.get(url, params=params)
+    if getattr(r, "status_code", 200) == 429:
+        try:
+            wait = float((r.json() or {}).get("retryAfter") or 5)
+        except Exception:
+            wait = 5.0
+        if wait <= RETRY_AFTER_CAP:
+            logger.info("[librarian] OpenAlex rate-limited; retrying in %.0fs", wait)
+            await asyncio.sleep(wait)
+            r = await client.get(url, params=params)
+    return r
+
+
+def _openalex_meta(w: Dict[str, Any]) -> Dict[str, Any]:
+    src = ((w.get("primary_location") or {}).get("source") or {}).get("display_name")
+    best = w.get("best_oa_location") or {}
+    ids = w.get("ids") or {}
+    pmcid = (ids.get("pmcid") or "").rsplit("/", 1)[-1] or None
+    return {
+        "title": w.get("title") or "", "year": w.get("publication_year"), "venue": src,
+        "authors": [a["author"]["display_name"] for a in (w.get("authorships") or [])[:6] if a.get("author")],
+        "doi": (w.get("doi") or "").replace("https://doi.org/", "") or None,
+        "abstract": _abstract_from_inverted(w.get("abstract_inverted_index")),
+        "pmcid": pmcid, "oa_pdf": best.get("pdf_url"), "is_oa": (w.get("open_access") or {}).get("is_oa", False),
+        "url": best.get("landing_page_url") or w.get("doi") or w.get("id"),
+        "citations": w.get("cited_by_count"), "found_via": "OpenAlex",
+        "openalex_id": norm_openalex(w.get("id")), "pmid": (ids.get("pmid") or "").rsplit("/", 1)[-1] or None,
+    }
+
+
+def meta_from_candidate(c: Any, found_via: str) -> Dict[str, Any]:
+    """A Semantic Scholar SourceCandidate (backend/scholarly.py) in the same shape as the searches above."""
+    year = str(getattr(c, "published_date", "") or "")[:4]
+    return {
+        "title": getattr(c, "title", "") or "", "year": int(year) if year.isdigit() else None, "venue": None,
+        "authors": list(getattr(c, "authors", None) or [])[:6], "doi": norm_doi(getattr(c, "doi", None)) or None,
+        "abstract": getattr(c, "abstract", "") or "", "pmcid": None, "oa_pdf": None, "is_oa": False,
+        "url": getattr(c, "url", "") or "", "citations": getattr(c, "citation_count", None), "found_via": found_via,
+        "s2_id": getattr(c, "paper_id", None) or None, "openalex_id": "",
+    }
+
+
+async def search_openalex(client: httpx.AsyncClient, query: str, limit: int, cursor: Optional[str] = None,
+                          page_info: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """One page of results. With a cursor ("*" for the first page) the next cursor and the total number of
+    matches are written to page_info, so a systematic review can page and record what it did not fetch.
+    OpenAlex needs an API key for cursor paging past page 1 (401 without one, 28 Oct 2026); without a key the
+    "cursor" is a page number and basic paging is used instead."""
+    import os
+    keyed = bool(os.getenv("OPENALEX_API_KEY"))
     try:
-        r = await client.get("https://api.openalex.org/works", params={
-            "search": keywords(query, 12), "per-page": limit, "filter": "has_abstract:true,type:article|review",
-            "select": "id,doi,title,publication_year,authorships,primary_location,abstract_inverted_index,open_access,best_oa_location,ids,cited_by_count,type",
-        })
+        params = {"search": keywords(query, 12), "per-page": limit, "filter": "has_abstract:true,type:article|review",
+                  "select": OPENALEX_SELECT}
+        page = None
+        if cursor is not None:
+            if keyed:
+                params["cursor"] = cursor
+            else:
+                page = 1 if cursor == "*" else int(cursor)
+                params["page"] = page
+        r = await openalex_get(client, "https://api.openalex.org/works", params)
         r.raise_for_status()
-        out = []
-        for w in r.json().get("results", []):
-            src = ((w.get("primary_location") or {}).get("source") or {}).get("display_name")
-            best = w.get("best_oa_location") or {}
-            pmcid = ((w.get("ids") or {}).get("pmcid") or "").rsplit("/", 1)[-1] or None
-            out.append({
-                "title": w.get("title") or "", "year": w.get("publication_year"), "venue": src,
-                "authors": [a["author"]["display_name"] for a in (w.get("authorships") or [])[:6] if a.get("author")],
-                "doi": (w.get("doi") or "").replace("https://doi.org/", "") or None,
-                "abstract": _abstract_from_inverted(w.get("abstract_inverted_index")),
-                "pmcid": pmcid, "oa_pdf": best.get("pdf_url"), "is_oa": (w.get("open_access") or {}).get("is_oa", False),
-                "url": best.get("landing_page_url") or w.get("doi") or w.get("id"),
-                "citations": w.get("cited_by_count"), "found_via": "OpenAlex",
-            })
-        return out
+        data = r.json()
+        results = data.get("results", [])
+        if page_info is not None:
+            meta = data.get("meta") or {}
+            page_info["total"] = meta.get("count")
+            page_info["cost_usd"] = meta.get("cost_usd")
+            if page is None:
+                page_info["next_cursor"] = meta.get("next_cursor")
+            else:
+                more = results and page * limit < int(meta.get("count") or 0) and page * limit < 10000
+                page_info["next_cursor"] = str(page + 1) if more else None
+        return [_openalex_meta(w) for w in results]
     except Exception as exc:
         logger.warning("[librarian] OpenAlex search failed: %s", sanitize_log_message(str(exc)))
+        if page_info is not None:
+            page_info["error"] = sanitize_log_message(str(exc))[:200]
         return []
 
 
@@ -120,24 +229,102 @@ def _stems(text: str) -> set:
             if w.lower() not in _STOP and w.lower() not in _BOOL}
 
 
-def on_topic(paper: Dict[str, Any], query: str) -> bool:
-    """Title + abstract share at least two of the query's content words (one if the query has only one).
-    Europe PMC matches words anywhere in the full text, which let in e.g. workplace-violence papers."""
+def on_topic(paper: Dict[str, Any], query: str, need: int = 2) -> bool:
+    """Title + abstract share at least `need` of the query's content words (fewer if the query has fewer).
+    Europe PMC matches words anywhere in the full text, which let in e.g. workplace-violence papers. Citation
+    following uses need=1: a seed's references are already linked to the topic, so the Screener decides the rest."""
     want = _stems(query)
     have = _stems(f"{paper.get('title', '')} {paper.get('abstract', '')}")
-    return len(want & have) >= min(2, len(want))
+    return len(want & have) >= min(need, len(want))
 
 
-async def search_europepmc(client: httpx.AsyncClient, query: str, limit: int, dropped: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+# ---------------------------------------------------------------- Semantic Scholar
+
+S2_GRAPH = "https://api.semanticscholar.org/graph/v1"
+S2_FIELDS = "title,authors,abstract,url,venue,year,citationCount,externalIds,publicationDate,paperId"
+
+
+async def _s2_raw(path: str, params: Dict[str, Any], keyed: bool = True) -> Dict[str, Any]:
+    import os
+    headers = {"User-Agent": UA["User-Agent"]}
+    if keyed and os.getenv("SEMANTIC_SCHOLAR_API_KEY"):
+        headers["x-api-key"] = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(f"{S2_GRAPH}{path}", params=params, headers=headers)
+        r.raise_for_status()
+        return r.json()
+
+
+async def s2_get(path: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """One Semantic Scholar Graph call through its rate limiter (a key allows 1 request a second). A key whose
+    quota is spent answers 429 while the shared anonymous pool still answers (seen 29 Oct 2026), so a keyed 429 is
+    retried once without the key. Raises on failure, so callers can record the error instead of "no papers"."""
+    import os
+    from backend import scholarly
+
+    async def call():
+        try:
+            return await _s2_raw(path, params, keyed=True)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429 and os.getenv("SEMANTIC_SCHOLAR_API_KEY"):
+                await asyncio.sleep(1.5)
+                return await _s2_raw(path, params, keyed=False)
+            raise
+    return await scholarly.s2_dispatcher.call(call)
+
+
+async def search_s2(query: str, limit: int, offset: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Semantic Scholar relevance search, paged by offset (up to 100 a call). Not the bulk endpoint its docs suggest for
+    heavy use: bulk search ANDs every term and returns results sorted by id, date or citations, not relevance (seen
+    29 Oct 2026: 2 matches for a 6-word query). A review takes the first N by relevance within its budget and stops
+    screening after K irrelevant records in a row, so it needs relevance order. Returns (records, {total, next_cursor, error})."""
+    start = int(offset or 0)
+    params = {"query": keywords(query, 10), "fields": S2_FIELDS, "limit": max(1, min(100, limit)), "offset": start}
+    try:
+        data = await s2_get("/paper/search", params)
+    except Exception as exc:
+        return [], {"error": f"Semantic Scholar: {sanitize_log_message(str(exc))[:180]}", "next_cursor": offset}
+    if not isinstance(data, dict):
+        return [], {"error": "Semantic Scholar returned no data", "next_cursor": offset}
+    rows = [x for x in data.get("data") or [] if isinstance(x, dict) and x.get("title")]
+    nxt = data.get("next")
+    # The relevance endpoint serves at most the first 1000 results.
+    return ([s2_meta(x, "Semantic Scholar") for x in rows],
+            {"total": data.get("total"), "next_cursor": str(nxt) if nxt is not None and int(nxt) < 1000 else None, "error": None})
+
+
+def _pmc(v: Any) -> Optional[str]:
+    v = str(v or "").strip().upper()
+    return (v if v.startswith("PMC") else f"PMC{v}") if v else None
+
+
+def s2_meta(p: Dict[str, Any], found_via: str) -> Dict[str, Any]:
+    ext = p.get("externalIds") or {}
+    year = p.get("year")
+    return {"title": p.get("title") or "", "year": year if isinstance(year, int) else None, "venue": p.get("venue") or None,
+            "authors": [a.get("name") for a in (p.get("authors") or [])[:6] if isinstance(a, dict) and a.get("name")],
+            "doi": norm_doi(ext.get("DOI")) or None, "abstract": p.get("abstract") or "", "pmcid": _pmc(ext.get("PubMedCentral")),
+            "oa_pdf": None, "is_oa": False, "url": p.get("url") or "", "citations": p.get("citationCount"),
+            "found_via": found_via, "s2_id": p.get("paperId") or None, "pmid": ext.get("PubMed") or None, "openalex_id": ""}
+
+
+async def search_europepmc(client: httpx.AsyncClient, query: str, limit: int, dropped: Optional[List[str]] = None,
+                           cursor: Optional[str] = None, page_info: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     # Europe PMC orders by relevance by default; its `sort` parameter takes fields (e.g. "CITED desc"), and
     # "RELEVANCE" is rejected (checked 25 Oct 2026). Matching only titles and abstracts is what tightens it.
     try:
-        r = await client.get("https://www.ebi.ac.uk/europepmc/webservices/rest/search", params={
-            "query": f"TITLE_ABS:({query}) AND HAS_ABSTRACT:Y", "format": "json", "resultType": "core", "pageSize": limit,
-        })
+        params = {"query": f"TITLE_ABS:({query}) AND HAS_ABSTRACT:Y", "format": "json", "resultType": "core", "pageSize": limit}
+        if cursor is not None:
+            params["cursorMark"] = cursor
+        r = await client.get("https://www.ebi.ac.uk/europepmc/webservices/rest/search", params=params)
         r.raise_for_status()
+        data = r.json()
+        if page_info is not None:
+            nxt = data.get("nextCursorMark")
+            page_info["next_cursor"] = nxt if nxt and nxt != cursor else None
+            page_info["total"] = data.get("hitCount")
         out = []
-        for p in r.json().get("resultList", {}).get("result", []):
+        for p in data.get("resultList", {}).get("result", []):
             pmcid = p.get("pmcid")
             out.append({
                 "title": (p.get("title") or "").rstrip("."), "year": int(p["pubYear"]) if str(p.get("pubYear", "")).isdigit() else None,
@@ -146,7 +333,7 @@ async def search_europepmc(client: httpx.AsyncClient, query: str, limit: int, dr
                 "doi": p.get("doi"), "abstract": re.sub(r"<[^>]+>", " ", p.get("abstractText") or "").strip(),
                 "pmcid": pmcid, "oa_pdf": None, "is_oa": p.get("isOpenAccess") == "Y",
                 "url": f"https://europepmc.org/article/{'PMC/' + pmcid if pmcid else (p.get('source', 'MED') + '/' + str(p.get('id')))}",
-                "citations": p.get("citedByCount"), "found_via": "Europe PMC",
+                "citations": p.get("citedByCount"), "found_via": "Europe PMC", "pmid": p.get("pmid"),
             })
         kept = [p for p in out if on_topic(p, query)]
         if dropped is not None:
@@ -154,6 +341,8 @@ async def search_europepmc(client: httpx.AsyncClient, query: str, limit: int, dr
         return kept
     except Exception as exc:
         logger.warning("[librarian] Europe PMC search failed: %s", sanitize_log_message(str(exc)))
+        if page_info is not None:
+            page_info["error"] = sanitize_log_message(str(exc))[:200]
         return []
 
 
@@ -175,20 +364,20 @@ async def search(strat: Dict[str, Any], limit: int = 15, subclaims: Optional[Lis
             strat["queries"]["europepmc_relaxed"] = relaxed
     # Recorded on the strategy so the trial (and the researcher) can see what was left out and why.
     strat["europepmc_dropped_off_topic"] = {"count": len(dropped), "titles": dropped[:10]}
-    seen, merged = set(), []
+    dedup, merged = Deduper(), []
     for i in range(max((len(l) for l in lists), default=0)):
         for l in lists:
             if i >= len(l) or not l[i]["title"]:
                 continue
             p = l[i]
-            keys = {k for k in (p.get("doi") and p["doi"].lower(), _norm_title(p["title"])) if k}
-            if keys & seen:
-                twin = next(m for m in merged if {m.get("doi") and m["doi"].lower(), _norm_title(m["title"])} & keys)
+            twin = dedup.match(p)
+            if twin is not None:
                 twin["pmcid"] = twin.get("pmcid") or p.get("pmcid")
                 twin["oa_pdf"] = twin.get("oa_pdf") or p.get("oa_pdf")
                 twin["is_oa"] = twin.get("is_oa") or p.get("is_oa")
+                dedup.add(p, twin)
                 continue
-            seen |= keys
+            dedup.add(p, p)
             merged.append(p)
     return merged[:limit]
 
@@ -210,7 +399,7 @@ async def by_doi(doi: str) -> Optional[Dict[str, Any]]:
     doi = re.sub(r"^(https?://(dx\.)?doi\.org/|doi:)", "", doi.strip(), flags=re.I)
     async with httpx.AsyncClient(timeout=20, headers=UA, follow_redirects=True) as client:
         try:
-            r = await client.get(f"https://api.openalex.org/works/doi:{doi}")
+            r = await openalex_get(client, f"https://api.openalex.org/works/doi:{doi}", {})
             r.raise_for_status()
             w = r.json()
         except Exception as exc:
@@ -225,7 +414,7 @@ async def by_doi(doi: str) -> Optional[Dict[str, Any]]:
         "pmcid": ((w.get("ids") or {}).get("pmcid") or "").rsplit("/", 1)[-1] or None,
         "oa_pdf": best.get("pdf_url"), "is_oa": (w.get("open_access") or {}).get("is_oa", False),
         "url": best.get("landing_page_url") or f"https://doi.org/{doi}", "citations": w.get("cited_by_count"),
-        "found_via": "added by you",
+        "found_via": "added by you", "openalex_id": norm_openalex(w.get("id")),
     }
 
 

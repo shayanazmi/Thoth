@@ -3,11 +3,12 @@
 // reviews whose critical concerns you answer → "reviewed", otherwise "provisional" with what is still open.
 import { getJSON, streamSSE } from './api.js';
 import { state, project, emit, addMessage, currentHypothesis } from './store.js';
-import { register, openPanel, cardRenderers } from './chat.js';
+import { register, openPanel, cardRenderers, actions } from './chat.js';
 import { PANELS } from './workspace.js';
 import { esc, md } from './util.js';
 
 const legacyDraft = PANELS.draft;
+const FIX_IN = { design: 'fix in the study design', evidence: 'needs more evidence' };
 const SEV = { FATAL: 'contradicted', MAJOR: 'contested', MINOR: 'insufficient_evidence' };
 const PROBLEM = { causal_leap: 'causal leap', overgeneralization: 'overgeneralization', direction_inversion: 'direction inverted',
   predicate_drift: 'different outcome or measure', number_mismatch: 'number not in the source', none: '' };
@@ -248,7 +249,8 @@ function liveLabel(d, key, sec) {
   if (sec.user_edited && !sec.verification) return '<span class="badge acc-abstract_only">your edits · not verified</span>';
   if (!sec.verification) return '<span class="badge acc-abstract_only">not verified</span>';
   const fallback = sec.written_by && !/ultra/i.test(sec.written_by) ? ` <span class="badge" title="Ultra was rate-limited; this section was written by ${esc(sec.written_by)}">fallback model</span>` : '';
-  return `<span class="badge acc-full_text">${sec.user_edited ? 'your edits · ' : ''}verified${sec.revisions ? ` · revised ×${sec.revisions}` : ''}</span>${fallback}`;
+  const staleDesign = sec.design_stale ? ` <span class="badge bad" title="Regenerate it to follow the current design">${esc(sec.design_stale)}</span>` : '';
+  return `<span class="badge acc-full_text">${sec.user_edited ? 'your edits · ' : ''}verified${sec.revisions ? ` · revised ×${sec.revisions}` : ''}</span>${fallback}${staleDesign}`;
 }
 
 function sectionCard(d, s, i) {
@@ -320,8 +322,11 @@ function reviewerBlock(p) {
     <p>${esc(r.summary)}</p>
     ${(r.weaknesses || []).map((x) => `<div class="finding sev-${x.severity}"><span class="verdict v-${SEV[x.severity]}">${x.severity}</span> <span class="faint">${esc(title(x.section) || 'unplaced')}</span>
       ${x.passage ? `<blockquote>${esc(x.passage)}</blockquote>${x.quoted ? '' : '<span class="faint">(passage not found verbatim in the proposal)</span>'}` : ''}
-      <p>${esc(x.problem)}</p>${x.fix ? `<p class="faint">Fix: ${esc(x.fix)}</p>` : ''}</div>`).join('')}
+      <p>${esc(x.problem)}</p>${x.fix ? `<p class="faint">Fix: ${esc(x.fix)}</p>` : ''}
+      ${FIX_IN[x.fix_in] ? `<div><span class="badge">${FIX_IN[x.fix_in]}</span>${x.severity === 'FATAL' && x.fix_in === 'design' ? ' <span class="faint">Rewording the proposal can\'t fix this, so it wasn\'t sent to the Writer.</span>' : ''}</div>` : ''}</div>`).join('')}
     ${r.held?.length ? `<p class="faint">Not revised automatically: ${r.held.map((h) => `${esc(h.id)} (${esc(h.why)})`).join('; ')}.</p>` : ''}
+    ${r.held?.some((h) => h.fix_in === 'design') ? '<div class="chips"><button class="chip primary" data-act="reviseDesign">Revise the design for this</button></div>' : ''}
+    ${r.resolved_held?.length ? `<h4>Resolved</h4><ul class="list">${r.resolved_held.map((h) => `<li><span class="rk">${esc(h.id)}</span>${esc(h.problem)} <span class="faint">· resolved by design v${esc(h.resolved_by_design_version)} (raised against v${esc(h.design_version ?? '?')})</span></li>`).join('')}</ul>` : ''}
     ${r.questions?.length ? `<h4>Questions</h4><ul class="list">${r.questions.map((q) => `<li>${esc(q)}</li>`).join('')}</ul>` : ''}
     <div class="chips"><button class="chip" data-act="pzReview">Run the Reviewer again</button></div></details>`;
 }
@@ -339,6 +344,39 @@ register('pzReview', async () => {
     emit();
   }
 });
+
+// ---------- After the design changes (docs/features/07 ↔ 08): regenerate what restates it, then review again ----------
+function staleSections(p) {
+  return Object.entries(p?.sections || {}).filter(([, s]) => s.design_stale).map(([k, s]) => ({ key: k, title: s.title || k, edited: !!s.user_edited }));
+}
+
+register('pzFollowDesign', () => {
+  const d = project();
+  const stale = staleSections(d.proposal);
+  const auto = stale.filter((s) => !s.edited), manual = stale.filter((s) => s.edited);
+  if (!stale.length) return;
+  // Cost first (the non-negotiable): every regenerated section is written and verified, then the Reviewer reads it all.
+  dialog({
+    title: 'Bring the proposal up to the new design',
+    body: `<p>Regenerate ${auto.length} section${auto.length === 1 ? '' : 's'} (${esc(auto.map((s) => s.title).join(', ') || 'none')}) from the current design, then run the peer Reviewer again: about ${auto.length * 2 + 2} model calls.</p>
+      ${manual.length ? `<p class="guard">Your edited section${manual.length > 1 ? 's' : ''} (${esc(manual.map((s) => s.title).join(', '))}) won't be touched; update ${manual.length > 1 ? 'them' : 'it'} yourself.</p>` : ''}`,
+    confirm: auto.length ? 'Regenerate and review' : 'Run the Reviewer again',
+    onConfirm: async () => {
+      const u = ui(d);
+      u.running = true; state.busy += 1; emit();
+      try {
+        for (const [i, s] of auto.entries()) {
+          u.stage = `Rewriting ${s.title} for the new design (${i + 1} of ${auto.length})`; emit();
+          await call('POST', `/api/proposal/sections/${encodeURIComponent(s.key)}/regenerate`, { project_id: state.projectId, overwrite: false });
+        }
+      } finally { u.running = false; u.stage = ''; state.busy -= 1; await load(d, true); }
+      setTimeout(() => (actions.pzReview || (() => {}))(), 0);
+    },
+  });
+});
+
+// A design chosen in the Design tab makes proposal sections stale: refetch so the panel says so at once.
+register('proposalStale', () => { fetched.delete(state.projectId); const d = project(); if (d) load(d, true); });
 
 // ---------- Thinkers ----------
 function thinkersBlock(p) {
@@ -407,7 +445,9 @@ function statusHeader(p) {
     <div class="pz-meters"><span>Verifier <b>${v.checked || 0}</b> checked · <b>${v.removed || 0}</b> removed · <b>${v.flagged || 0}</b> flagged</span>
       <span>Reviewer ${r.state === 'none' ? 'not run' : `<b>${r.open.FATAL}</b> FATAL · <b>${r.open.MAJOR}</b> MAJOR · <b>${r.open.MINOR}</b> MINOR open${r.state === 'stale' ? ' (out of date)' : ''}`}</span>
       <span>Thinkers ${t.reviewed ? `<b>${t.need_answer - t.open}</b> answered · <b>${t.open}</b> open` : 'not asked'}</span></div>
+    ${(st.advisories || []).map((x) => `<div class="faint">Advice: ${esc(x)} <button class="link-btn" data-act="review">Plan a systematic review</button></div>`).join('')}
     ${st.gaps.length ? `<details><summary class="faint">${st.gaps.length} open item${st.gaps.length > 1 ? 's' : ''}</summary><ul class="list">${st.gaps.map((g) => `<li>${esc(g)}</li>`).join('')}</ul></details>` : ''}
+    ${staleSections(p).length && !ui(p).running ? `<div class="guard">${staleSections(p).length} section${staleSections(p).length > 1 ? 's were' : ' was'} written for an older design. <button class="chip primary" data-act="pzFollowDesign">Bring the proposal up to the new design</button></div>` : ''}
     <div class="chips">${st.sections_written < st.sections_total && !ui(p).running ? `<button class="chip primary" data-act="proposalApprove">${p.mode === 'autopilot' ? 'Write the remaining sections' : 'Write the next section'}</button>` : ''}<button class="chip" data-act="pzExport">Export…</button><button class="chip" data-act="olEdit">Edit the outline</button></div></div>`;
 }
 

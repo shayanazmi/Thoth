@@ -76,10 +76,11 @@ def update_paper(paper_id: str, **fields: Any) -> None:
 
 def _paper(r) -> Dict[str, Any]:
     return {"paper_id": r[0], "trial_id": r[1], "meta": json.loads(r[2]), "access": r[3], "text_source": r[4],
-            "record": json.loads(r[5]), "row": json.loads(r[6]), "weight": r[7], "i_say_user": r[8], "status": r[9]}
+            "record": json.loads(r[5]), "row": json.loads(r[6]), "weight": r[7], "i_say_user": r[8], "status": r[9],
+            "appraisal": json.loads(r[10] or "{}")}
 
 
-_COLS = "paper_id, trial_id, meta_json, access, text_source, record_json, row_json, weight, i_say_user, status"
+_COLS = "paper_id, trial_id, meta_json, access, text_source, record_json, row_json, weight, i_say_user, status, appraisal_json"
 
 
 def get_paper(paper_id: str) -> Optional[Dict[str, Any]]:

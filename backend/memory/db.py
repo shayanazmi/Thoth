@@ -14,7 +14,15 @@ def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
+# Databases whose schema is already in place in this process: every store call used to re-run the whole schema
+# script (a review inserts hundreds of rows). Keyed by absolute path; a file that has gone is set up again.
+_READY: set = set()
+
+
 def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
+    key = os.path.abspath(db_path)
+    if key in _READY and os.path.exists(key):
+        return get_connection(db_path)
     conn = get_connection(db_path)
     with conn:
         conn.execute("""
@@ -662,8 +670,47 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                 conn.execute(f"ALTER TABLE trials ADD COLUMN {col} {typ};")
             except sqlite3.OperationalError:
                 pass
+        # Evidence depth (migration 012): the systematic review's search log, budgets and stopping rules,
+        # record identities and origins (keyword or citation search), structured appraisal of each paper, and
+        # the rationale behind every research-file version.
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS sys_review_searches (
+                search_id TEXT PRIMARY KEY,
+                review_id TEXT NOT NULL,
+                round INTEGER NOT NULL DEFAULT 0,
+                kind TEXT NOT NULL,
+                source TEXT NOT NULL,
+                query TEXT NOT NULL DEFAULT '',
+                seed_record_id TEXT,
+                page INTEGER NOT NULL DEFAULT 1,
+                requested INTEGER,
+                returned INTEGER,
+                new_unique INTEGER,
+                duplicates INTEGER,
+                removed_offtopic INTEGER NOT NULL DEFAULT 0,
+                total_available INTEGER,
+                next_cursor TEXT,
+                error TEXT,
+                searched_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_sys_searches_review ON sys_review_searches(review_id, searched_at);
+        """)
+        for table, col, typ in (("sys_reviews", "budget_json", "TEXT DEFAULT '{}'"),
+                                ("sys_reviews", "stopping_json", "TEXT DEFAULT '[]'"),
+                                ("sys_review_records", "ids_json", "TEXT DEFAULT '{}'"),
+                                ("sys_review_records", "origin_json", "TEXT DEFAULT '{}'"),
+                                ("sys_review_records", "rank", "INTEGER"),
+                                ("trial_papers", "appraisal_json", "TEXT DEFAULT '{}'"),
+                                ("notebook_sections", "rationale_json", "TEXT DEFAULT '{}'"),
+                                # migration 013: what each search request cost (OpenAlex reports meta.cost_usd)
+                                ("sys_review_searches", "cost_usd", "REAL")):
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ};")
+            except sqlite3.OperationalError:
+                pass
 
 
+    _READY.add(key)
     return conn
 
 def save_session(

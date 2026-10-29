@@ -229,3 +229,16 @@
 .ruling .r-verdict { margin: 6px 0 10px; }
 .ruling .fact.warn { flex: 2 1 220px; }
 .ruling .fact.warn b { margin-bottom: 4px; }
+
+/* Evidence depth: study-quality appraisal, originality checks, the review's search record (plan Phase 2). */
+.badge.bad { color: var(--bad); border-color: var(--bad); }
+details.appraisal, details.originality { margin: 8px 0; }
+details.appraisal > summary, details.originality > summary { cursor: pointer; }
+details.appraisal .list li, details.originality .list li { margin: 3px 0; }
+details.originality li.hl { border-left: 2px solid var(--gold); padding-left: 6px; }
+.search-log { width: 100%; border-collapse: collapse; font-size: .85em; }
+.search-log th, .search-log td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.budget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 8px 0; }
+.budget-grid label { display: flex; flex-direction: column; gap: 2px; font-size: .85em; }
+.prisma .id-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 560px) { .prisma .id-col { grid-template-columns: 1fr; } }

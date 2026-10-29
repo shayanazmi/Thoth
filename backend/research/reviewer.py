@@ -16,6 +16,7 @@ from typing import Any, Dict, List
 from backend.research.llm import call_json
 
 SEVERITIES = ("FATAL", "MAJOR", "MINOR")
+FIX_IN = ("writing", "design", "evidence")
 
 PROMPT = """ROLE
 You are Thoth's Reviewer: a skeptical, fair reviewer of a research proposal.
@@ -29,13 +30,17 @@ METHOD
    unsupported; the gap is not real).
    MAJOR = a serious weakness a panel would require fixed.
    MINOR = clarity, polish, small omissions.
-4. Keep looking after the first problem.
+4. Say where each problem must be fixed (fix_in):
+   writing = the wording, structure or explanation; the research file already supports the fix;
+   design = the study design itself must change (measures, timing, sampling, analysis); rewording cannot fix it;
+   evidence = it needs literature or data the research file does not have.
+5. Keep looking after the first problem.
 
 OUTPUT (JSON)
 {"summary": str,
  "strengths": [{"point": str, "passage": str}],
  "weaknesses": [{"id": "R1", "severity": "FATAL"|"MAJOR"|"MINOR", "section": str, "passage": str, "problem": str,
-                 "fix": str}],
+                 "fix": str, "fix_in": "writing"|"design"|"evidence"}],
  "questions": [str], "revision_plan": [str]}
 
 RULES
@@ -75,7 +80,8 @@ def enforce(raw: Dict[str, Any], sections: List[Dict[str, str]]) -> Dict[str, An
         if not key:
             key = titles.get(_norm(str(w.get("section") or "")), "")
         weaknesses.append({"id": f"R{n}", "severity": sev, "section": key, "passage": str(w.get("passage") or "")[:600],
-                           "quoted": quoted, "problem": str(w.get("problem"))[:800], "fix": str(w.get("fix") or "")[:600]})
+                           "quoted": quoted, "problem": str(w.get("problem"))[:800], "fix": str(w.get("fix") or "")[:600],
+                           "fix_in": w.get("fix_in") if w.get("fix_in") in FIX_IN else "writing"})
     counts = {s: sum(1 for w in weaknesses if w["severity"] == s) for s in SEVERITIES}
     return {"summary": str(raw.get("summary") or "")[:1500],
             "strengths": [s for s in raw.get("strengths") or [] if isinstance(s, dict) and s.get("point")][:6],

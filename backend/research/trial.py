@@ -16,19 +16,25 @@ import base64
 import logging
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
+import httpx
+
 from backend.agents import ROLE_MODELS, sanitize_log_message
-from backend.research import analyst, judge, librarian, reader, store
+from backend.research import analyst, appraisal as appraisal_mod, citations, judge, librarian, reader, store
 from backend.research.llm import start_usage
 
 logger = logging.getLogger("ThothTrial")
 
 DEFAULT_PAPERS = 15
+# Per readable paper: Reader, Appraiser, Analyst. Plus the Librarian, the sub-claim split and the Judge.
 ESTIMATE = {
     "label": "Put the hypothesis on trial",
-    "scope": f"about {DEFAULT_PAPERS} papers from OpenAlex and Europe PMC; open-access full text where it exists, abstracts otherwise",
-    "duration": "5-10 minutes (free-tier rate limits)",
-    "model_calls": f"about {2 * DEFAULT_PAPERS + 3}",
+    "scope": f"about {DEFAULT_PAPERS} papers from OpenAlex and Europe PMC; open-access full text where it exists, abstracts otherwise; "
+             "each paper appraised with a checklist for its design; papers citing or cited by the strongest witnesses checked for prior work",
+    "duration": "6-12 minutes (free-tier rate limits)",
+    "model_calls": f"about {3 * DEFAULT_PAPERS + 3}",
 }
+CITATION_SEEDS = 3
+CITATION_PER_SEED = 5
 
 
 class NotTrialable(ValueError):
@@ -110,8 +116,10 @@ async def remap_plan(trial_id: str, hypothesis: Optional[str] = None) -> Dict[st
     done = [p for p in src["papers"] if p["status"] == "done"]
     for p in done:
         pid = store.add_paper(new_id, p["meta"])
-        # The researcher's "I say" was about the old hypothesis, so it is not carried over.
-        store.update_paper(pid, access=p["access"], text_source=p["text_source"], record_json=p["record"], weight=p["weight"], status="read")
+        # The researcher's "I say" was about the old hypothesis, so it is not carried over. The appraisal is
+        # hypothesis-blind, like the record, so it is.
+        store.update_paper(pid, access=p["access"], text_source=p["text_source"], record_json=p["record"], weight=p["weight"],
+                           appraisal_json=p.get("appraisal") or {}, status="read")
     n = len(done)
     papers = f"{n} paper{'' if n == 1 else 's'}"
     return {"trial_id": new_id, "hypothesis": hypothesis, "subclaims": subs, "ambiguities": split["ambiguities"],
@@ -164,7 +172,8 @@ def _clean_subclaims(edited: Optional[List[Any]], fallback: List[Dict[str, Any]]
 
 async def _process(trial: Dict[str, Any], paper_id: str, meta: Dict[str, Any], out: asyncio.Queue,
                    text_override: Optional[Tuple[str, str, str]] = None, texts: Optional[Dict[str, str]] = None) -> None:
-    """Fetch → read (hypothesis-blind) → analyse one paper, reporting each step."""
+    """Fetch → read (hypothesis-blind) → appraise (hypothesis-blind, while the text is in hand) → analyse one
+    paper, reporting each step."""
     try:
         text, access, source = text_override or await librarian.full_text(meta)
         if texts is not None:
@@ -178,10 +187,14 @@ async def _process(trial: Dict[str, Any], paper_id: str, meta: Dict[str, Any], o
         record = await reader.read(meta, text, access)
         store.update_paper(paper_id, record_json=record, status="analysing")
         await out.put(("paper_read", {"paper_id": paper_id, "record": record}))
+        appr = await appraisal_mod.appraise(meta, text, access, record.get("design") or {})
+        store.update_paper(paper_id, appraisal_json=appr)
+        await out.put(("paper_appraised", {"paper_id": paper_id, "appraisal": appr}))
         row = await analyst.row(trial["hypothesis"], trial["subclaims"], record)
-        w = analyst.weight(record)
-        store.update_paper(paper_id, row_json=row, weight=w, status="done")
-        await out.put(("matrix_row", {"paper_id": paper_id, "row": row, "weight": w}))
+        w, basis = analyst.weight_v2(record, appr)
+        appr["weight_basis"] = basis
+        store.update_paper(paper_id, row_json=row, weight=w, appraisal_json=appr, status="done")
+        await out.put(("matrix_row", {"paper_id": paper_id, "row": row, "weight": w, "weight_basis": basis}))
     except Exception as exc:
         logger.warning("[trial] paper %s failed: %s", paper_id, sanitize_log_message(str(exc)))
         store.update_paper(paper_id, status="failed")
@@ -202,10 +215,13 @@ async def _reread_one(trial: Dict[str, Any], paper: Dict[str, Any], text: str) -
         logger.info("[trial] re-read of %s kept the fallback record: %s", pid, sanitize_log_message(str(exc)))
         return [("paper_reread", {"paper_id": pid, "recovered": False, "read_by": old_by,
                                   "message": "The primary model was still unavailable; the fallback reading stays flagged."})]
-    w = analyst.weight(record)
-    store.update_paper(pid, record_json=record, row_json=row, weight=w, status="done")
+    appr = await appraisal_mod.appraise(paper["meta"], text, paper["access"], record.get("design") or {}, primary_only=True)
+    w, basis = analyst.weight_v2(record, appr)
+    appr["weight_basis"] = basis
+    store.update_paper(pid, record_json=record, row_json=row, weight=w, appraisal_json=appr, status="done")
     return [("paper_reread", {"paper_id": pid, "recovered": True, "read_by": record["read_by"], "was_read_by": old_by, "record": record}),
-            ("matrix_row", {"paper_id": pid, "row": row, "weight": w})]
+            ("paper_appraised", {"paper_id": pid, "appraisal": appr}),
+            ("matrix_row", {"paper_id": pid, "row": row, "weight": w, "weight_basis": basis})]
 
 
 async def reread_fallbacks(trial: Dict[str, Any], texts: Dict[str, str]) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
@@ -220,26 +236,74 @@ async def reread_fallbacks(trial: Dict[str, Any], texts: Dict[str, str]) -> Asyn
             yield ev
 
 
+async def citation_neighbours(trial_id: str, hypothesis: str) -> Dict[str, Any]:
+    """Papers citing, or cited by, the strongest witnesses (vision §4.2): prior work keyword search can miss. Read
+    at abstract level only, never as witnesses; the Judge uses them for originality. API calls only, no model."""
+    papers = store.list_papers(trial_id)
+    seeds = sorted([p for p in papers if p["status"] == "done" and (p["meta"].get("openalex_id") or p["meta"].get("doi"))],
+                   key=lambda p: -(p["weight"] or 0))[:CITATION_SEEDS]
+    if not seeds:
+        return {"ran": False, "reason": "No witness had a DOI or OpenAlex id to follow.", "seeds": [], "papers": [], "errors": []}
+    dedup = librarian.Deduper()
+    for p in papers:
+        dedup.add(p["meta"], p["paper_id"])
+    out, errors, calls_ok = [], [], 0
+    witness_no = {p["paper_id"]: i for i, p in enumerate([x for x in papers if x["status"] == "done"], 1)}
+    async with httpx.AsyncClient(timeout=20, headers=librarian.UA, follow_redirects=True) as client:
+        for seed in seeds:
+            w = f"W{witness_no.get(seed['paper_id'], '?')}"
+            for kind, fn, rel in (("backward", citations.backward, f"cited by {w}"), ("forward", citations.forward, f"cites {w}")):
+                found, info = await fn(client, seed["meta"], CITATION_PER_SEED * (3 if kind == "backward" else 1), query=hypothesis)
+                if info.get("error"):
+                    errors.append(f"{kind} for {w}: {info['error']}")
+                else:
+                    calls_ok += 1
+                kept = 0
+                for m in found:
+                    if kept >= CITATION_PER_SEED or dedup.match(m) is not None:
+                        continue
+                    dedup.add(m, f"C{len(out) + 1}")
+                    kept += 1
+                    out.append({"id": f"C{len(out) + 1}", "title": m.get("title"), "year": m.get("year"), "relation": rel,
+                                "abstract": (m.get("abstract") or "")[:500], "seed_paper_id": seed["paper_id"], "doi": m.get("doi"),
+                                "openalex_id": m.get("openalex_id"), "provider": info.get("provider"), "url": m.get("url")})
+    ran = calls_ok > 0
+    return {"ran": ran, "reason": "" if ran else "Every citation lookup failed.", "seeds": [s["paper_id"] for s in seeds],
+            "papers": out, "errors": errors}
+
+
+def coverage_of(trial: Dict[str, Any], papers: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """How the witnesses were found, set in code (never by the model), so no verdict reads as exhaustive."""
+    cov = (trial.get("strategy") or {}).get("coverage")
+    if cov:
+        return cov
+    return {"kind": "scan", "identified": len(store.list_papers(trial["trial_id"])), "witnesses": len(papers),
+            "note": "A lightweight scan: the first page of results from OpenAlex and Europe PMC, not a systematic search."}
+
+
 async def _verdict(trial: Dict[str, Any], adjacent: Dict[str, Any]) -> Dict[str, Any]:
     papers = [p for p in store.list_papers(trial["trial_id"]) if p["status"] == "done"]
+    trial = {**trial, "strategy": trial.get("strategy") or (store.get_trial(trial["trial_id"]) or {}).get("strategy") or {}}
+    coverage = coverage_of(trial, papers)
     if not papers:
         return {"overall": {"verdict": "insufficient_evidence", "reason": "No paper could be read and analysed, so there is nothing to weigh."},
                 "per_subclaim": [], "originality": {"label": "insufficiently_assessed", "reason": ""}, "gaps": [],
-                "witnesses": 0, "full_text_witnesses": 0, "guardrail_notes": [], "degraded": True}
+                "witnesses": 0, "full_text_witnesses": 0, "guardrail_notes": [], "degraded": True, "coverage": coverage}
     not_run = sum(1 for p in store.list_papers(trial["trial_id"]) if p["status"] == "not_run")
     try:
-        verdict = await judge.judge(trial["hypothesis"], trial["subclaims"], papers, adjacent)
+        verdict = await judge.judge(trial["hypothesis"], trial["subclaims"], papers, adjacent, coverage)
         if not_run:
             verdict["guardrail_notes"] = verdict.get("guardrail_notes", []) + [
                 f"{not_run} papers were not run (the trial was stopped); this verdict weighs only the {len(papers)} that were."]
             verdict["partial"] = True
+        verdict["coverage"] = coverage
         return verdict
     except Exception as exc:
         logger.warning("[trial] judge failed: %s", sanitize_log_message(str(exc)))
         return {"overall": {"verdict": "insufficient_evidence", "reason": "The judge couldn't be reached; the matrix stands without a verdict."},
                 "per_subclaim": [], "originality": {"label": "insufficiently_assessed", "reason": ""}, "gaps": [],
                 "witnesses": len(papers), "full_text_witnesses": sum(p["access"] == "full_text" for p in papers),
-                "guardrail_notes": [], "degraded": True}
+                "guardrail_notes": [], "degraded": True, "coverage": coverage}
 
 
 async def run(trial_id: str, edited_subclaims: Optional[List[Any]] = None, limit: int = DEFAULT_PAPERS) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
@@ -317,9 +381,20 @@ async def run(trial_id: str, edited_subclaims: Optional[List[Any]] = None, limit
                 yield ev
             return
 
+        yield "citation_search", {"seeds": min(CITATION_SEEDS, sum(1 for p in store.list_papers(trial_id) if p["status"] == "done"))}
+        cited = await citation_neighbours(trial_id, trial["hypothesis"])
+        yield "citation_neighbours", {"ran": cited["ran"], "seeds": len(cited["seeds"]), "papers": len(cited["papers"]),
+                                      "reason": cited.get("reason", "")}
+        if trial_id in STOPS:
+            for ev in await _stop(trial_id, [adjacent_task], usage):
+                yield ev
+            return
+
         adjacent = await adjacent_task
+        adjacent = {**adjacent, "citation": cited}
         store.update_trial(trial_id, adjacent_json=adjacent)
-        yield "adjacent", {"ran": adjacent.get("ran", False), "fields": [{"field": f["field"], "papers": len(f["papers"])} for f in adjacent.get("fields", [])]}
+        yield "adjacent", {"ran": adjacent.get("ran", False), "fields": [{"field": f["field"], "papers": len(f["papers"])} for f in adjacent.get("fields", [])],
+                           "citation": cited}
         yield "judging", {"witnesses": sum(1 for p in store.list_papers(trial_id) if p["status"] == "done")}
 
         verdict = await _verdict(trial, adjacent)

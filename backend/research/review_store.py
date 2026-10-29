@@ -39,12 +39,13 @@ def claim(review_id: str) -> bool:
 
 
 def get(review_id: str) -> Optional[Dict[str, Any]]:
-    r = _conn().execute("SELECT review_id, thread_id, hypothesis, protocol_json, subclaims_json, mode, status, stage, trial_id, note "
-                        "FROM sys_reviews WHERE review_id = ?", (review_id,)).fetchone()
+    r = _conn().execute("SELECT review_id, thread_id, hypothesis, protocol_json, subclaims_json, mode, status, stage, trial_id, note, "
+                        "budget_json, stopping_json FROM sys_reviews WHERE review_id = ?", (review_id,)).fetchone()
     if not r:
         return None
     return {"review_id": r[0], "thread_id": r[1], "hypothesis": r[2], "protocol": json.loads(r[3]), "subclaims": json.loads(r[4]),
-            "mode": r[5], "status": r[6], "stage": r[7], "trial_id": r[8], "note": r[9]}
+            "mode": r[5], "status": r[6], "stage": r[7], "trial_id": r[8], "note": r[9],
+            "budget": json.loads(r[10] or "{}"), "stopping": json.loads(r[11] or "[]")}
 
 
 def latest(thread_id: str) -> Optional[str]:
@@ -53,11 +54,13 @@ def latest(thread_id: str) -> Optional[str]:
     return r[0] if r else None
 
 
-def add_record(review_id: str, meta: Dict[str, Any], source: str, dup_of: Optional[str] = None) -> str:
+def add_record(review_id: str, meta: Dict[str, Any], source: str, dup_of: Optional[str] = None,
+               ids: Optional[Dict[str, str]] = None, origin: Optional[Dict[str, Any]] = None, rank: Optional[int] = None) -> str:
     rec_id = f"rec_{uuid.uuid4().hex[:10]}"
     with _conn() as c:
-        c.execute("INSERT INTO sys_review_records (record_id, review_id, meta_json, source, dup_of, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                  (rec_id, review_id, json.dumps(meta), source, dup_of, time.time()))
+        c.execute("INSERT INTO sys_review_records (record_id, review_id, meta_json, source, dup_of, ids_json, origin_json, rank, created_at) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (rec_id, review_id, json.dumps(meta), source, dup_of, json.dumps(ids or {}), json.dumps(origin or {}), rank, time.time()))
     return rec_id
 
 
@@ -68,10 +71,37 @@ def update_record(record_id: str, **fields: Any) -> None:
 
 
 def records(review_id: str) -> List[Dict[str, Any]]:
-    rows = _conn().execute("SELECT record_id, meta_json, source, dup_of, screening_json, ft_access, paper_id FROM sys_review_records "
-                           "WHERE review_id = ? ORDER BY created_at, rowid", (review_id,)).fetchall()
+    rows = _conn().execute("SELECT record_id, meta_json, source, dup_of, screening_json, ft_access, paper_id, ids_json, origin_json, rank "
+                           "FROM sys_review_records WHERE review_id = ? ORDER BY created_at, rowid", (review_id,)).fetchall()
     return [{"record_id": r[0], "meta": json.loads(r[1]), "source": r[2], "dup_of": r[3], "screening": json.loads(r[4] or "{}"),
-             "ft_access": r[5], "paper_id": r[6]} for r in rows]
+             "ft_access": r[5], "paper_id": r[6], "ids": json.loads(r[7] or "{}"), "origin": json.loads(r[8] or "{}"), "rank": r[9]}
+            for r in rows]
+
+
+SEARCH_COLS = ("search_id", "review_id", "round", "kind", "source", "query", "seed_record_id", "page", "requested", "returned",
+               "new_unique", "duplicates", "removed_offtopic", "total_available", "next_cursor", "error", "searched_at", "cost_usd")
+
+
+def add_search(review_id: str, **fields: Any) -> str:
+    """One row per search request (a page of keyword results, or one citation lookup): the review's search record."""
+    sid = f"srch_{uuid.uuid4().hex[:10]}"
+    row = {k: v for k, v in fields.items() if k in SEARCH_COLS}
+    row.update(search_id=sid, review_id=review_id, searched_at=fields.get("searched_at") or time.time())
+    row.setdefault("removed_offtopic", 0)
+    with _conn() as c:
+        c.execute(f"INSERT INTO sys_review_searches ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})", tuple(row.values()))
+    return sid
+
+
+def searches(review_id: str) -> List[Dict[str, Any]]:
+    rows = _conn().execute(f"SELECT {', '.join(SEARCH_COLS)} FROM sys_review_searches WHERE review_id = ? ORDER BY searched_at, rowid",
+                           (review_id,)).fetchall()
+    return [dict(zip(SEARCH_COLS, r)) for r in rows]
+
+
+def review_of(record_id: str) -> Optional[str]:
+    r = _conn().execute("SELECT review_id FROM sys_review_records WHERE record_id = ?", (record_id,)).fetchone()
+    return r[0] if r else None
 
 
 def get_record(record_id: str) -> Optional[Dict[str, Any]]:

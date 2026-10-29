@@ -63,7 +63,7 @@ register('openMode', () => {
     <p class="faint">Either way, a trial, a systematic review or a proposal is never started without your approval and an estimate.</p>
     <details ${Object.keys(m.step_overrides).length ? 'open' : ''}><summary>Per step</summary>
       ${STEPS.map(([k, label, what]) => `<div class="mode-step"><span><b>${label}</b><br><span class="faint">${esc(what)}</span></span>
-        <select name="${k}"><option value="">Same as the project</option>${['copilot', 'autopilot'].map((v) => `<option value="${v}" ${m.step_overrides[k] === v ? 'selected' : ''}>${LABEL[v]}</option>`).join('')}</select></div>`).join('')}
+        <select name="${k}" aria-label="${label}: Co-pilot, Autopilot or the project's mode"><option value="">Same as the project</option>${['copilot', 'autopilot'].map((v) => `<option value="${v}" ${m.step_overrides[k] === v ? 'selected' : ''}>${LABEL[v]}</option>`).join('')}</select></div>`).join('')}
     </details>
     <div class="dialog-row"><button type="button" class="chip" data-cancel>Cancel</button><button type="submit" class="chip primary">Save</button></div></form>`;
   const close = () => scrim.remove();

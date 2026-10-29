@@ -132,6 +132,7 @@ CONTEXT
 <research_file>{research_file_snapshot}</research_file>
 <pending>{open_proposals_and_offers}</pending>
 <thinker_territories>{roster_id: one-line territory, …}</thinker_territories>
+<thinkers_heard>{each thinker's stance on the project; the latest exchange of each one-to-one room}</thinkers_heard>
 <recent_turns>{recent_turns}</recent_turns>
 ```
 
@@ -555,7 +556,7 @@ OUTPUT (JSON)
 {"summary": str,
  "strengths": [{"point": str, "passage": str}],
  "weaknesses": [{"id": "W1", "severity": "FATAL"|"MAJOR"|"MINOR", "passage": str, "problem": str,
-                 "fix": str}],
+                 "fix": str, "fix_in": "writing"|"design"|"evidence"}],
  "questions": [str], "revision_plan": [str]}
 
 RULES
@@ -707,3 +708,14 @@ Live-model tests run behind `-m live`; the default gate stays fast and stubbed.
 - **v1.4 (25 Oct 2026):** the valid blind-attribution run scored 24/30 with Darwin and Ibn al-Haytham at 1/3; both opened
   with the same generic confounder checklist. Persona rule added against leading with that checklist; both dossiers
   gained a written first instinct and a "misreading to avoid" for the checklist opening.
+
+## Appraiser (added 29 Oct 2026)
+
+Role `appraiser` (Ultra, temperature 0, 2500 tokens, hidden reasoning off): one call per readable paper, right after
+the Reader, hypothesis-blind. The prompt is in `backend/research/appraisal.py`.
+- The checklist (RoB 2, JBI ×6, MMAT, SANRA, or core questions only) is chosen in code from the Reader's design.
+- Item answers need a quote and a locator; code enforces that, plus the abstract-only limits.
+- The overall judgement and the weight factor are computed from the items.
+
+The Screener prompt now asks for single quotes inside evidence strings (a double quote broke the JSON live), and a
+retry carries a format note.

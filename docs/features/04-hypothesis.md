@@ -86,3 +86,16 @@ entry bar is two named constructs (vague placeholders rejected), stricter than "
 comparison. Old trials get their version inferred from their text. Not yet: the Judge is not given the markers,
 and the Writer and Designer don't check the trial's version.
 
+
+## Build note (29 Oct 2026): why each version changed
+
+Every version of the question, the hypothesis, a rival or the design stores a rationale with it, write-once
+(`notebook_sections.rationale_json`, `backend/memory/rationale.py`):
+- `reason` and `trigger`: initial, your edit, Thoth's proposal, a rival swap, an idea, a thinker, a design revision;
+- `evidence` given for it, and `decision_ref` (the proposal or finding it came from);
+- `context` attached by the server: what was known then, e.g. the latest trial verdict for the version replaced. It is never presented as the reason;
+- `previous_version`.
+
+Editing asks "Why are you changing it?" (optional). `GET /api/projects/{id}/history?kind=` returns every version and
+the original motivation with its question. The Writer gets `hypothesis_history` and `design_history`.
+Tests: S25. Walkthrough: `docs/archive/verify/revision_history_and_design_loop.md`.

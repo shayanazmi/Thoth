@@ -36,15 +36,86 @@ def kind(pid: str) -> str:
     return "project" if promoted_at(pid) else "thread"
 
 
-def write(pid: str, section: str, value: str) -> Dict[str, Any]:
-    """The researcher's own edit of the question, the hypothesis or a rival (a new version, authored by them)."""
+def with_context(pid: str, section: str, rationale: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Attach what was known when a hypothesis changed (vision §8.1): the question, for the first version; the
+    latest finished trial of the version being replaced, otherwise. It is context, never presented as the reason."""
+    from backend.research import store as trials
+    r = dict(rationale or {})
+    if section != "hypothesis":
+        return r
+    hist = store.section_history(pid, "hypothesis")
+    ctx = list(r.get("context") or [])
+    if not hist:
+        # The first statement is the original motivation, whoever wrote it; a proposal or an idea keeps its trigger.
+        if r.get("trigger") in (None, "", "user_edit", "unknown"):
+            r["trigger"] = "initial"
+        r["reason"] = r.get("reason") or "First statement of the hypothesis"
+        q = store.section_history(pid, "question")
+        if q:
+            ctx.append({"kind": "question", "ref": {"version": q[-1]["version"]}, "label": q[-1]["content"][:200]})
+    else:
+        prev = hist[-1]["version"]
+        row = _conn().execute("SELECT trial_id FROM trials WHERE thread_id = ? AND hypothesis_version = ? AND status = 'complete' "
+                              "ORDER BY created_at DESC LIMIT 1", (pid, prev)).fetchone()
+        t = trials.get_trial(row[0]) if row else None
+        if t and t.get("verdict"):
+            v = (t["verdict"].get("overall") or {}).get("verdict") or "no verdict"
+            ctx.append({"kind": "trial_verdict", "ref": {"trial_id": t["trial_id"], "hypothesis_version": prev},
+                        "label": f"Latest trial for v{prev}: {v.replace('_', ' ')}"})
+    r["context"] = ctx
+    return r
+
+
+def write(pid: str, section: str, value: str, rationale: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The researcher's own edit of the question, the hypothesis or a rival (a new version, authored by them),
+    with why it changed (optional; a plain edit says "Edited by you")."""
     if section not in WRITABLE:
         raise ValueError(f"only {', '.join(WRITABLE)} can be written here")
     value = (value or "").strip()
     if not value:
         raise ValueError("empty value")
-    version = store.write_section(pid, section, value[:4000], "user")
+    r = dict(rationale or {})
+    r.setdefault("trigger", "user_edit")
+    r.setdefault("source", "you")
+    r = with_context(pid, section, r)
+    r["reason"] = r.get("reason") or "Edited by you"
+    version = store.write_section(pid, section, value[:4000], "user", rationale=r)
     return {"section": section, "value": value, "version": version, "kind": kind(pid)}
+
+
+HISTORY_KINDS = ("question", "hypothesis", "rival_hypothesis", "design")
+
+
+def history(pid: str, section: str) -> Dict[str, Any]:
+    """Every version with why it changed, and the original motivation (version 1 and the question it answered)."""
+    if section not in HISTORY_KINDS:
+        raise ValueError(f"history is kept for {', '.join(HISTORY_KINDS)}")
+    rows = store.section_history(pid, section)
+    out, prev = [], None
+    for v in rows:
+        content: Any = v["content"]
+        item = {"version": v["version"], "author": v["author"], "source": SOURCE.get(v["author"], v["author"]),
+                "at": int(v["created_at"] * 1000), "rationale": v.get("rationale") or {}}
+        if section == "design":
+            try:
+                content = json.loads(content)
+            except ValueError:
+                pass
+            if isinstance(content, dict) and isinstance(prev, dict):
+                item["changed_fields"] = sorted(k for k in set(content) | set(prev)
+                                                if k not in ("version", "author") and content.get(k) != prev.get(k))
+        else:
+            item["previous_content"] = prev
+        item["content"] = content
+        out.append(item)
+        prev = content
+    question = store.section_history(pid, "question")
+    original = None
+    if out:
+        first_at = rows[0]["created_at"]
+        asked = [q for q in question if q["created_at"] <= first_at]
+        original = {**out[0], "question": (asked[-1] if asked else (question[0] if question else {})).get("content", "")}
+    return {"project_id": pid, "kind": section, "original": original, "versions": out}
 
 
 def _messages(pid: str) -> List[Dict[str, Any]]:
@@ -108,7 +179,8 @@ def rivals(pid: str) -> List[str]:
 def retire_rival(pid: str, text: str) -> List[str]:
     if text not in rivals(pid):
         raise ValueError("not a parked rival")
-    store.write_section(pid, "rivals_retired", json.dumps(_retired(pid) + [text]), "user")
+    store.write_section(pid, "rivals_retired", json.dumps(_retired(pid) + [text]), "user",
+                        rationale={"trigger": "user_edit", "source": "you", "reason": "Retired by you"})
     return rivals(pid)
 
 
@@ -118,8 +190,12 @@ def swap(pid: str, text: str) -> Dict[str, Any]:
         raise ValueError("not a parked rival")
     old = current_hypothesis(pid)
     if old:
-        store.write_section(pid, "rival_hypothesis", old["text"], "user")
-    store.write_section(pid, "hypothesis", text, "user")
+        store.write_section(pid, "rival_hypothesis", old["text"], "user",
+                            rationale={"trigger": "rival_swap", "source": "you", "reason": "Parked when a rival was swapped in"})
+    why = with_context(pid, "hypothesis", {"trigger": "rival_swap", "source": "you",
+                                           "reason": f"Swapped in a parked rival (it replaced v{old['version']})" if old else "Swapped in a parked rival",
+                                           "decision_ref": {"kind": "rival", "id": text[:120]}})
+    store.write_section(pid, "hypothesis", text, "user", rationale=why)
     retired = _retired(pid)
     if old and old["text"] in retired:
         store.write_section(pid, "rivals_retired", json.dumps([r for r in retired if r != old["text"]]), "user")
@@ -166,8 +242,13 @@ def state(pid: str) -> Dict[str, Any]:
         "project_id": pid, "title": row[0] if row else "", "kind": "project" if hyp else "thread",
         "promoted_at": hyp[0]["created_at"] if hyp else None,
         "question": question[-1]["content"] if question else "",
-        "hypothesis": [{"text": v["content"], "version": v["version"], "source": SOURCE.get(v["author"], v["author"]),
-                        "at": int(v["created_at"] * 1000)} for v in hyp],
+        "hypothesis": [{"text": v["content"], "version": v["version"],
+                        "source": (v.get("rationale") or {}).get("source") or SOURCE.get(v["author"], v["author"]),
+                        "at": int(v["created_at"] * 1000), "reason": (v.get("rationale") or {}).get("reason") or "",
+                        "trigger": (v.get("rationale") or {}).get("trigger") or "",
+                        "evidence": (v.get("rationale") or {}).get("evidence") or [],
+                        "context": (v.get("rationale") or {}).get("context") or [],
+                        "previous_version": (v.get("rationale") or {}).get("previous_version")} for v in hyp],
         "rivals": rivals_now, "messages": _messages(pid), "mode": get_mode(pid),
     }
 
@@ -185,7 +266,8 @@ def _args(pid: str):
 
 
 LABELS = [("papers", "paper", "papers"), ("trials", "trial", "trials"), ("systematic_reviews", "systematic review", "systematic reviews"),
-          ("review_records", "screening record", "screening records"), ("messages", "message", "messages"),
+          ("review_records", "screening record", "screening records"),
+          ("review_searches", "logged search", "logged searches"), ("messages", "message", "messages"),
           ("notebook_entries", "notebook entry", "notebook entries"), ("thinker_memories", "thinker memory", "thinker memories")]
 
 
@@ -202,6 +284,7 @@ def footprint(pid: str) -> Dict[str, Any]:
         "papers": one(f"SELECT COUNT(*) FROM trial_papers WHERE trial_id IN (SELECT trial_id FROM trials WHERE {w})", a),
         "systematic_reviews": one(f"SELECT COUNT(*) FROM sys_reviews WHERE {w}", a),
         "review_records": one(f"SELECT COUNT(*) FROM sys_review_records WHERE review_id IN (SELECT review_id FROM sys_reviews WHERE {w})", a),
+        "review_searches": one(f"SELECT COUNT(*) FROM sys_review_searches WHERE review_id IN (SELECT review_id FROM sys_reviews WHERE {w})", a),
     }
     parts = [f"{counts[k]} {one_ if counts[k] == 1 else many}" for k, one_, many in LABELS if counts[k]]
     return {"project_id": pid, "counts": counts, "summary": ", ".join(parts) or "nothing stored yet"}
@@ -215,6 +298,7 @@ def delete(pid: str) -> Dict[str, Any]:
     with c:
         c.execute(f"DELETE FROM trial_papers WHERE trial_id IN (SELECT trial_id FROM trials WHERE {w})", a)
         c.execute(f"DELETE FROM sys_review_records WHERE review_id IN (SELECT review_id FROM sys_reviews WHERE {w})", a)
+        c.execute(f"DELETE FROM sys_review_searches WHERE review_id IN (SELECT review_id FROM sys_reviews WHERE {w})", a)
         for table in ("conversation_turns", "thread_summaries", "conductor_proposals", "notebook_sections", "thinker_memory", "trials", "sys_reviews"):
             c.execute(f"DELETE FROM {table} WHERE {w}", a)
         c.execute("DELETE FROM research_projects WHERE project_id = ?", (pid,))

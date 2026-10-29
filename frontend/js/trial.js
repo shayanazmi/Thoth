@@ -102,7 +102,13 @@ function onEvent(d, type, pl) {
     case 'paper_found': Object.assign(paper(pl.paper_id), { meta: pl.meta }); t.order.push(pl.paper_id); t.stage = t.remap ? 'Matching the existing records to the new sub-claims' : 'Fetching full texts and reading'; break;
     case 'paper_access': Object.assign(paper(pl.paper_id), { access: pl.access, text_source: pl.text_source, status: 'reading' }); break;
     case 'paper_read': Object.assign(paper(pl.paper_id), { record: pl.record, status: 'analysing' }); break;
-    case 'matrix_row': Object.assign(paper(pl.paper_id), { row: pl.row, weight: pl.weight, status: 'done' }); break;
+    case 'paper_appraised': Object.assign(paper(pl.paper_id), { appraisal: pl.appraisal }); break;
+    case 'matrix_row':
+      Object.assign(paper(pl.paper_id), { row: pl.row, weight: pl.weight, status: 'done' });
+      if (pl.weight_basis) paper(pl.paper_id).appraisal = { ...(paper(pl.paper_id).appraisal || {}), weight_basis: pl.weight_basis };
+      break;
+    case 'citation_search': t.stage = 'Checking papers that cite, or are cited by, the strongest witnesses'; break;
+    case 'citation_neighbours': t.citation = pl; break;
     case 'paper_failed': case 'paper_skipped': Object.assign(paper(pl.paper_id), { status: type === 'paper_failed' ? 'failed' : 'unreadable', reason: pl.reason }); break;
     case 'search_filtered': t.filtered = pl; break;
     case 'rereading': t.stage = `Re-reading ${pl.papers.length} paper${pl.papers.length > 1 ? 's' : ''} the fallback model read`; break;
@@ -174,7 +180,7 @@ async function ensureLoaded(d) {
     // A run that started while this was loading owns d.trial: don't overwrite it with an older snapshot.
     if (t.trial_id && !(liveTrial && d.trial?.trial_id === liveTrial)) {
       d.trial = { trial_id: t.trial_id, hypothesis: t.hypothesis, subclaims: t.subclaims, verdict: Object.keys(t.verdict || {}).length ? t.verdict : null,
-        stale: t.stale, hypothesis_version: t.hypothesis_version, hypothesis_now: t.hypothesis_now, remapped_from: t.remapped_from,
+        stale: t.stale, hypothesis_version: t.hypothesis_version, hypothesis_now: t.hypothesis_now, remapped_from: t.remapped_from, adjacent: t.adjacent,
         filtered: t.strategy?.europepmc_dropped_off_topic?.count ? { dropped: t.strategy.europepmc_dropped_off_topic.count, titles: t.strategy.europepmc_dropped_off_topic.titles } : null,
         status: t.status, stage: { complete: 'Done', stopped: 'Stopped before finishing' }[t.status] || t.status, started: Date.now(), papers: {}, order: [] };
       for (const p of t.papers) { d.trial.papers[p.paper_id] = p; d.trial.order.push(p.paper_id); }
@@ -243,7 +249,7 @@ function liveWork(t) {
   return `<div class="live-work" role="status">
     <span><b class="lw-elapsed">${fmt(Date.now() - t.started)}</b>${t.estimate ? ` <span class="faint">of ~${esc(t.estimate.replace(/ \(.*\)/, ''))}</span>` : ''}</span>
     <span><b>${done}</b>/${found} papers analysed</span>
-    <span><b>${u.model_calls ?? 0}</b> model calls${u.fallback_calls ? ` <span class="faint">(${u.fallback_calls} by the fallback)</span>` : ''}</span>
+    <span><b>${u.model_calls ?? 0}</b> model call${(u.model_calls ?? 0) === 1 ? '' : 's'}${u.fallback_calls ? ` <span class="faint">(${u.fallback_calls} by the fallback)</span>` : ''}</span>
     <button class="chip" data-act="stopTrial" ${t.stopping ? 'disabled' : ''}>${t.stopping ? 'Stopping…' : 'Stop'}</button>
   </div>`;
 }
@@ -274,11 +280,59 @@ function verdictBlock(t) {
       <div class="cases"><div><b>Case for</b>${md(s.case_for || '—')}${s.witness_ids_for?.length ? `<div class="faint">${esc(s.witness_ids_for.join(', '))}</div>` : ''}</div>
       <div><b>Case against</b>${md(s.case_against || '—')}${s.witness_ids_against?.length ? `<div class="faint">${esc(s.witness_ids_against.join(', '))}</div>` : ''}</div></div>
       ${s.conflicts ? `<div class="faint">Conflicts: ${esc(s.conflicts)}</div>` : ''}</details>`).join('')}
+    ${originalityBlock(t, v)}
     ${v.gaps?.length ? `<h3>Not covered by these ${v.witnesses} papers</h3><ul class="list">${v.gaps.map((g) => `<li>${esc(g.gap)} <span class="faint">(${esc((g.revealed_by || []).join(', '))})</span></li>`).join('')}</ul><p class="faint">A trial reads a sample of the literature. These are gaps in the sample, which may point to gaps in the literature; a systematic review would tell.</p>` : ''}
     ${v.hypothesis_weaknesses?.length ? `<h3>What would strengthen the hypothesis</h3><ul class="list">${v.hypothesis_weaknesses.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
     <div class="chips"><button class="chip" data-act="rejudgeTrial" title="The Judge only; the rows stay as they are">Weigh again</button>
       <button class="chip" data-act="editSubclaims" title="Redo every row against edited sub-claims, then weigh again">Edit sub-claims</button>
       <button class="chip" data-act="verdictThinkers">Ask thinkers about this verdict</button></div>`;
+}
+
+// ---------- Study-quality appraisal (vision §5.6): the checklist for the paper's design, item by item ----------
+const APPRAISAL = { low: ['Low risk of bias', 'acc-full_text'], some_concerns: ['Some concerns', 'acc-abstract_only'], high: ['High risk of bias', 'bad'],
+  not_assessable: ["Couldn't be assessed", 'acc-metadata_only'], core_only: ['Core questions only', 'acc-metadata_only'],
+  not_appraised: ['Not appraised', 'acc-metadata_only'] };
+const ANSWER = { yes: 'yes', no: 'no', unclear: 'unclear', not_applicable: 'n/a', not_assessable: 'not assessable' };
+
+function weightTitle(p) {
+  const b = p.appraisal?.weight_basis;
+  if (!b) return 'Witness weight = design × access (appraised with the older method)';
+  return `Witness weight = design ${b.design_tier} × access ${b.access_factor} × appraisal ${b.appraisal_factor} (${APPRAISAL[b.appraisal]?.[0] || b.appraisal || 'not appraised'})`;
+}
+
+function appraisalBlock(p) {
+  const a = p.appraisal;
+  if (!a || !a.overall) return p.status === 'done' ? '<div><span class="rk">Appraisal</span><span class="faint">Appraised with the older method (before checklists).</span></div>' : '';
+  const [label, cls] = APPRAISAL[a.overall] || [a.overall, ''];
+  const core = a.core || {};
+  return `<details class="appraisal"><summary><span class="rk">Appraisal</span>${esc(a.checklist_name || 'Core questions')}${a.adapted_from ? ` <span class="faint">(adapted from ${esc(a.adapted_from)})</span>` : ''} <span class="badge ${cls}">${esc(label)}</span></summary>
+    ${a.overall_why ? `<p class="faint">${esc(a.overall_why)}</p>` : ''}
+    ${a.design_uncertain ? '<div class="guard">The study design was unclear from the text, so the checklist may not fit.</div>' : ''}
+    ${a.selection_note ? `<div class="faint">${esc(a.selection_note)}</div>` : ''}
+    ${(a.items || []).length ? `<ul class="list">${a.items.map((i) => `<li>${i.critical ? '<b>' : ''}${esc(i.q)}${i.critical ? '</b>' : ''} · <span class="badge">${esc(ANSWER[i.answer] || i.answer)}</span>${i.evidence ? ` “${esc(i.evidence)}”` : ''}${i.locator ? ` <span class="prov">${esc(i.locator)}</span>` : ''}${i.why ? ` <span class="faint">${esc(i.why)}</span>` : ''}</li>`).join('')}</ul>` : ''}
+    ${core.methods_fit ? `<div><span class="rk">Methods fit</span>${esc(core.methods_fit.answer)}${core.methods_fit.why ? `: ${esc(core.methods_fit.why)}` : ''}</div>` : ''}
+    ${(core.key_biases || []).length ? `<div><span class="rk">Key biases</span>${core.key_biases.map((b) => `${esc(b.bias)}${b.locator ? ` <span class="prov">${esc(b.locator)}</span>` : ''}`).join('; ')}</div>` : ''}
+    ${(core.conclusions_beyond_evidence || []).length ? `<div><span class="rk">Beyond the evidence</span>${core.conclusions_beyond_evidence.map((c) => `${esc(c.claim)}${c.why ? ` <span class="faint">(${esc(c.why)})</span>` : ''}`).join('; ')}</div>` : ''}
+    ${a.error ? `<div class="faint">${esc(a.error)}; the weight is unchanged.</div>` : ''}
+    <div class="faint">${a.access === 'full_text' ? 'Judged from the full text.' : 'Judged from the abstract only: items that need the methods are marked “not assessable”.'}</div>
+  </details>`;
+}
+
+// ---------- Originality: papers citing, or cited by, the strongest witnesses (vision §4.2) ----------
+function originalityBlock(t, v) {
+  const c = t.adjacent?.citation;
+  const ids = new Set(v.originality?.closest_prior_work_ids || []);
+  const cov = v.coverage;
+  if (!c && !cov) return '';
+  return `<details class="originality"><summary><b>How originality and coverage were checked</b></summary>
+    ${cov ? `<p class="faint">${cov.kind === 'systematic_review' ? `From a systematic review: ${esc(cov.identified)} records identified, ${esc(cov.included)} included.` : esc(cov.note || 'A lightweight scan.')}</p>` : ''}
+    ${(cov?.limitations || []).length ? `<ul class="list">${cov.limitations.map((x) => `<li class="faint">${esc(x)}</li>`).join('')}</ul>` : ''}
+    ${!c ? '<p class="faint">Citation search was not part of this (older) run.</p>'
+      : !c.ran ? `<div class="guard">Citation search didn't run: ${esc(c.reason || (c.errors || []).join('; '))}</div>`
+      : c.papers?.length ? `<p class="faint">Papers citing, or cited by, the strongest witnesses (abstracts only; not witnesses):</p><ul class="list">${c.papers.map((p) => `<li${ids.has(p.id) ? ' class="hl"' : ''}><span class="wid">${esc(p.id)}</span> ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title)} <span class="faint">· ${esc(p.year ?? '')} · ${esc(p.relation)}${ids.has(p.id) ? ' · named as closest prior work' : ''}</span></li>`).join('')}</ul>`
+      : '<p class="faint">The citation search ran and found no new prior work beyond the witnesses.</p>'}
+    ${(c?.errors || []).length && c.ran ? `<div class="faint">Some lookups failed: ${esc(c.errors.join('; '))}</div>` : ''}
+  </details>`;
 }
 
 function recordBlock(p) {
@@ -291,7 +345,8 @@ function recordBlock(p) {
     ${(r.limitations_stated || []).length ? `<div><span class="rk">Authors' limits</span>${esc(r.limitations_stated.join('; '))}</div>` : ''}
     ${(r.limitations_noticed_by_reader || []).length ? `<div><span class="rk">Reader noticed</span>${esc(r.limitations_noticed_by_reader.join('; '))}</div>` : ''}
     ${p.row?.boundary_conditions?.length ? `<div><span class="rk">Boundary</span>${esc(p.row.boundary_conditions.join('; '))}</div>` : ''}
-    ${p.row?.appraisal?.risks_of_bias?.length ? `<div><span class="rk">Risks of bias</span>${esc(p.row.appraisal.risks_of_bias.join('; '))}</div>` : ''}
+    ${appraisalBlock(p)}
+    ${p.row?.appraisal?.risks_of_bias?.length ? `<div><span class="rk">Risks of bias</span>${esc(p.row.appraisal.risks_of_bias.join('; '))} <span class="faint">(the Analyst's note)</span></div>` : ''}
     ${p.row?.blind_spots?.length ? `<div><span class="rk">Blind spots</span>${esc(p.row.blind_spots.join('; '))}</div>` : ''}
     <div class="faint">Text: ${esc(p.text_source || ACCESS[p.access] || '')}</div>
     ${readByNote(p)}
@@ -320,7 +375,7 @@ function matrix(t) {
       <span class="mtitle">${esc(m.title || '…')}<span class="faint"> · ${esc(m.year ?? '')}${rec.design?.value ? ` · ${esc(String(rec.design.value).replace(/_/g, ' '))}` : ''}${rec.sample_size?.value ? ` · n ${esc(String(rec.sample_size.value).slice(0, 40))}` : ''}</span></span>
       <span class="badge acc-${esc(p.access)}">${esc(ACCESS[p.access] || p.access)}</span>
       <span class="dirs">${done ? subs.map((s) => { const x = (p.row.per_subclaim || []).find((y) => y.id === s.id) || {}; const [g, l] = DIR[x.direction] || DIR.not_addressed; return `<span class="dir d-${esc(x.direction || 'not_addressed')}" title="${s.id}. ${esc(l)}${x.locator ? ` · ${esc(x.locator)}` : ''}">${g}</span>`; }).join('') : `<span class="faint">${esc({ found: 'queued', reading: 'reading…', analysing: 'analysing…', failed: "couldn't read", unreadable: 'title only', not_run: 'not run', read: 'record reused' }[p.status] || p.status)}</span>`}</span>
-      ${done ? `<span class="weight" title="Witness weight">${p.weight}</span>` : ''}
+      ${done ? `<span class="weight" title="${esc(weightTitle(p))}">${p.weight}</span>` : ''}
     </summary>
     ${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener" class="faint">${esc(m.venue || 'Source')} ↗</a>` : ''}
     ${done ? `<div class="isay"><span class="rk">${p.i_say_user ? 'You say' : "Thoth's draft “I say”"}</span> ${esc(isay)} <span class="faint">· ${esc(p.row.stance)}</span> <button class="link-btn" data-act="editISay" data-arg="${esc(p.paper_id)}">${p.i_say_user ? 'Edit' : 'Write your own'}</button></div>
@@ -332,7 +387,7 @@ function matrix(t) {
   const off = t.filtered;
   return `<h3>The matrix</h3>
     ${off?.dropped ? `<details class="faint"><summary>${off.dropped} off-topic Europe PMC result${off.dropped > 1 ? 's' : ''} left out (title and abstract shared too few words with the search)</summary><ul class="list">${(off.titles || []).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></details>` : ''}
-    <p class="faint">Rows are witnesses, columns your sub-claims. ▲ convergent · ▼ divergent · ○ null · · not addressed. Weight = design strength × how much of the paper was read.</p>
+    <p class="faint">Rows are witnesses, columns your sub-claims. ▲ convergent · ▼ divergent · ○ null · · not addressed. Weight = design strength × how much of the paper was read × its appraisal (hover a weight to see how).</p>
     <div class="matrix">${loud.map(row).join('')}${silent.length ? silentGroup(silent, row) : ''}</div>
     <form class="add-doi" data-act-form="addDoi"><input name="doi" placeholder="Add a paper by DOI (e.g. 10.1186/…)" aria-label="DOI"><button class="chip">Add</button></form>`;
 }

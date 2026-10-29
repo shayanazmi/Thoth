@@ -71,8 +71,9 @@ def test_autopilot_still_needs_approval_and_the_run_reports_its_work(client, mon
         events = read_sse(r, max_events=200, max_seconds=20)
     usage = [e["payload"] for e in events if e["event"] == "usage"]
     assert usage and usage[-1]["found"] == 3 and usage[-1]["analysed"] == 3
-    # Sub-claims were split at planning; the run makes Librarian strategy + 3 Reader + 3 Analyst + Judge = 8 calls.
-    assert usage[-1]["model_calls"] == 8 and usage[-1]["fallback_calls"] == 0
+    # Sub-claims were split at planning; the run makes Librarian strategy + 3 Reader + 3 Appraiser + 3 Analyst
+    # + Judge = 11 calls (citation following makes no model calls).
+    assert usage[-1]["model_calls"] == 11 and usage[-1]["fallback_calls"] == 0
     assert [u["model_calls"] for u in usage] == sorted(u["model_calls"] for u in usage), "counts only grow"
 
 

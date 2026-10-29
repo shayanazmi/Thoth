@@ -353,6 +353,9 @@ async function boot() {
   const last = lastProject();
   if (last && state.projects.some((p) => p.id === last)) state.projectId = last;
   render();
+  // A reload restores the project from this browser's cache; the server's copy (versions and why each changed,
+  // rivals, the chat) is the source of truth, so fetch it too.
+  if (state.projectId) hydrate(state.projectId);
   bootReady();
   // Optional guided tour: lives entirely in /scripted; if that folder is gone, this quietly does nothing.
   import('/scripted/index.js').then((m) => m.install({ state, emit, subscribe, actions, register, say, openPanel, scene, toast, rememberProject })).catch(() => {});

@@ -70,7 +70,9 @@ RULES
 - Keep disagreements and caveats visible. Do not upgrade "contested" or "insufficient evidence" to "supported".
 - An abstract-only witness supports only what its abstract states; say so where it matters.
 - Proposed work is future tense ("will"); what witnesses found is past tense with a marker.
-- In "Expected outcomes", include the result that would refute the hypothesis and what it would mean."""
+- In "Expected outcomes", include the result that would refute the hypothesis and what it would mean.
+- If the hypothesis or the design changed (hypothesis_history, design_history), you may say how and why, using only
+  those entries. Describe the literature's reach as the verdict's coverage states it; never call it exhaustive."""
 
 REVISE = """
 REVISION
@@ -102,7 +104,9 @@ def _text(thread: str, kind: str) -> str:
 
 def research_file(thread: str) -> Dict[str, Any]:
     """Everything the Writer may draw on, and nothing else. Witness ids match designer.trial_lessons."""
-    trial = designer.latest_trial(thread)
+    # The design's witness ids belong to the trial it was built from; read that trial so W3 means the same paper
+    # in the Methods as in the design (a newer trial would renumber them).
+    trial = designer.trial_for_design(thread, _section(thread, "design"))
     witnesses: List[Dict[str, Any]] = []
     verdict: Dict[str, Any] = {}
     subclaims: List[Dict[str, Any]] = []
@@ -124,11 +128,12 @@ def research_file(thread: str) -> Dict[str, Any]:
                 "stance": row.get("stance"), "floor_or_ceiling": row.get("floor_or_ceiling"),
                 "boundary_conditions": (row.get("boundary_conditions") or [])[:4],
                 "risks_of_bias": ((row.get("appraisal") or {}).get("risks_of_bias") or [])[:4],
+                "appraisal": designer.appraisal_summary(p.get("appraisal") or {}),
                 "researcher_says": p.get("i_say_user") or None,
                 "analyst_reading": None if p.get("i_say_user") else row.get("i_say_draft"),
             })
         v = trial.get("verdict") or {}
-        verdict = {k: v.get(k) for k in ("overall", "per_subclaim", "originality", "gaps", "hypothesis_weaknesses", "guardrail_notes")}
+        verdict = {k: v.get(k) for k in ("overall", "per_subclaim", "originality", "gaps", "hypothesis_weaknesses", "guardrail_notes", "coverage")}
         verdict["witnesses"], verdict["full_text_witnesses"] = v.get("witnesses"), v.get("full_text_witnesses")
     design = _section(thread, "design")
     if design:
@@ -137,7 +142,25 @@ def research_file(thread: str) -> Dict[str, Any]:
         "question": _text(thread, "question"), "hypothesis": _text(thread, "hypothesis") or (trial or {}).get("hypothesis", ""),
         "subclaims": subclaims, "trial_available": bool(trial), "verdict": verdict, "witnesses": witnesses,
         "design": design, "resources": _section(thread, "resources"),
+        "hypothesis_history": _history(thread, "hypothesis"), "design_history": _history(thread, "design"),
     }
+
+
+def _history(thread: str, kind: str) -> List[Dict[str, Any]]:
+    """How the hypothesis or the design changed, and why (vision §8.1), from the research file's own versions."""
+    out = []
+    for v in notebook.section_history(thread, kind)[-6:]:
+        r = v.get("rationale") or {}
+        item: Dict[str, Any] = {"version": v["version"], "reason": r.get("reason") or "", "trigger": r.get("trigger") or ""}
+        if kind == "hypothesis":
+            item["text"] = v["content"]
+        else:
+            try:
+                item["name"] = json.loads(v["content"]).get("name")
+            except Exception:
+                item["name"] = ""
+        out.append(item)
+    return out if len(out) > 1 else []
 
 
 def file_keys(rf: Dict[str, Any]) -> Dict[str, bool]:
