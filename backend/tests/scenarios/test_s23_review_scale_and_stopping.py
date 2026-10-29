@@ -306,3 +306,59 @@ def test_an_unparseable_screener_answer_is_retried_with_a_format_note(client, mo
     st = state(client, rid)
     assert st["status"] == "complete" and st["counts"]["unscreened"] == 0 and st["counts"]["full_text_unscreened"] == 0
     assert st["counts"]["included"] == 2
+
+
+def test_every_page_is_a_full_page_so_page_numbers_never_overlap(client, monkeypatch):
+    """Engineering review, 29 Oct: without an OpenAlex key paging is by page number, so a smaller last page re-fetched
+    earlier records. Every request now asks for a full page; records beyond the budget are not kept."""
+    import backend.research.librarian as L
+    install(monkeypatch, lambda t: False)
+    titles = [f"Paper {i}" for i in range(400)]
+    asked = []
+
+    async def oa(client_, q, limit, cursor=None, page_info=None):
+        page = 1 if cursor in (None, "*") else int(cursor)
+        asked.append((page, limit))
+        chunk = titles[(page - 1) * limit:page * limit]  # page-number semantics: offset = (page-1) * per-page
+        if page_info is not None:
+            page_info.update(total=len(titles), next_cursor=str(page + 1))
+        return [{"title": t, "doi": f"10.9/{t.split()[-1]}", "abstract": "a", "found_via": "OpenAlex"} for t in chunk]
+
+    monkeypatch.setattr(L, "search_openalex", oa)
+    rid = protocol(client)["review_id"]
+    run(client, rid, {"keyword_records": 148, "citation_rounds": 0, "stop_after_irrelevant": 0})
+    c = state(client, rid)["counts"]
+    assert asked == [(1, 100), (2, 100)], "constant page size"
+    assert c["identified"] == 148 and c["duplicates_removed"] == 0, "no record fetched twice"
+
+
+def test_a_weak_europe_pmc_query_keeps_what_it_found_and_logs_the_relaxed_search(client, monkeypatch):
+    import backend.research.librarian as L
+    install(monkeypatch, lambda t: False)
+    openalex(monkeypatch, [])
+
+    async def ep(client_, q, limit, dropped=None, cursor=None, page_info=None):
+        n = 2 if "AND" in q or q == PROTOCOL["search"]["europepmc"] else 5
+        if page_info is not None:
+            page_info.update(total=n, next_cursor=None)
+        return [{"title": f"EPMC {q[:5]} {i}", "doi": f"10.6/{len(q)}-{i}", "abstract": "a", "found_via": "Europe PMC"} for i in range(n)]
+
+    monkeypatch.setattr(L, "search_europepmc", ep)
+    rid = protocol(client)["review_id"]
+    run(client, rid, {"keyword_records": 300, "citation_rounds": 0, "stop_after_irrelevant": 0})
+    log = [s for s in client.get(f"/api/review/{rid}/searches").json()["searches"] if s["source"] == "Europe PMC" and s["requested"]]
+    assert [s["returned"] for s in log] == [2, 5], "the weak query's results are kept and both searches are logged"
+    assert log[0]["query"] == PROTOCOL["search"]["europepmc"] and log[1]["query"] != log[0]["query"]
+    assert state(client, rid)["counts"]["by_source"]["Europe PMC"] == 7
+
+
+def test_a_decision_cannot_be_written_into_another_review(client, monkeypatch):
+    install(monkeypatch, lambda t: False)
+    openalex(monkeypatch, ["Paper A"])
+    a = protocol(client, "p23x")["review_id"]
+    run(client, a, {"keyword_records": 50, "citation_rounds": 0, "stop_after_irrelevant": 0})
+    b = protocol(client, "p23y")["review_id"]
+    rec = client.get(f"/api/review/{a}/records").json()["records"][0]["record_id"]
+    r = client.post(f"/api/review/{b}/decisions/{rec}", json={"stage": "ta", "decision": "include"})
+    assert r.status_code == 404
+    assert client.post(f"/api/review/{a}/decisions/{rec}", json={"stage": "ta", "decision": "include"}).status_code == 200

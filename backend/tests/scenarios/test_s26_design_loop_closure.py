@@ -89,3 +89,16 @@ def test_designer_and_writer_see_appraisal_coverage_and_why_things_changed(clien
     assert rf["witnesses"][0]["appraisal"]["overall"] == "high" and rf["verdict"]["coverage"]["kind"] == "scan"
     assert [h["reason"] for h in rf["hypothesis_history"]] == ["First statement", "Narrowed after the trial"]
     assert rf["design_history"] == [], "one version (or none) is not a history"
+
+
+def test_a_finding_not_repeated_without_a_design_change_is_not_resolved(client, monkeypatch):
+    """Engineering review, 29 Oct: a Reviewer that merely doesn't repeat a design finding resolves nothing."""
+    _seed()
+    _install(monkeypatch, [FATAL])
+    _write(client)
+    _install(monkeypatch, [])  # same design v1; the Reviewer just doesn't mention it this time
+    rv = _review(client)["review"]
+    assert rv["resolved_held"] == []
+    assert rv["held"] and rv["held"][0]["carried"] is True and "nothing that could fix it has changed" in rv["held"][0]["why"]
+    st = client.get(f"/api/proposal?project_id={PID}").json()["status"]
+    assert any("study design" in g for g in st["gaps"]), "still provisional for it"

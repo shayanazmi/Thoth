@@ -165,3 +165,23 @@ def test_remap_copies_the_appraisal(client, monkeypatch):
     remap = client.post(f"/api/trial/{plan['trial_id']}/remap", json={}).json()
     copied = client.get(f"/api/trial/{remap['trial_id']}").json()["papers"][0]
     assert copied["appraisal"]["checklist_id"] == "jbi_cohort" and copied["appraisal"]["overall"] == "low"
+
+
+def test_untitled_neighbours_are_deduplicated_too(client, monkeypatch):
+    from backend.research import citations
+
+    async def backward(client_, meta, limit, query=""):
+        return ([{"title": "", "doi": "10.8/x", "abstract": "a"}, {"title": "", "doi": "10.8/x", "abstract": "a"},
+                 {"title": "Named prior work", "doi": "10.8/y", "abstract": "b"}], {"provider": "OpenAlex", "error": None})
+
+    async def forward(client_, meta, limit, query=""):
+        return [], {"provider": "OpenAlex", "error": None}
+
+    monkeypatch.setattr(citations, "backward", backward)
+    monkeypatch.setattr(citations, "forward", forward)
+    _install(monkeypatch, ANSWERS)
+    _stub_library(monkeypatch, access="abstract_only")
+    plan = _plan(client, "p24u")
+    _run(client, plan["trial_id"])
+    papers = client.get(f"/api/trial/{plan['trial_id']}").json()["adjacent"]["citation"]["papers"]
+    assert sorted(p["doi"] for p in papers) == ["10.8/x", "10.8/y"], "the same DOI appears once"

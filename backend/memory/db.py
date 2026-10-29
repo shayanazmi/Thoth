@@ -14,7 +14,15 @@ def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
+# Databases whose schema is already in place in this process: every store call used to re-run the whole schema
+# script (a review inserts hundreds of rows). Keyed by absolute path; a file that has gone is set up again.
+_READY: set = set()
+
+
 def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
+    key = os.path.abspath(db_path)
+    if key in _READY and os.path.exists(key):
+        return get_connection(db_path)
     conn = get_connection(db_path)
     with conn:
         conn.execute("""
@@ -702,6 +710,7 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                 pass
 
 
+    _READY.add(key)
     return conn
 
 def save_session(

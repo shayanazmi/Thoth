@@ -99,6 +99,11 @@ def searches(review_id: str) -> List[Dict[str, Any]]:
     return [dict(zip(SEARCH_COLS, r)) for r in rows]
 
 
+def review_of(record_id: str) -> Optional[str]:
+    r = _conn().execute("SELECT review_id FROM sys_review_records WHERE record_id = ?", (record_id,)).fetchone()
+    return r[0] if r else None
+
+
 def get_record(record_id: str) -> Optional[Dict[str, Any]]:
     r = _conn().execute("SELECT review_id FROM sys_review_records WHERE record_id = ?", (record_id,)).fetchone()
     return next((x for x in records(r[0]) if x["record_id"] == record_id), None) if r else None

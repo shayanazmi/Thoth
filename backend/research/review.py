@@ -376,10 +376,11 @@ def queue(review_id: str, stage: str) -> List[Dict[str, Any]]:
     return out
 
 
-def decide(record_id: str, stage: str, decision: str, reason: str = "") -> Dict[str, Any]:
-    """The researcher confirms or overrides a decision. Exclusions need a protocol reason."""
+def decide(record_id: str, stage: str, decision: str, reason: str = "", review_id: Optional[str] = None) -> Dict[str, Any]:
+    """The researcher confirms or overrides a decision. Exclusions need a protocol reason. With review_id, the record
+    must belong to that review (a decision is never written into another review's log)."""
     rec = rs.get_record(record_id)
-    if not rec or stage not in ("ta", "ft"):
+    if not rec or stage not in ("ta", "ft") or (review_id is not None and rs.review_of(record_id) != review_id):
         raise KeyError(record_id)
     allowed = ("include", "exclude", "maybe") if stage == "ta" else ("include", "exclude")
     reason = (reason or "").strip().lower()
@@ -460,20 +461,19 @@ async def _identify(rev: Dict[str, Any], budget: Dict[str, int]) -> AsyncIterato
             while quota > 0:
                 if _stopping_now(review_id):
                     return
-                per = min(PAGE, quota)
+                # Always a full page: without an OpenAlex key paging is by page number, which needs a constant page size
+                # (a smaller last page would re-fetch earlier records). Records beyond the quota are not kept.
+                per = PAGE
                 info: Dict[str, Any] = {}
                 dropped: List[str] = []
                 if source == "OpenAlex":
                     found = await librarian.search_openalex(client, query, per, cursor=cursor, page_info=info)
                 elif source == "Europe PMC":
                     found = await librarian.search_europepmc(client, query, per, dropped, cursor=cursor, page_info=info)
-                    if page == 1 and len(found) < 3 and not info.get("error"):
-                        # A Boolean query that ANDs too many blocks returns almost nothing; relax it (logged as its own search).
-                        query = librarian.keywords(p["openalex"], 8)
-                        info, dropped, cursor = {}, [], "*"
-                        found = await librarian.search_europepmc(client, query, per, dropped, cursor=cursor, page_info=info)
                 else:
                     found, info = await librarian.search_s2(query, per, None if cursor == "*" else cursor)
+                cut = len(found) > quota
+                found = found[:quota]
                 origin = {"kind": "keyword", "source": source, "round": 0, "page": page}
                 new, dups, no_title = _store_results(review_id, found, dedup, origin, rank_base=(page - 1) * 1000 + slot, rank_step=3)
                 n = new + dups
@@ -495,8 +495,14 @@ async def _identify(rev: Dict[str, Any], budget: Dict[str, int]) -> AsyncIterato
                     if entry:
                         yield "stop_rule", entry
                     break  # Continue retries this page
+                if (source == "Europe PMC" and page == 1 and len(found) < 3 and not info.get("error")
+                        and query != librarian.keywords(p["openalex"], 8)):
+                    # A Boolean query that ANDs too many blocks returns almost nothing: what it found is kept and logged
+                    # above; the relaxed query runs next as its own logged search.
+                    query, cursor, page = librarian.keywords(p["openalex"], 8), "*", 1
+                    continue
                 total = info.get("total")
-                more = bool(nxt) or (total is not None and used[source] < int(total))
+                more = bool(nxt) or cut or (total is not None and used[source] < int(total))
                 if (not nxt or not found) and not (quota <= 0 and more):
                     entry = _add_stop(review_id, "source_exhausted", source,
                                       f"{source}: all {total if total is not None else used[source]} match(es) for the query were retrieved.")
@@ -650,6 +656,9 @@ async def _chase(review_id: str, rnd: int, budget: Dict[str, int], query: str) -
     seeds = _round_seeds(review_id, rnd)
     looked = {s["seed_record_id"] for s in rs.searches(review_id) if s["kind"] in ("backward", "forward") and s["round"] == rnd}
     found_total = new_total = 0
+    all_recs = rs.records(review_id)
+    used = sum(1 for r in all_recs if _kind(r) != "keyword")
+    next_rank = rnd * 100000 + len(all_recs)
     async with httpx.AsyncClient(timeout=20, headers=librarian.UA, follow_redirects=True) as client:
         for seed in seeds:
             if seed["record_id"] in looked:
@@ -657,7 +666,6 @@ async def _chase(review_id: str, rnd: int, budget: Dict[str, int], query: str) -
             for kind, fn, per in (("backward", citations.backward, BACKWARD_PER_SEED), ("forward", citations.forward, FORWARD_PER_SEED)):
                 if _stopping_now(review_id):
                     return
-                used = sum(1 for r in rs.records(review_id) if _kind(r) != "keyword")
                 remaining = budget["citation_records"] - used
                 if remaining <= 0:
                     entry = _add_stop(review_id, "citation_budget_reached", "citations",
@@ -667,7 +675,9 @@ async def _chase(review_id: str, rnd: int, budget: Dict[str, int], query: str) -
                     return
                 papers, info = await fn(client, seed["meta"], min(per, remaining), query=query)
                 origin = {"kind": kind, "seed_record_id": seed["record_id"], "round": rnd, "provider": info.get("provider")}
-                new, dups, _nt = _store_results(review_id, papers, dedup, origin, rank_base=rnd * 100000 + len(rs.records(review_id)))
+                new, dups, _nt = _store_results(review_id, papers, dedup, origin, rank_base=next_rank)
+                used += new + dups
+                next_rank += len(papers)
                 found_total += new + dups
                 new_total += new
                 rs.add_search(review_id, round=rnd, kind=kind, source=info.get("provider") or "OpenAlex", query=query,

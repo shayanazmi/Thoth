@@ -358,19 +358,35 @@ def _similar(a: str, b: str) -> bool:
 
 
 def resolved_since(thread: str, held_now: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """A design or evidence finding held by the previous review that this review no longer raises was resolved, by the
-    design version current now. Recorded (append-only, at most 20) so the correction loop stays auditable; a finding
-    is never silently dropped."""
+    """A design finding held by the previous review that this review no longer raises was resolved by the design version
+    current now, but only if the design changed since it was raised: a Reviewer that merely doesn't repeat it (model
+    variance) resolves nothing; that finding is carried forward (carried_held). Append-only, at most 20."""
     prev = get_meta(thread).get("review") or {}
     out = list(prev.get("resolved_held") or [])
     now = design_version(thread)
+    for h in prev.get("held") or []:
+        if h.get("fix_in") not in ("design", "evidence") or h.get("carried"):
+            continue
+        if any(n.get("fix_in") == h.get("fix_in") and _similar(n.get("problem", ""), h.get("problem", "")) for n in held_now):
+            continue
+        if h.get("fix_in") == "design" and h.get("design_version") not in (None, now):
+            out.append({**h, "resolved_at": time.time(), "resolved_by_design_version": now})
+    return out[-20:]
+
+
+def carried_held(thread: str, held_now: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Held findings the Reviewer didn't repeat although nothing that could fix them changed: still open."""
+    prev = get_meta(thread).get("review") or {}
+    now = design_version(thread)
+    out = []
     for h in prev.get("held") or []:
         if h.get("fix_in") not in ("design", "evidence"):
             continue
         if any(n.get("fix_in") == h.get("fix_in") and _similar(n.get("problem", ""), h.get("problem", "")) for n in held_now):
             continue
-        out.append({**h, "resolved_at": time.time(), "resolved_by_design_version": now})
-    return out[-20:]
+        if h.get("fix_in") == "evidence" or h.get("design_version") in (None, now):
+            out.append({**h, "carried": True, "why": (h.get("why") or "") + " (not repeated by this review, but nothing that could fix it has changed)"})
+    return out
 
 
 async def review_loop(thread: str, rf: Optional[Dict[str, Any]] = None) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
@@ -407,8 +423,10 @@ async def review_loop(thread: str, rf: Optional[Dict[str, Any]] = None) -> Async
                 revisable.setdefault(w["section"], []).append(w)
             else:
                 held.append({**base, "why": "the section has your edits" if w["section"] in by_key else "the passage could not be placed in a section"})
+        resolved = resolved_since(thread, held)
+        held = held + carried_held(thread, held)
         rv.update(seen={s["key"]: s["version"] for s in secs}, loops=len(rounds), rounds=rounds, held=held, at=time.time(),
-                  resolved_held=resolved_since(thread, held))
+                  resolved_held=resolved)
         update_meta(thread, review=rv)
         yield "review_done", {"review": rv, "round": rnd}
         if not revisable or rnd == MAX_LOOPS:

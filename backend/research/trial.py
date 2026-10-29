@@ -262,7 +262,7 @@ async def citation_neighbours(trial_id: str, hypothesis: str) -> Dict[str, Any]:
                 for m in found:
                     if kept >= CITATION_PER_SEED or dedup.match(m) is not None:
                         continue
-                    dedup.add(m, m.get("title"))
+                    dedup.add(m, f"C{len(out) + 1}")
                     kept += 1
                     out.append({"id": f"C{len(out) + 1}", "title": m.get("title"), "year": m.get("year"), "relation": rel,
                                 "abstract": (m.get("abstract") or "")[:500], "seed_paper_id": seed["paper_id"], "doi": m.get("doi"),

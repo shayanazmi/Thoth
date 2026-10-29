@@ -29,7 +29,7 @@
       "name": "thoth-evidence",
       "runtimeExecutable": "env",
       "runtimeArgs": [
-        "THOTH_DB_PATH=/private/tmp/claude-501/-Users-shayanazmi-college-project-based-learning--langchain-thoth/c8b084cc-40c0-4f4a-93b5-473db9b27449/scratchpad/walk.db",
+        "THOTH_DB_PATH=scratch/walk.db",
         "venv/bin/uvicorn",
         "backend.main:app",
         "--host",

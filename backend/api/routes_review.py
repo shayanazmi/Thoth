@@ -117,7 +117,7 @@ async def records(review_id: str, offset: int = 0, limit: int = 50, filter: str 
 async def decide(review_id: str, record_id: str, request: Request):
     body = await request.json()
     try:
-        out = review.decide(record_id, body.get("stage") or "", body.get("decision") or "", body.get("reason") or "")
+        out = review.decide(record_id, body.get("stage") or "", body.get("decision") or "", body.get("reason") or "", review_id=review_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="no such record or stage")
     except ValueError as exc:
