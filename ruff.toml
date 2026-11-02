@@ -1,0 +1,4 @@
+# Thoth · Developed by Shayan Azmi
+# Lint for real errors: syntax, undefined names, unused imports and variables.
+[lint]
+select = ["E9", "F"]

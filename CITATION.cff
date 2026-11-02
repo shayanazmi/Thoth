@@ -1,0 +1,19 @@
+# Thoth · Developed by Shayan Azmi
+cff-version: 1.2.0
+message: "If you use Thoth in your work, please cite it as below."
+title: "Thoth: a research companion"
+abstract: "An open-source research companion that helps people discover which questions are worth asking, understand what existing scholarship establishes, and investigate what might meaningfully add to that knowledge."
+type: software
+authors:
+  - given-names: Shayan
+    family-names: Azmi
+repository-code: "https://github.com/shayanazmi/Thoth"
+license: MIT
+version: 1.0.0
+date-released: 2026-11-02
+keywords:
+  - research
+  - literature review
+  - PRISMA
+  - hypothesis
+  - open source

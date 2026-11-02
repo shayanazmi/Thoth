@@ -1,0 +1,160 @@
+# Thoth · Developed by Shayan Azmi
+"""
+Scenario-suite shared fixtures and helpers.
+
+- ``client``: the app booted on an isolated SQLite db per test, provider keys blank (honest fail-open).
+- ``read_sse`` / ``kinds``: parse an /api/chat-style SSE stream into ``{event, payload}`` dicts.
+- Live scholarly fetchers and every model are stubbed so the gate never touches the network
+  (opt out with ``@pytest.mark.live_scholarly`` / ``@pytest.mark.live_llm``).
+"""
+from __future__ import annotations
+
+import importlib
+import json
+import sys
+import time
+
+import pytest
+from fastapi.testclient import TestClient
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    """Boot the app against an isolated SQLite db and empty env."""
+    monkeypatch.setenv("THOTH_DB_PATH", str(tmp_path / "scenario.db"))
+    for k in ("NVIDIA_API_KEY", "GROQ_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.setenv(k, "")
+    # Modules that cache the DB path at import time are reloaded so each test lands on its own tmp_path.
+    for mod_name in ("backend.memory.db",
+                     "backend.conversation.idea", "backend.core.config", "backend.main"):
+        if mod_name in sys.modules:
+            importlib.reload(sys.modules[mod_name])
+    import backend.core.config as cfg
+    cfg.get_settings.cache_clear()  # type: ignore[attr-defined]
+    import backend.main as bm
+    importlib.reload(bm)
+    with TestClient(bm.app) as c:
+        yield c
+
+
+def read_sse(resp, *, max_events: int = 60, max_seconds: float = 20.0):
+    """Parse SSE line by line into a list of {event, payload} dicts; stop on 'complete'."""
+    events = []
+    start = time.time()
+    for raw in resp.iter_lines():
+        if raw.startswith("data: "):
+            try:
+                events.append(json.loads(raw[6:]))
+            except Exception:
+                pass
+        if len(events) >= max_events or (time.time() - start) > max_seconds:
+            break
+        if events and events[-1].get("event") == "complete":
+            break
+    return events
+
+
+def kinds(events):
+    return [e.get("event") for e in events]
+
+# Provider keys and hosted-service URLs are blanked in the repo-root conftest.py,
+# which pytest loads before importing the backend package (see the note there).
+
+
+@pytest.fixture(autouse=True)
+def _neutralize_scholarly(request, monkeypatch):
+    """Stub all live scholarly fetchers to empty lists in the scenario suite.
+
+    Opt out by marking a test with ``@pytest.mark.live_scholarly``.
+    """
+    if request.node.get_closest_marker("live_scholarly"):
+        return
+
+    try:
+        import backend.scholarly as sch
+    except Exception:
+        return
+
+    async def _async_empty(*a, **kw):
+        return []
+
+    def _sync_empty(*a, **kw):
+        return []
+
+    # Cover both the public and the raw fetcher names.
+    for name in (
+        "search_semantic_scholar",
+        "search_openalex",
+        "search_europepmc",
+        "_fetch_semantic_scholar_raw",  # the systematic review's third database (backend/research/review.py)
+    ):
+        fn = getattr(sch, name, None)
+        if fn is None:
+            continue
+        import inspect
+        stub = _async_empty if inspect.iscoroutinefunction(fn) else _sync_empty
+        monkeypatch.setattr(sch, name, stub, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_citations(request, monkeypatch):
+    """Citation following (backend/research/citations.py) never reaches OpenAlex or Semantic Scholar in the
+    scenario suite: by default it answers "looked, found nothing". Tests that drive it with a fake client opt out
+    with ``@pytest.mark.citations_unstubbed``; tests that need neighbours monkeypatch backward/forward."""
+    if request.node.get_closest_marker("citations_unstubbed"):
+        return
+    from backend.research import citations
+
+    async def _none(client, meta, limit, query=""):
+        return [], {"provider": "OpenAlex", "requested": limit, "returned": 0, "removed_offtopic": 0, "total_available": 0, "error": None}
+
+    monkeypatch.setattr(citations, "backward", _none)
+    monkeypatch.setattr(citations, "forward", _none)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_semantic_scholar(request, monkeypatch):
+    """Semantic Scholar calls made through backend/research/librarian.py (bulk search, references, citations) answer
+    "no data" in the scenario suite. Tests that drive them stub librarian._s2_raw themselves."""
+    if request.node.get_closest_marker("citations_unstubbed"):
+        return
+    from backend.research import librarian
+
+    async def _empty(path, params, keyed=True):
+        return {"total": 0, "data": []}
+
+    monkeypatch.setattr(librarian, "_s2_raw", _empty)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_conductor_model(request, monkeypatch):
+    """The conductor (docs/FEATURES.md §1) never calls a real model in the scenario
+    suite. By default it behaves as if no provider is reachable (degraded reply);
+    tests that need behaviour install a scripted fake. Opt out with
+    ``@pytest.mark.live_llm``."""
+    if request.node.get_closest_marker("live_llm"):
+        return
+    # Blank provider keys BEFORE the import below: importing the conductor imports
+    # backend.agents, whose load_dotenv() would otherwise pull real keys from .env
+    # and make the scenarios call live models.
+    for k in ("NVIDIA_API_KEY", "GROQ_API_KEY", "OPENAI_API_KEY", "TAVILY_API_KEY"):
+        monkeypatch.setenv(k, "")
+    try:
+        import backend.conversation.conductor as cd
+    except Exception:
+        return
+
+    def _unavailable():
+        raise RuntimeError("no model in scenario tests")
+
+    monkeypatch.setattr(cd, "_llm", _unavailable, raising=False)
+    try:
+        import backend.thinkers.modes as tm
+        monkeypatch.setattr(tm, "_llm", lambda role: _unavailable(), raising=False)
+    except Exception:
+        pass
+    try:
+        import backend.research.llm as rl
+        monkeypatch.setattr(rl, "_llm", lambda role: _unavailable(), raising=False)
+    except Exception:
+        pass

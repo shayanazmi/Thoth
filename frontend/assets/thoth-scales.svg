@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 400">
+  <!-- Thoth · the scales: a hunch weighed against what is known · Developed by Shayan Azmi -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#1e1a12"/><stop offset="1" stop-color="#0a0907"/>
+    </radialGradient>
+    <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="60" y1="40" x2="420" y2="360">
+      <stop offset="0" stop-color="#f3d58a"/><stop offset=".45" stop-color="#c99a3a"/><stop offset="1" stop-color="#8a6420"/>
+    </linearGradient>
+    <mask id="moon"><rect width="480" height="400" fill="#fff"/><circle cx="248" cy="52" r="15" fill="#000"/></mask>
+  </defs>
+  <rect width="480" height="400" fill="url(#bg)"/>
+  <circle cx="240" cy="190" r="150" fill="#d4a64a" opacity=".06"/>
+  <g fill="none" stroke="url(#gold)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- pillar and base -->
+    <path d="M240 78 V330" stroke-width="7"/>
+    <path d="M170 344 H310" stroke-width="9"/>
+    <path d="M200 330 H280" stroke-width="6"/>
+    <!-- beam, tilted: the evidence weighs more than the hunch -->
+    <path d="M110 104 L370 128" stroke-width="6"/>
+    <circle cx="240" cy="116" r="7" fill="#0a0907" stroke-width="4"/>
+    <!-- left pan (the hunch, lighter, higher) -->
+    <path d="M110 104 L80 196 M110 104 L140 196" stroke-width="2" opacity=".85"/>
+    <path d="M66 196 Q110 234 154 196 Z" stroke-width="4" fill="#15120c"/>
+    <!-- right pan (what is known, heavier, lower) -->
+    <path d="M370 128 L340 220 M370 128 L400 220" stroke-width="2" opacity=".85"/>
+    <path d="M326 220 Q370 258 414 220 Z" stroke-width="4" fill="#15120c"/>
+  </g>
+  <!-- a feather on the left pan, papers on the right -->
+  <path d="M96 192 C102 170 122 160 132 156 C126 168 118 182 104 194 Z" fill="url(#gold)" opacity=".9"/>
+  <g fill="url(#gold)" opacity=".85">
+    <rect x="348" y="206" width="44" height="6" rx="1"/><rect x="352" y="198" width="38" height="6" rx="1"/><rect x="346" y="190" width="42" height="6" rx="1"/>
+  </g>
+  <!-- the ink-moon on top of the pillar -->
+  <circle cx="240" cy="58" r="20" fill="url(#gold)" mask="url(#moon)"/>
+  <path d="M253 78 C253 78 249.5 83 249.5 85.5 a3.5 3.5 0 0 0 7 0 C256.5 83 253 78 253 78Z" fill="url(#gold)"/>
+</svg>

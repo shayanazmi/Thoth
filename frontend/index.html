@@ -1,0 +1,82 @@
+<!doctype html>
+<!-- Thoth, a research companion · Developed by Shayan Azmi -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Thoth</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <meta name="author" content="Shayan Azmi">
+  <meta name="description" content="A research companion that helps you find the questions worth asking, and records honestly what the evidence shows.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/styles/tokens.css?v=30">
+  <link rel="stylesheet" href="/styles/app.css?v=33">
+  <link rel="stylesheet" href="/styles/folio.css?v=30">
+  <link rel="stylesheet" href="/styles/motion.css?v=2">
+  <script>
+    // The backend serves this page, so the API is same-origin. Set THOTH_API_BASE only to point the UI elsewhere.
+    window.THOTH_API_BASE = window.THOTH_API_BASE || '';
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+</head>
+<body>
+  <div class="app" id="app" data-view="home">
+    <aside class="sidebar" id="sidebar" aria-label="Projects"></aside>
+
+    <main class="main" id="main">
+      <header class="topbar" id="topbar">
+        <button class="icon-btn only-narrow" id="sidebarToggle" aria-label="Show projects">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+        </button>
+        <nav class="journey" id="journey" aria-label="Research journey"></nav>
+        <div class="topbar-spacer only-narrow"></div>
+        <button class="icon-btn" id="themeToggle" aria-label="Switch light or dark theme" title="Light / dark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
+        </button>
+        <div class="layout-seg" id="layoutSeg" role="group" aria-label="Layout">
+          <button data-layout="chat" aria-pressed="false" title="Conversation only">Chat</button>
+          <button data-layout="split" aria-pressed="true" title="Conversation and research file side by side">Split</button>
+          <button data-layout="file" aria-pressed="false" title="Give the research file most of the screen">File</button>
+        </div>
+        <button class="icon-btn" id="workspaceToggle" aria-label="Show or hide the workspace" title="Workspace" aria-pressed="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg>
+        </button>
+      </header>
+
+      <section class="home" id="home" aria-label="Start"></section>
+
+      <section class="conversation" id="conversation" aria-label="Conversation">
+        <div class="hypothesis-slot" id="hypothesisCard"></div>
+        <div class="thinker-banner" id="thinkerBanner" hidden></div>
+        <div class="messages" id="messages" aria-live="polite"></div>
+        <div class="composer-wrap">
+          <form class="composer" id="composer" autocomplete="off">
+            <div class="slash-menu" id="slashMenu" role="listbox" hidden></div>
+            <textarea id="input" rows="1" placeholder="Think out loud… or type / for actions" aria-label="Message"></textarea>
+            <button type="submit" class="send-btn" id="sendBtn" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+            </button>
+          </form>
+          <div class="composer-hint">Type <b>/</b> for thinkers, checks and reviews · nothing costly runs without your approval</div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="workspace" id="workspace" aria-label="Workspace"></aside>
+
+    <nav class="bottombar" id="bottombar" aria-label="Sections">
+      <button data-mobile="chat" class="active">Chat</button>
+      <button data-mobile="hypothesis">Hypothesis</button>
+      <button data-mobile="workspace">Workspace</button>
+    </nav>
+  </div>
+
+  <div class="room" id="room" hidden></div>
+  <div class="intro" id="intro" hidden></div>
+
+  <script type="module" src="/js/main.js?v=43"></script>
+</body>
+</html>

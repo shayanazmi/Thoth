@@ -1,0 +1,65 @@
+[
+  {
+    "id": "nurses",
+    "icon": "☾",
+    "color": "#d4a64a",
+    "field": "Health · human factors",
+    "title": "Night-shift nurses and medication errors",
+    "hunch": "Why do night-shift nurses seem to make more medication errors near the end of a shift?",
+    "followup": "I keep noticing it's the last two hours of a twelve-hour night. Maybe it's fatigue stacking up with the pressure of handover?",
+    "aside": "While that runs: is circadian low the same thing as sleep debt?",
+    "hypothesis": "Among nurses working 12-hour night shifts, medication administration errors are more frequent in the final two hours of the shift than in earlier hours, partly because accumulated fatigue coincides with handover workload.",
+    "refined": "In nurses on 12-hour night shifts, medication administration error rates are higher in the final two hours than in the first ten, and this difference is partly explained by self-reported fatigue.",
+    "resources": {
+      "time": "4 months, part-time",
+      "population_access": "Nurses at one teaching hospital, about 60 on night rota",
+      "budget": "None",
+      "skills": "Basic statistics in R; no qualitative training",
+      "ethics_route": "University student ethics committee",
+      "tools": "Online survey software; hospital incident reports with permission"
+    },
+    "outcome": "Ruled: insufficient evidence · review included 0 of 26 · draft provisional"
+  },
+  {
+    "id": "cities",
+    "icon": "◐",
+    "color": "#7d9ff0",
+    "field": "Perception · urban studies",
+    "title": "Why cities feel faster at night",
+    "hunch": "Why do cities feel faster at night, even when there's less traffic?",
+    "followup": "Maybe it's the lights: fewer reference points, so motion feels quicker?",
+    "aside": "Quick one while that runs: does darkness change how we judge distance?",
+    "hypothesis": "Pedestrians walking at night overestimate the speed of passing vehicles compared with the same vehicles in daylight, because reduced peripheral reference points distort speed perception.",
+    "refined": "Pedestrians overestimate passing vehicle speed more at night than in daylight, and the difference shrinks when peripheral lighting adds visual reference points.",
+    "resources": {
+      "time": "3 months",
+      "population_access": "University students, ~100 volunteers",
+      "budget": "£300",
+      "skills": "Basic experimental psychology methods",
+      "ethics_route": "Department ethics review",
+      "tools": "Laptop-based video stimuli; survey software"
+    },
+    "outcome": ""
+  },
+  {
+    "id": "trust",
+    "icon": "◆",
+    "color": "#e0684b",
+    "field": "Psychology · epistemics",
+    "title": "Trusting confident wrong answers",
+    "hunch": "Why do people trust a confident wrong answer over a hesitant right one?",
+    "followup": "It feels like confidence works as a shortcut for competence, especially when people can't check.",
+    "aside": "While that runs: is this the same as the Dunning-Kruger effect?",
+    "hypothesis": "When listeners cannot verify an answer, they rate a confidently delivered incorrect answer as more credible than a hesitantly delivered correct one.",
+    "refined": "When listeners cannot verify an answer, delivery confidence increases its rated credibility more than its correctness does.",
+    "resources": {
+      "time": "3 months",
+      "population_access": "Online participants via a panel, ~200",
+      "budget": "£400",
+      "skills": "Survey design, basic statistics",
+      "ethics_route": "University ethics committee",
+      "tools": "Online survey and audio stimuli"
+    },
+    "outcome": ""
+  }
+]

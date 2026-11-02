@@ -1,0 +1,252 @@
+# Thoth · Developed by Shayan Azmi
+"""Conversation core storage (docs/FEATURES.md §1, §2).
+
+Turns, rolling summaries, conductor proposals/offers and versioned notebook
+sections. The DB path is resolved at call time from ``backend.memory.db`` so
+scenario fixtures that reload that module land on their own tmp database.
+"""
+from __future__ import annotations
+
+import json
+import time
+import uuid
+from typing import Any, Dict, List, Optional
+
+from backend.memory import db as _db
+
+
+def _conn():
+    path = _db.DEFAULT_DB_PATH
+    _db.init_db(path)
+    return _db.get_connection(path)
+
+
+def _id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+# ---------------------------------------------------------------- turns
+
+def add_turn(thread_id: str, role: str, content: str, meta: Optional[Dict[str, Any]] = None) -> str:
+    turn_id = _id("turn")
+    conn = _conn()
+    with conn:
+        conn.execute(
+            "INSERT INTO conversation_turns (turn_id, thread_id, role, content, meta_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (turn_id, thread_id, role, content, json.dumps(meta or {}), time.time()),
+        )
+    return turn_id
+
+
+def recent_turns(thread_id: str, limit: int = 12) -> List[Dict[str, Any]]:
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT role, content, meta_json, created_at FROM conversation_turns WHERE thread_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?",
+        (thread_id, limit),
+    ).fetchall()
+    return [{"role": r[0], "content": r[1], "meta": json.loads(r[2] or "{}"), "created_at": r[3]} for r in reversed(rows)]
+
+
+def count_turns(thread_id: str) -> int:
+    conn = _conn()
+    return conn.execute("SELECT COUNT(*) FROM conversation_turns WHERE thread_id = ?", (thread_id,)).fetchone()[0]
+
+
+def search_turns(thread_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    words = [w for w in query.lower().split() if len(w) > 3][:5] or [query.lower()]
+    conn = _conn()
+    clause = " OR ".join("LOWER(content) LIKE ?" for _ in words)
+    rows = conn.execute(
+        f"SELECT role, content FROM conversation_turns WHERE thread_id = ? AND ({clause}) ORDER BY created_at DESC LIMIT ?",
+        (thread_id, *[f"%{w}%" for w in words], limit),
+    ).fetchall()
+    return [{"role": r[0], "content": r[1][:400]} for r in rows]
+
+
+# ---------------------------------------------------------------- summaries
+
+def get_summary(thread_id: str) -> Dict[str, Any]:
+    conn = _conn()
+    row = conn.execute("SELECT summary, turns_covered FROM thread_summaries WHERE thread_id = ?", (thread_id,)).fetchone()
+    return {"summary": row[0], "turns_covered": row[1]} if row else {"summary": "", "turns_covered": 0}
+
+
+def set_summary(thread_id: str, summary: str, turns_covered: int) -> None:
+    conn = _conn()
+    with conn:
+        conn.execute(
+            "INSERT INTO thread_summaries (thread_id, summary, turns_covered, updated_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(thread_id) DO UPDATE SET summary = excluded.summary, turns_covered = excluded.turns_covered, updated_at = excluded.updated_at",
+            (thread_id, summary, turns_covered, time.time()),
+        )
+
+
+# ---------------------------------------------------------------- proposals and offers
+
+def add_proposal(thread_id: str, kind: str, payload: Dict[str, Any]) -> str:
+    proposal_id = _id("prop")
+    conn = _conn()
+    with conn:
+        conn.execute(
+            "INSERT INTO conductor_proposals (proposal_id, thread_id, kind, payload_json, status, created_at) VALUES (?, ?, ?, ?, 'open', ?)",
+            (proposal_id, thread_id, kind, json.dumps(payload), time.time()),
+        )
+    return proposal_id
+
+
+def open_proposals(thread_id: str) -> List[Dict[str, Any]]:
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT proposal_id, kind, payload_json, created_at FROM conductor_proposals WHERE thread_id = ? AND status = 'open' ORDER BY created_at",
+        (thread_id,),
+    ).fetchall()
+    return [{"proposal_id": r[0], "kind": r[1], "payload": json.loads(r[2]), "created_at": r[3]} for r in rows]
+
+
+def recent_proposals(thread_id: str, kind: str, limit: int = 5) -> List[Dict[str, Any]]:
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT proposal_id, payload_json, status, created_at FROM conductor_proposals WHERE thread_id = ? AND kind = ? ORDER BY created_at DESC LIMIT ?",
+        (thread_id, kind, limit),
+    ).fetchall()
+    return [{"proposal_id": r[0], "payload": json.loads(r[1]), "status": r[2], "created_at": r[3]} for r in rows]
+
+
+def get_proposal(proposal_id: str) -> Optional[Dict[str, Any]]:
+    conn = _conn()
+    r = conn.execute(
+        "SELECT proposal_id, thread_id, kind, payload_json, status FROM conductor_proposals WHERE proposal_id = ?",
+        (proposal_id,),
+    ).fetchone()
+    return {"proposal_id": r[0], "thread_id": r[1], "kind": r[2], "payload": json.loads(r[3]), "status": r[4]} if r else None
+
+
+def resolve_proposal(proposal_id: str, status: str) -> None:
+    conn = _conn()
+    with conn:
+        conn.execute(
+            "UPDATE conductor_proposals SET status = ?, resolved_at = ? WHERE proposal_id = ?",
+            (status, time.time(), proposal_id),
+        )
+
+
+# ---------------------------------------------------------------- notebook
+
+def write_section(thread_id: str, kind: str, content: str, author: str, rationale: Optional[Dict[str, Any]] = None) -> int:
+    """Append a version. `rationale` (backend/memory/rationale.py) says why; it is stored with the version, write-once."""
+    from backend.memory.rationale import clean
+    conn = _conn()
+    with conn:
+        row = conn.execute(
+            "SELECT COALESCE(MAX(version), 0) FROM notebook_sections WHERE thread_id = ? AND kind = ?",
+            (thread_id, kind),
+        ).fetchone()
+        version = (row[0] or 0) + 1
+        why = clean(rationale)
+        why["previous_version"] = version - 1 if version > 1 else None
+        conn.execute(
+            "INSERT INTO notebook_sections (section_id, thread_id, kind, version, content, author, created_at, rationale_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (_id("sec"), thread_id, kind, version, content, author, time.time(), json.dumps(why)),
+        )
+    return version
+
+
+def notebook_snapshot(thread_id: str) -> Dict[str, Dict[str, Any]]:
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT kind, content, version, author, rationale_json FROM notebook_sections s WHERE thread_id = ? AND version = "
+        "(SELECT MAX(version) FROM notebook_sections WHERE thread_id = s.thread_id AND kind = s.kind)",
+        (thread_id,),
+    ).fetchall()
+    return {r[0]: {"content": r[1], "version": r[2], "author": r[3], "rationale": _why(r[4])} for r in rows}
+
+
+def _why(raw: Optional[str]) -> Dict[str, Any]:
+    try:
+        return json.loads(raw or "{}") or {}
+    except ValueError:
+        return {}
+
+
+# ---------------------------------------------------------------- thinker memory
+
+def get_thinker_memory(thread_id: str, thinker_id: str) -> Dict[str, Any]:
+    conn = _conn()
+    row = conn.execute(
+        "SELECT stance, changes FROM thinker_memory WHERE thread_id = ? AND thinker_id = ?",
+        (thread_id, thinker_id),
+    ).fetchone()
+    return {"stance": row[0], "changes": row[1]} if row else {"stance": "", "changes": 0}
+
+
+def set_thinker_memory(thread_id: str, thinker_id: str, stance: str, changed: bool) -> None:
+    conn = _conn()
+    with conn:
+        conn.execute(
+            "INSERT INTO thinker_memory (thread_id, thinker_id, stance, changes, updated_at) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(thread_id, thinker_id) DO UPDATE SET stance = excluded.stance, "
+            "changes = thinker_memory.changes + ?, updated_at = excluded.updated_at",
+            (thread_id, thinker_id, stance, int(changed), time.time(), int(changed)),
+        )
+
+
+def section_history(thread_id: str, kind: str) -> List[Dict[str, Any]]:
+    """Every version of one notebook section, oldest first."""
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT content, version, author, created_at, rationale_json FROM notebook_sections WHERE thread_id = ? AND kind = ? ORDER BY version",
+        (thread_id, kind),
+    ).fetchall()
+    return [{"content": r[0], "version": r[1], "author": r[2], "created_at": r[3], "rationale": _why(r[4])} for r in rows]
+
+
+# ---------------------------------------------------------------- what the thinkers said (for the conductor)
+
+def _room_prefix(thread_id: str) -> str:
+    return f"{thread_id}::room::"
+
+
+def thinker_memories(thread_id: str) -> List[Dict[str, Any]]:
+    """Every thinker's remembered stance on this project (thinker_memory), most recently updated first."""
+    rows = _conn().execute(
+        "SELECT thinker_id, stance, changes FROM thinker_memory WHERE thread_id = ? AND stance != '' ORDER BY updated_at DESC",
+        (thread_id,),
+    ).fetchall()
+    return [{"thinker_id": r[0], "stance": r[1], "changes": r[2]} for r in rows]
+
+
+def room_threads(thread_id: str) -> List[str]:
+    """The project's one-to-one thinker rooms (thread ids "<project>::room::<thinker>") that have turns."""
+    p = _room_prefix(thread_id)
+    rows = _conn().execute(
+        "SELECT thread_id, MAX(created_at) FROM conversation_turns WHERE substr(thread_id, 1, ?) = ? GROUP BY thread_id ORDER BY 2 DESC",
+        (len(p), p),
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
+def search_project_turns(thread_id: str, query: str, limit: int = 6) -> List[Dict[str, Any]]:
+    """Like search_turns, across the main conversation AND the thinker rooms, saying who spoke and where."""
+    words = [w for w in query.lower().split() if len(w) > 3][:5] or [query.lower()]
+    p = _room_prefix(thread_id)
+    clause = " OR ".join("LOWER(content) LIKE ?" for _ in words)
+    rows = _conn().execute(
+        f"SELECT thread_id, role, content, meta_json FROM conversation_turns WHERE (thread_id = ? OR substr(thread_id, 1, ?) = ?) "
+        f"AND ({clause}) ORDER BY created_at DESC LIMIT ?",
+        (thread_id, len(p), p, *[f"%{w}%" for w in words], limit),
+    ).fetchall()
+    out = []
+    for tid, role, content, meta_json in rows:
+        meta = json.loads(meta_json or "{}")
+        who = meta.get("thinker_name") if role == "thinker" else ("the researcher" if role == "user" else "Thoth")
+        room = tid[len(p):] if tid.startswith(p) else ""
+        where = "the main conversation"
+        if room:
+            name = meta.get("thinker_name") or room
+            if role != "thinker":
+                name = next((t["meta"].get("thinker_name") for t in recent_turns(tid, 20) if t["meta"].get("thinker_name")), room)
+            where = f"one-to-one with {name}"
+        # A thinker's words come back whole (up to 1500 characters) so they can be quoted exactly.
+        out.append({"who": who or "a thinker", "where": where, "content": content[:1500 if role == "thinker" else 400]})
+    return out

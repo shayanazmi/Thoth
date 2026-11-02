@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="132" height="132">
+  <!-- Thoth · the ink-moon mark · Developed by Shayan Azmi -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f3d58a"/><stop offset=".45" stop-color="#c99a3a"/><stop offset="1" stop-color="#8a6420"/>
+    </linearGradient>
+    <mask id="c"><rect width="64" height="64" fill="#fff"/><circle cx="39" cy="24" r="19" fill="#000"/></mask>
+  </defs>
+  <circle cx="30" cy="30" r="22" fill="url(#g)" mask="url(#c)"/>
+  <path fill="url(#g)" d="M45 47 C45 47 40.5 53 40.5 56 a4.5 4.5 0 0 0 9 0 C49.5 53 45 47 45 47Z"/>
+</svg>

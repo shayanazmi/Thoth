@@ -1,0 +1,2 @@
+# Thoth · Developed by Shayan Azmi
+-r backend/requirements.txt

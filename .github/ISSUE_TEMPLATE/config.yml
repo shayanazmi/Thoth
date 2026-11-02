@@ -1,0 +1,6 @@
+# Thoth · Developed by Shayan Azmi
+blank_issues_enabled: true
+contact_links:
+  - name: Security issue
+    url: https://github.com/shayanazmi/Thoth/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.
