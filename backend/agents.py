@@ -158,20 +158,25 @@ _primary_verifier_llm = _nim_client(
 groq_key = os.getenv("GROQ_API_KEY")
 openai_key = os.getenv("OPENAI_API_KEY")
 
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
 if groq_key and len(groq_key) > 10 and not groq_key.startswith("dummy"):
     groq_primary_model = os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-120b")
     groq_verifier_model = os.getenv("GROQ_VERIFIER_MODEL", "openai/gpt-oss-20b")
-    _fallback_llm = ChatOpenAI(model=groq_primary_model, api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.6, timeout=60)
-    _fallback_verifier_llm = ChatOpenAI(model=groq_verifier_model, api_key=groq_key, base_url="https://api.groq.com/openai/v1", temperature=0.1, timeout=30)
+    _fallback_llm = ChatOpenAI(model=groq_primary_model, api_key=groq_key, base_url=GROQ_BASE_URL, temperature=0.6, timeout=60)
+    _fallback_verifier_llm = ChatOpenAI(model=groq_verifier_model, api_key=groq_key, base_url=GROQ_BASE_URL, temperature=0.1, timeout=30)
     _fb_name = f"Groq ({groq_primary_model})"
+    _fb_slot = f"groq:{groq_primary_model}"
 elif openai_key and len(openai_key) > 10 and not openai_key.startswith("sk-dummy") and not openai_key.startswith("dummy"):
     _fallback_llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0.6, timeout=60)
     _fallback_verifier_llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0.1, timeout=30)
     _fb_name = "OpenAI"
+    _fb_slot = "openai:gpt-4o-mini"
 else:
     _fallback_llm = None
     _fallback_verifier_llm = None
     _fb_name = "None"
+    _fb_slot = ""
 
 verifier_llm = FallbackLLMWrapper(primary_llm=_primary_verifier_llm, fallback_llm=_fallback_verifier_llm, primary_name="NVIDIA-Nemotron-30B", fallback_name=_fb_name)
 
@@ -179,7 +184,10 @@ verifier_llm = FallbackLLMWrapper(primary_llm=_primary_verifier_llm, fallback_ll
 # Per-role models (docs/FEATURES.md §9, model map). All free NVIDIA NIM.
 NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
 NIM_ULTRA = "nvidia/nemotron-3-ultra-550b-a55b"
-NIM_FALLBACK = "openai/gpt-oss-20b"
+# gpt-oss-20b on NIM stopped answering (no first token in 180s, observed 2026-11-04); Lightning answers in
+# seconds with its hidden reasoning off.
+NIM_FALLBACK = "nvidia/nemotron-3.5-lightning-30b-a3b"
+NO_THINKING = {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
 ROLE_MODELS: Dict[str, Dict[str, Any]] = {
     "conductor": {"model": NIM_ULTRA, "temperature": 0.5, "max_tokens": 1200, "timeout": 60},
     "thinker": {"model": NIM_ULTRA, "temperature": 0.8, "max_tokens": 900, "timeout": 90},
@@ -209,14 +217,73 @@ ROLE_MODELS: Dict[str, Dict[str, Any]] = {
 }
 
 
-# NIM's free tier answers 429 when ~10 requests arrive at once and the fallback would
-# then silently answer with a different model. Every role call that can fan out takes one of these slots.
+# Thinkers speak through models from different labs, so the council does not share one model's blind spots
+# (docs/FEATURES.md §3, §9). None is an NVIDIA model, so the Ultra judge never grades its own model's thinkers.
+# Chosen from live tests on 2026-11-04; the NIM catalogue changes, so swap a model here if it stops answering.
+_NIM_THINKER = {"base_url": NIM_BASE_URL, "key_env": "NVIDIA_API_KEY", "max_tokens": 3000, "timeout": 120,
+                "max_retries": 3, "extra": {"reasoning_effort": "low"}}  # "low": 30s -> 5s on MiniMax, same voice
+THINKER_MODELS: Dict[str, Dict[str, Any]] = {
+    "minimaxai/minimax-m3.1-flash": _NIM_THINKER,
+    "meta/muse-glimmer-30b": _NIM_THINKER,
+    "stepfun-ai/step-5-preview": _NIM_THINKER,
+    # Groq allows 8K tokens a minute per model and a dossier is ~2K, so at most two thinkers per Groq model.
+    # Extra retries: the client waits out Groq's retry-after on a 429.
+    "openai/gpt-oss-120b": {"base_url": GROQ_BASE_URL, "key_env": "GROQ_API_KEY", "max_tokens": 1500, "timeout": 60,
+                            "max_retries": 4, "extra": {}},
+    "qwen/qwen3.8-27b": {"base_url": GROQ_BASE_URL, "key_env": "GROQ_API_KEY", "max_tokens": 900, "timeout": 60,
+                         "max_retries": 4, "extra": {}},
+}
+# Thinkers who argue with each other are on different models (Popper/Kuhn, Popper/Hume, and the default
+# review trio Popper + Hume + a domain voice).
+THINKER_ASSIGNMENT: Dict[str, str] = {
+    "popper": "minimaxai/minimax-m3.1-flash", "aristotle": "minimaxai/minimax-m3.1-flash", "simon": "minimaxai/minimax-m3.1-flash",
+    "hume": "meta/muse-glimmer-30b", "kuhn": "meta/muse-glimmer-30b", "ibn_al_haytham": "meta/muse-glimmer-30b",
+    "nightingale": "openai/gpt-oss-120b", "weber": "openai/gpt-oss-120b",
+    "darwin": "qwen/qwen3.8-27b", "ostrom": "qwen/qwen3.8-27b",
+}
+# From a lab no thinker uses, so a fallback never makes two thinkers share a mind.
+THINKER_SPARE = "stepfun-ai/step-5-preview"
+
+
+# NIM's free tier answers 429 to bursts, on one model and across the account, and the fallback would then
+# answer with a different model. Each call holds a slot for the model actually answering, so a council on
+# Groq never queues behind a trial on NIM.
+import contextlib as _contextlib
 import threading as _threading
-MODEL_SLOTS = _threading.BoundedSemaphore(4)
+NIM_SLOTS = _threading.BoundedSemaphore(8)
+_model_slots: Dict[str, _threading.BoundedSemaphore] = {}
+_model_slots_lock = _threading.Lock()
+
+
+def model_slot(slot_key: str) -> _threading.BoundedSemaphore:
+    with _model_slots_lock:
+        return _model_slots.setdefault(slot_key, _threading.BoundedSemaphore(4))
+
+
+class _Slotted(Runnable):
+    """A client that takes its model's slot (and the NIM-wide one) for the length of each call."""
+
+    def __init__(self, llm: Any, slot_key: str, nim: bool):
+        super().__init__()
+        self.llm, self.slot_key, self.nim = llm, slot_key, nim
+
+    def invoke(self, input: Any, config: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
+        with _contextlib.ExitStack() as held:
+            if self.nim:
+                held.enter_context(NIM_SLOTS)  # always before the model slot, so no two calls wait on each other
+            held.enter_context(model_slot(self.slot_key))
+            return self.llm.invoke(input, config=config, **kwargs)
+
+    def bind_tools(self, tools: Any, **kwargs: Any) -> "_Slotted":
+        return _Slotted(self.llm.bind_tools(tools, **kwargs), self.slot_key, self.nim)
+
+
+def _nim_llm(model: str, key: str, **kwargs: Any) -> _Slotted:
+    return _Slotted(ChatOpenAI(model=model, api_key=key, base_url=NIM_BASE_URL, **kwargs), model, nim=True)
 
 
 def get_role_llm(role: str, allow_fallback: bool = True) -> FallbackLLMWrapper:
-    """Build the LLM for one agent role: Ultra → gpt-oss-20b (both NIM) → the configured
+    """Build the LLM for one agent role: Ultra → Lightning (both NIM) → the configured
     Groq/OpenAI fallback. Keys are read at call time so tests with empty env fail open.
     allow_fallback=False gives the primary model only (evaluations must not be answered by another model)."""
     cfg = ROLE_MODELS[role]
@@ -224,25 +291,53 @@ def get_role_llm(role: str, allow_fallback: bool = True) -> FallbackLLMWrapper:
     # Two retries with the client's backoff before falling back: a 429 is usually a passing rate limit,
     # and the fallback model is weaker.
     common = {"temperature": cfg["temperature"], "max_tokens": cfg["max_tokens"], "timeout": cfg["timeout"], "max_retries": 2}
+    primary_extra = {} if cfg.get("thinking", True) else NO_THINKING
     if not allow_fallback:
         common["max_retries"] = 6
-        extra = {} if cfg.get("thinking", True) else {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
-        return FallbackLLMWrapper(ChatOpenAI(model=cfg["model"], api_key=key, base_url=NIM_BASE_URL, **common, **extra), None,
+        return FallbackLLMWrapper(_nim_llm(cfg["model"], key, **common, **primary_extra), None,
                                   primary_name=f"NIM {cfg['model']}")
-    tail = _fallback_llm
+    tail = _Slotted(_fallback_llm, _fb_slot, nim=False) if _fallback_llm is not None else None
     if key:
         backup = FallbackLLMWrapper(
-            ChatOpenAI(model=NIM_FALLBACK, api_key=key, base_url=NIM_BASE_URL, **common),
+            _nim_llm(NIM_FALLBACK, key, **common, **NO_THINKING),
             tail, primary_name=f"NIM {NIM_FALLBACK}", fallback_name=_fb_name,
         )
-        primary_extra = {} if cfg.get("thinking", True) else {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
         return FallbackLLMWrapper(
-            ChatOpenAI(model=cfg["model"], api_key=key, base_url=NIM_BASE_URL, **common, **primary_extra),
+            _nim_llm(cfg["model"], key, **common, **primary_extra),
             backup, primary_name=f"NIM {cfg['model']}", fallback_name=f"NIM {NIM_FALLBACK}",
         )
     if tail is None:
         raise RuntimeError("No LLM provider configured (NVIDIA_API_KEY is empty and no fallback key)")
     return FallbackLLMWrapper(tail, None, primary_name=_fb_name)
+
+
+def _thinker_client(model: str) -> Optional[_Slotted]:
+    cfg = THINKER_MODELS[model]
+    key = os.getenv(cfg["key_env"]) or ""
+    if not key:
+        return None
+    nim = cfg["base_url"] == NIM_BASE_URL
+    llm = ChatOpenAI(model=model, api_key=key, base_url=cfg["base_url"], temperature=0.8, max_tokens=cfg["max_tokens"],
+                     timeout=cfg["timeout"], max_retries=cfg["max_retries"], **cfg["extra"])
+    return _Slotted(llm, model if nim else f"groq:{model}", nim)
+
+
+_thinkers_on_default: set = set()
+
+
+def get_thinker_llm(thinker_id: str) -> FallbackLLMWrapper:
+    """The model one thinker speaks through, with the spare behind it. Without the provider's key the
+    thinker speaks through the shared "thinker" role model instead (logged once)."""
+    model = THINKER_ASSIGNMENT.get(thinker_id, "")
+    own = _thinker_client(model) if model else None
+    if own is None:
+        if thinker_id not in _thinkers_on_default:
+            _thinkers_on_default.add(thinker_id)
+            logger.warning("[LLM setup] %s has no reachable model of their own (%s); using the shared thinker model",
+                           thinker_id, model or "unassigned")
+        return get_role_llm("thinker")
+    spare = _thinker_client(THINKER_SPARE) if model != THINKER_SPARE else None
+    return FallbackLLMWrapper(own, spare, primary_name=model, fallback_name=f"{THINKER_SPARE} (spare)")
 
 
 summarizer_prompt = ChatPromptTemplate.from_messages([

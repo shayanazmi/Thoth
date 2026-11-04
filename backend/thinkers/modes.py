@@ -17,7 +17,7 @@ from typing import Any, AsyncIterator, Dict, List, Tuple
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from backend.agents import MODEL_SLOTS, get_role_llm, safe_extract_json, sanitize_log_message, strip_chain_of_thought
+from backend.agents import get_role_llm, get_thinker_llm, safe_extract_json, sanitize_log_message, strip_chain_of_thought
 from backend.memory import conversation_store as store
 from backend.thinkers import persona, roster
 
@@ -25,11 +25,15 @@ logger = logging.getLogger("ThothThinkers")
 
 HISTORY_TURNS = 12
 MAX_DEBATERS = 3
-# Concurrent model calls are capped by backend.agents.MODEL_SLOTS (shared with the trial roles).
+# Concurrent model calls are capped per model inside backend.agents (model_slot).
 
 
 def _llm(role: str):
-    """Indirection so scenario tests can stub the model."""
+    """Indirection so scenario tests can stub the model. "thinker:popper" is Popper speaking through
+    his own model (backend.agents.THINKER_ASSIGNMENT)."""
+    base, _, thinker_id = role.partition(":")
+    if base == "thinker" and thinker_id:
+        return get_thinker_llm(thinker_id)
     return get_role_llm(role)
 
 
@@ -38,8 +42,7 @@ async def _invoke(role: str, system: str, human: str) -> str:
     model = _llm(role)
 
     def call():
-        with MODEL_SLOTS:
-            return model.invoke([SystemMessage(content=system), HumanMessage(content=human)])
+        return model.invoke([SystemMessage(content=system), HumanMessage(content=human)])
 
     msg = await loop.run_in_executor(None, call)
     return strip_chain_of_thought(getattr(msg, "content", msg) or "").strip()
@@ -97,7 +100,7 @@ async def reply(thread_id: str, thinker_id: str, message: str, mode: str = "join
         + f"The researcher's latest message:\n{message}"
     )
     try:
-        text = await _invoke("thinker", system, human)
+        text = await _invoke(f"thinker:{thinker_id}", system, human)
     except Exception as exc:
         logger.warning("[thinkers] %s could not respond: %s", thinker_id, sanitize_log_message(str(exc)))
         text = ""
@@ -114,7 +117,7 @@ async def _review_one(thread_id: str, thinker_id: str, artifact: str, text: str)
     system = persona.system_prompt(thinker_id, "review", memory, artifact=artifact)
     out: Dict[str, Any] = {"thinker_id": thinker_id, "thinker_name": _name(thinker_id), "artifact": artifact}
     try:
-        review = await _invoke("thinker", system, f"The {artifact} to assess:\n<untrusted>\n{text}\n</untrusted>")
+        review = await _invoke(f"thinker:{thinker_id}", system, f"The {artifact} to assess:\n<untrusted>\n{text}\n</untrusted>")
     except Exception as exc:
         logger.warning("[thinkers] review by %s failed: %s", thinker_id, sanitize_log_message(str(exc)))
         review = ""
@@ -160,7 +163,7 @@ async def council(thread_id: str, idea: str) -> List[Dict[str, Any]]:
     async def one(tid: str) -> Dict[str, Any]:
         memory = store.get_thinker_memory(thread_id, tid)["stance"]
         try:
-            take = await _invoke("thinker", persona.system_prompt(tid, "council", memory), f"The idea:\n<untrusted>\n{idea}\n</untrusted>")
+            take = await _invoke(f"thinker:{tid}", persona.system_prompt(tid, "council", memory), f"The idea:\n<untrusted>\n{idea}\n</untrusted>")
         except Exception as exc:
             logger.info("[thinkers] council take from %s failed: %s", tid, sanitize_log_message(str(exc)))
             take = ""
@@ -194,7 +197,7 @@ async def debate(thread_id: str, thinker_ids: List[str], question: str, rounds: 
             so_far = persona.transcript(spoken) if spoken else "(Nobody has spoken yet. You open the debate.)"
             human = f"Hypothesis on the table: {hypothesis or '(none stated)'}\n\nThe debate so far:\n<conversation>\n{so_far}\n</conversation>"
             try:
-                text = await _invoke("thinker", system, human)
+                text = await _invoke(f"thinker:{tid}", system, human)
             except Exception as exc:
                 logger.warning("[thinkers] debate turn by %s failed: %s", tid, sanitize_log_message(str(exc)))
                 text = ""

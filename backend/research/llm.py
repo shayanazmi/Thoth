@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from backend.agents import MODEL_SLOTS, get_role_llm, safe_extract_json, strip_chain_of_thought
+from backend.agents import get_role_llm, safe_extract_json, strip_chain_of_thought
 
 SHARED = """You are part of Thoth, a research companion. Shared rules:
 - Never fabricate citations, numbers, quotes, methods, results, screening counts, or access to a source.
@@ -44,8 +44,7 @@ async def call_json(role: str, system: str, human: str, default: Any = None) -> 
     model = _llm(role)
 
     def call():
-        with MODEL_SLOTS:
-            return model.invoke([SystemMessage(content=SHARED + "\n\n" + system), HumanMessage(content=human)])
+        return model.invoke([SystemMessage(content=SHARED + "\n\n" + system), HumanMessage(content=human)])
 
     msg = await loop.run_in_executor(None, call)
     usage = USAGE.get()

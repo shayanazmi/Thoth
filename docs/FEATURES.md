@@ -158,12 +158,27 @@ fatal flaw in the proposal, the design **revises itself**, and you choose again.
 ## 9. Agents and models
 
 Every model call goes through `get_role_llm(role)` in `backend/agents.py`: a per-role model map on free
-**NVIDIA NIM** models (a stronger model for the key roles), with **Groq** and then **OpenAI** as optional
-fallbacks through `FallbackLLMWrapper`. Output from a fallback model is labelled. A process-wide semaphore
-caps concurrent model calls (the free tier rejects bursts). Roles include the conductor, the thinkers, the
-reader, analyst and judge of the trial, the screener of the systematic review, the designer, and the
-writer, verifier and reviewer of the proposal. Chain-of-thought is stripped from replies, and JSON answers
-are parsed defensively.
+**NVIDIA NIM** models (Nemotron 3 Ultra for every role), falling back to Nemotron 3.5 Lightning on NIM, then
+**Groq** (or **OpenAI** without a Groq key), through `FallbackLLMWrapper`. Output from a fallback model is
+labelled. Roles include the conductor, the reader, analyst and judge of the trial, the screener of the
+systematic review, the designer, and the writer, verifier and reviewer of the proposal. Chain-of-thought is
+stripped from replies, and JSON answers are parsed defensively.
+
+**Thinkers speak through models from different labs** (`get_thinker_llm`, `THINKER_ASSIGNMENT`), so the
+council does not share one model's blind spots: MiniMax (Popper, Aristotle, Simon), Meta (Hume, Kuhn,
+Ibn al-Haytham), OpenAI gpt-oss on Groq (Nightingale, Weber) and Qwen on Groq (Darwin, Ostrom). Thinkers who
+argue are on different models, and none is on an NVIDIA model, so the Ultra judge never grades its own
+model's thinkers. A thinker whose model fails speaks through a spare from a lab no other thinker uses
+(StepFun), never another thinker's model. Their memory notes, review envelopes and debate summaries stay on
+Ultra.
+
+**Concurrency** is capped per model (4 calls) and across NIM (8), because the free tier answers 429 to
+bursts. Groq allows 8K tokens a minute per model, so it carries at most two thinkers per model.
+
+Chosen from live tests on 2026-11-04. At that time Nemotron 3 Super's free endpoint was deprecated, Kimi K2.6
+had been removed, and DeepSeek V4.1, GLM 5.3, Mistral Large 4 and gpt-oss-20b on NIM did not answer reliably.
+The NIM model list (`/v1/models`) still names withdrawn models, so check a model with a live call before
+assigning it.
 
 ## 10. The interface
 

@@ -22,6 +22,7 @@ def readiness_probe():
 
 @router.get("/api/status")
 def api_status():
+    from backend import agents
     from backend.dispatcher import default_dispatcher, scholarly_dispatcher, s2_dispatcher
     return {
         "status": "online",
@@ -29,7 +30,10 @@ def api_status():
         "scholarly_breaker_state": scholarly_dispatcher._state,
         "s2_breaker_state": s2_dispatcher._state,
         "primary_provider": "NVIDIA NIM",
-        "primary_model": os.getenv("NVIDIA_PRIMARY_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"),
-        "fallback_provider": "Groq / OpenAI",
+        "primary_model": agents.NIM_ULTRA,
+        "fallback_provider": "NVIDIA NIM, then Groq / OpenAI",
         "fallback_model": os.getenv("GROQ_FALLBACK_MODEL", "openai/gpt-oss-120b"),
+        "fallback_chain": [agents.NIM_ULTRA, agents.NIM_FALLBACK, agents._fb_name],
+        "thinker_models": dict(agents.THINKER_ASSIGNMENT),
+        "thinker_spare": agents.THINKER_SPARE,
     }

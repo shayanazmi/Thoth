@@ -70,7 +70,7 @@ def _tidy(detail: str) -> str:
 IDENT_LIMIT = 25          # kept for importers; identification now pages up to the budget (DEFAULT_BUDGET)
 PAGE = 100                # records per OpenAlex / Europe PMC request (OpenAlex caps a page at 100)
 TA_BATCH = 4              # records per Screener call at title/abstract stage
-TA_WAVE = 3               # Screener calls in flight at once (MODEL_SLOTS caps the whole process at 4)
+TA_WAVE = 3               # Screener calls in flight at once (backend.agents.model_slot caps each model at 4)
 AUDIT_BELOW = 0.7         # Auto mode: decisions below this confidence are queued for the researcher
 FT_TEXT_CHARS = 6000      # focused full text given to the Screener
 CRITERIA = ("population", "exposure", "comparison", "outcomes", "designs", "dates", "languages")

@@ -8,7 +8,7 @@ run()   → only for a planned trial the user approved (claimed atomically, once
 reanalyse() → the researcher edited the sub-claims: every matrix row is redone against them (records stay),
           then the Judge weighs again.
 
-Papers are processed concurrently; model calls are capped by backend.agents.MODEL_SLOTS.
+Papers are processed concurrently; model calls are capped per model by backend.agents.model_slot.
 """
 from __future__ import annotations
 
